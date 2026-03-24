@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
-const DEFAULT_URI = "mongodb://127.0.0.1:27017/tecnitower";
-const DEFAULT_DB_NAME = "tecnitower";
+const DEFAULT_URI = "mongodb+srv://mairacoria1209_db_user:barberiaApp12@barberiaapp.gs7mwz3.mongodb.net/barberiaApp?retryWrites=true&w=majority&appName=barberiaApp";
+const DEFAULT_DB_NAME = "barberApp";
 const DEFAULT_TIMEOUT = 5000;
 
 let mongoReadyPromise;

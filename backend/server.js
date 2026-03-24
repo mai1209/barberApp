@@ -1,4 +1,3 @@
-
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -9,50 +8,35 @@ import barberRoutes from "./routes/barberRoutes.js";
 import appointmentRoutes from "./routes/appointmentRoutes.js";
 import publicRoutes from "./routes/publicRoutes.js";
 
-
-
-//inicio express como nombre app
 const app = express();
 
-//seteo cors
-app.use(cors())
+app.use(cors());
+app.use(express.json());
 
-//transformo en json
-app.use(express.json())
+// Conexión a MongoDB (Intentamos conectar apenas arranca la función)
+connectMongo().catch(err => console.error("Error inicial de Mongo:", err));
 
-//defino puerto en variable y host en variable
-const PORT = Number(process.env.PORT ?? 3002)
-const HOST = process.env.Host ?? '0.0.0.0'
+// Rutas
+app.use('/api/auth', authRoutes);
+app.use('/api/barbers', barberRoutes);
+app.use('/api/appointments', appointmentRoutes);
+app.use('/api/public', publicRoutes);
 
-
-
-//rutas
-
-app.use('/api/auth', authRoutes)
-app.use('/api/barbers', barberRoutes)
-app.use('/api/appointments', appointmentRoutes)
-app.use('/api/public', publicRoutes)
-
-
-//manejadores de errores (AL FINAL)
+// Manejadores de errores
 app.use(notFoundHandler);
 app.use(errorHandler);
 
+/**
+ * EXPLICACIÓN PARA CODEX®:
+ * En Vercel no usamos app.listen(). Vercel "envuelve" esta app y la ejecuta 
+ * cuando llega un request. Por eso exportamos 'app' como default.
+ */
+export default app;
 
-
-
-//FUNCION PARA INICIAR EL SERVIDOR 
-async function startServer() {
-  try {
-    await connectMongo();
-
-    app.listen(PORT, HOST, () => {
-      console.log(`Servidor corriendo en http://${HOST}:${PORT}`);
-    });
-  } catch (err) {
-    console.error("Error iniciando servidor:", err);
-    process.exit(1);
-  }
+// Solo ejecutamos el servidor manualmente si estamos en nuestra compu (Local)
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = Number(process.env.PORT ?? 3002);
+  app.listen(PORT, () => {
+    console.log(`🚀 Servidor local corriendo en http://localhost:${PORT}`);
+  });
 }
-
-startServer();
