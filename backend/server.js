@@ -20,7 +20,7 @@ app.use(async (req, res, next) => {
     await connectMongo();
     next();
   } catch (err) {
-    res.status(500).json({ error: "Error de conexión a la base de datos" });
+    res.status(500).json({ error: "Error de conexión a la DB" });
   }
 });
 // Rutas
