@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const DEFAULT_URI = "mongodb+srv://mairacoria1209_db_user:barberiaApp12@barberiaapp.gs7mwz3.mongodb.net/barberiaApp?retryWrites=true&w=majority&appName=barberiaApp";
 const DEFAULT_DB_NAME = "barberApp";
-const DEFAULT_TIMEOUT = 5000;
+const DEFAULT_TIMEOUT = 15000;
 
 let mongoReadyPromise;
 

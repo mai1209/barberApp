@@ -14,8 +14,15 @@ app.use(cors());
 app.use(express.json());
 
 // Conexión a MongoDB (Intentamos conectar apenas arranca la función)
-connectMongo().catch(err => console.error("Error inicial de Mongo:", err));
-
+// Middleware para asegurar conexión en cada request de Vercel
+app.use(async (req, res, next) => {
+  try {
+    await connectMongo();
+    next();
+  } catch (err) {
+    res.status(500).json({ error: "Error de conexión a la base de datos" });
+  }
+});
 // Rutas
 app.use('/api/auth', authRoutes);
 app.use('/api/barbers', barberRoutes);
