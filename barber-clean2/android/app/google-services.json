@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "856164090518",
+    "project_id": "barberapp-codex",
+    "storage_bucket": "barberapp-codex.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:856164090518:android:c4de00113ef8e27e9b38b7",
+        "android_client_info": {
+          "package_name": "com.barber"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAiy9yCQY28MN2jkbbnYcvxGpAI848lAeo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
