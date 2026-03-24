@@ -33,6 +33,7 @@ app.use(errorHandler);
  */
 export default app;
 
+
 // Solo ejecutamos el servidor manualmente si estamos en nuestra compu (Local)
 if (process.env.NODE_ENV !== 'production') {
   const PORT = Number(process.env.PORT ?? 3002);
