@@ -13,35 +13,38 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Conexión a MongoDB (Intentamos conectar apenas arranca la función)
-// Middleware para asegurar conexión en cada request de Vercel
+// 1. Middleware de Conexión (Asegura que Mongo esté listo antes de cada consulta)
 app.use(async (req, res, next) => {
   try {
     await connectMongo();
     next();
   } catch (err) {
-    res.status(500).json({ error: "Error de conexión a la DB" });
+    res.status(500).json({ error: "Error de conexión a la base de datos" });
   }
 });
-// Rutas
+
+// 2. Ruta de Bienvenida (Para que la URL principal no tire 404)
+app.get('/', (req, res) => {
+  res.status(200).json({
+    message: "🚀 BarberApp Backend Online - Powered by CODEX®",
+    status: "Ready",
+    database: "Connected"
+  });
+});
+
+// 3. Rutas de la API
 app.use('/api/auth', authRoutes);
 app.use('/api/barbers', barberRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/public', publicRoutes);
 
-// Manejadores de errores
+// 4. Manejo de Errores (Siempre al final)
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-/**
- * EXPLICACIÓN PARA CODEX®:
- * En Vercel no usamos app.listen(). Vercel "envuelve" esta app y la ejecuta 
- * cuando llega un request. Por eso exportamos 'app' como default.
- */
 export default app;
 
-
-// Solo ejecutamos el servidor manualmente si estamos en nuestra compu (Local)
+// Solo para desarrollo local
 if (process.env.NODE_ENV !== 'production') {
   const PORT = Number(process.env.PORT ?? 3002);
   app.listen(PORT, () => {

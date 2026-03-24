@@ -1,47 +1,33 @@
 import mongoose from "mongoose";
 
-const DEFAULT_URI ="mongodb+srv://mairacoria1209_db_user:barberiaApp12@barberiaapp.gs7mwz3.mongodb.net/barberiaApp?retryWrites=true&w=majority&appName=barberiaApp";
-const DEFAULT_DB_NAME ="barberApp";
-const DEFAULT_TIMEOUT =15000;
+const DEFAULT_URI = "mongodb+srv://mairacoria1209_db_user:barberiaApp12@barberiaapp.gs7mwz3.mongodb.net/barberiaApp?retryWrites=true&w=majority";
+const DEFAULT_DB_NAME = "barberiaApp";
+const DEFAULT_TIMEOUT = 15000;
 
 let mongoReadyPromise;
 
 export async function connectMongo() {
-  if (mongoReadyPromise) return mongoReadyPromise;
+  if (mongoReadyPromise && mongoose.connection.readyState === 1) return mongoReadyPromise;
 
-  const uri = process.env.MONGODB_URI ?? DEFAULT_URI;
-  const dbName = process.env.MONGODB_DB_NAME ?? DEFAULT_DB_NAME;
+  // El .trim() elimina los espacios invisibles que nos estaban rompiendo todo
+  const uri = (process.env.MONGODB_URI ?? DEFAULT_URI).trim();
+  const dbName = (process.env.MONGODB_DB_NAME ?? DEFAULT_DB_NAME).trim();
   const timeout = Number(process.env.MONGODB_TIMEOUT_MS ?? DEFAULT_TIMEOUT);
-
-  if (!uri) {
-    throw new Error("Falta la variable MONGODB_URI");
-  }
 
   mongoose.set("strictQuery", true);
 
-  mongoReadyPromise = mongoose.connect(uri, {
-    dbName,
-    serverSelectionTimeoutMS: timeout,
-  });
+  try {
+    mongoReadyPromise = mongoose.connect(uri, {
+      dbName,
+      serverSelectionTimeoutMS: timeout,
+    });
 
-  mongoose.connection.on("connected", () => {
-    console.log(`[MongoDB] Conectado a ${mongoose.connection.name}`);
-  });
-
-  mongoose.connection.on("error", (err) => {
-    console.error("[MongoDB] Error de conexión", err);
-  });
-
-  mongoose.connection.on("disconnected", () => {
-    console.warn("[MongoDB] Conexión cerrada");
-  });
-
-  return mongoReadyPromise;
-}
-
-export async function disconnectMongo() {
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.connection.close();
+    await mongoReadyPromise;
+    console.log(`[MongoDB] ✅ Conectado exitosamente a la DB: ${dbName}`);
+    return mongoReadyPromise;
+  } catch (err) {
+    console.error("[MongoDB] ❌ Error de conexión:", err.message);
+    mongoReadyPromise = null;
+    throw err;
   }
-  mongoReadyPromise = null;
 }
