@@ -4,21 +4,28 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 let serviceAccount;
 
-// 1. Intentamos leer la variable de entorno de Vercel (Producción)
+// 1. Intentamos primero con la Variable de Entorno (Producción)
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   try {
     serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    console.log("✅ Usando Firebase desde Variable de Entorno");
   } catch (error) {
-    console.error("Error parseando FIREBASE_SERVICE_ACCOUNT:", error);
+    console.error("❌ Error parseando JSON de FIREBASE_SERVICE_ACCOUNT:", error);
   }
-} else {
-  // 2. Si no hay variable (estás en local), usamos el archivo físico
-  // Usamos require() para evitar el error de 'assert'
-  serviceAccount = require("./firebase-key.json");
+} 
+
+// 2. Si no funcionó lo anterior, probamos el archivo local (Desarrollo)
+if (!serviceAccount) {
+  try {
+    serviceAccount = require("./firebase-key.json");
+    console.log("🏠 Usando Firebase desde archivo local");
+  } catch (error) {
+    console.error("⚠️ No se encontró firebase-key.json y tampoco hay Variable de Entorno.");
+  }
 }
 
-// Inicializar solo si no se inicializó antes (evita errores en Hot Reload)
-if (!admin.apps.length) {
+// 3. Inicializamos si logramos conseguir la credencial
+if (serviceAccount && !admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
   });
