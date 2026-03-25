@@ -13,10 +13,18 @@ const app = express();
 // --- CONFIGURACIÓN DE CORS ---
 // Esto permite que tu Frontend en Vercel pueda hablar con este Backend
 app.use(cors({
-  origin: [
-    "http://localhost:3000", // Para probar en tu compu
-    "https://barber-app-evf4.vercel.app" // 👈 Tu URL de Frontend real
-  ],
+  origin: function (origin, callback) {
+    const whitelist = [
+      "http://localhost:3000",
+      "https://barber-app-evf4.vercel.app"
+    ];
+    // Si el origin está en la lista O si no hay origin (App móvil), permitimos
+    if (!origin || whitelist.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('No permitido por CORS'));
+    }
+  },
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));

@@ -18,10 +18,13 @@ const DEV_API_URL = Platform.select({
 });
 
 // Producción (Vercel)
-const PROD_API_URL = "https://barber-f8qtylpas-mai1209s-projects.vercel.app";
+const PROD_API_URL = "https://barber-app-evf4.vercel.app";
 
 // 2. EXPORTACIÓN DE LA URL BASE
-export const API_BASE_URL = __DEV__ ? DEV_API_URL : PROD_API_URL;
+export const API_BASE_URL = PROD_API_URL;
+
+//export const API_BASE_URL = __DEV__ ? DEV_API_URL : PROD_API_URL;
+
 
 // 3. FUNCIÓN DE PETICIÓN GENÉRICA
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
