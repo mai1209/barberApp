@@ -213,42 +213,14 @@ function LandingPage() {
             <div className={styles.phoneFrame}>
               <div className={styles.phoneNotch} />
               <div className={styles.phoneScreen}>
-                <div className={styles.screenHeader}>
-                  <span className={styles.screenGreeting}>
-                    ¡Hola, Barbería!
-                  </span>
-                  <div className={styles.screenAvatar}>B</div>
+                <div className={styles.loginLogo}>BARBERAPP</div>
+                <div className={styles.loginSubtitle}>Inicia sesión</div>
+                <div className={styles.loginInput}>correo@ejemplo.com</div>
+                <div className={styles.loginInput}>••••••••</div>
+                <button className={styles.loginButton}>Entrar</button>
+                <div className={styles.loginFooter}>
+                  ¿No tienes cuenta? <span>Registrate</span>
                 </div>
-                <div className={styles.screenDateCard}>
-                  <span className={styles.screenDateLabel}>HOY</span>
-                  <span className={styles.screenDateDay}>Lunes</span>
-                  <span className={styles.screenDateFull}>23 de marzo</span>
-                </div>
-                <div className={styles.screenSectionTitle}>Turnos del día</div>
-                {appointments.map((t, i) => (
-                  <div
-                    className={styles.screenCard}
-                    key={i}
-                    style={{ animationDelay: `${0.8 + i * 0.2}s` }}
-                  >
-                    <div
-                      className={styles.screenCardTime}
-                      style={{ color: t.color }}
-                    >
-                      {t.time}
-                    </div>
-                    <div className={styles.screenCardInfo}>
-                      <div className={styles.screenCardName}>{t.name}</div>
-                      <div className={styles.screenCardService}>
-                        {t.service}
-                      </div>
-                    </div>
-                    <div
-                      className={styles.screenCardDot}
-                      style={{ background: t.color }}
-                    />
-                  </div>
-                ))}
               </div>
             </div>
             <div className={styles.phoneGlow} />

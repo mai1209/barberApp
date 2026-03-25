@@ -9,15 +9,16 @@ type RequestOptions = {
 };
 
 // 1. CONFIGURACIÓN DE IPs
-const LAN_IP = "192.168.100.54"; // Tu IP actual para el iPhone físico
-
+// Desarrollo local (simuladores/emuladores)
+const LAN_IP = "192.168.100.54"; // Ajusta a tu IP local si cambió
 const DEV_API_URL = Platform.select({
-  ios: `http://${LAN_IP}:3002`,      // iPhone real -> Busca la Mac en la red
-  android: 'http://10.0.2.2:3002',   // Emulador Android -> Busca la Mac internamente
+  ios: `http://${LAN_IP}:3002`,
+  android: 'http://10.0.2.2:3002',
   default: 'http://localhost:3002',
 });
 
-const PROD_API_URL = "https://api.tu-dominio.com";
+// Producción (Vercel)
+const PROD_API_URL = "https://barber-f8qtylpas-mai1209s-projects.vercel.app";
 
 // 2. EXPORTACIÓN DE LA URL BASE
 export const API_BASE_URL = __DEV__ ? DEV_API_URL : PROD_API_URL;

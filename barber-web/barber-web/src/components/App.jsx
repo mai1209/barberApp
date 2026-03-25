@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import {  useState } from 'react';
 import BookingForm from './BookingForm';
 import styles from '../styles/App.module.css';
 import { setShopSlug as registerShopSlug } from '../services/api';
 import LandingPage from './LandingPage';
-import landingStyles from '../styles/LandingPage.module.css';
+//import landingStyles from '../styles/LandingPage.module.css';
 
 
 

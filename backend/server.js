@@ -10,10 +10,20 @@ import publicRoutes from "./routes/publicRoutes.js";
 
 const app = express();
 
-app.use(cors());
+// --- CONFIGURACIÓN DE CORS ---
+// Esto permite que tu Frontend en Vercel pueda hablar con este Backend
+app.use(cors({
+  origin: [
+    "http://localhost:3000", // Para probar en tu compu
+    "https://barber-app-evf4.vercel.app" // 👈 Tu URL de Frontend real
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
+
 app.use(express.json());
 
-// 1. Middleware de Conexión (Asegura que Mongo esté listo antes de cada consulta)
+// 1. Middleware de Conexión
 app.use(async (req, res, next) => {
   try {
     await connectMongo();
@@ -23,7 +33,7 @@ app.use(async (req, res, next) => {
   }
 });
 
-// 2. Ruta de Bienvenida (Para que la URL principal no tire 404)
+// 2. Ruta de Bienvenida
 app.get('/', (req, res) => {
   res.status(200).json({
     message: "🚀 BarberApp Backend Online - Powered by CODEX®",
@@ -38,13 +48,12 @@ app.use('/api/barbers', barberRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/public', publicRoutes);
 
-// 4. Manejo de Errores (Siempre al final)
+// 4. Manejadores de errores
 app.use(notFoundHandler);
 app.use(errorHandler);
 
 export default app;
 
-// Solo para desarrollo local
 if (process.env.NODE_ENV !== 'production') {
   const PORT = Number(process.env.PORT ?? 3002);
   app.listen(PORT, () => {

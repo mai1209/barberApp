@@ -358,8 +358,52 @@
 
 .phoneScreen {
   background: #0d0d0d; border-radius: 30px;
-  padding: 16px 14px; min-height: 400px;
+  padding: 20px 18px; min-height: 400px;
+  display: flex; flex-direction: column; gap: 12px;
 }
+
+.loginLogo {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-align: center;
+  color: #fff;
+}
+
+.loginSubtitle {
+  text-align: center;
+  color: #888;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+.loginInput {
+  background: #151515;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 14px;
+  padding: 14px 12px;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.loginButton {
+  background: linear-gradient(135deg, #ff1493, #b51b7a);
+  border: none;
+  color: #fff;
+  font-weight: 800;
+  border-radius: 16px;
+  padding: 14px 12px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(255,20,147,0.35);
+}
+
+.loginFooter {
+  text-align: center;
+  color: #666;
+  font-size: 0.85rem;
+}
+.loginFooter span { color: #ff1493; font-weight: 700; }
 
 .screenHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .screenGreeting { font-size: 0.68rem; color: #666; font-weight: 500; }
