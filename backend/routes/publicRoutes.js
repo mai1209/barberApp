@@ -16,3 +16,4 @@ router.get("/shops/:shopSlug/services", publicListServices);
 router.post("/shops/:shopSlug/appointments", publicCreateAppointment);
 
 export default router;
+ 

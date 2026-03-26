@@ -1,5 +1,17 @@
-const rawBaseUrl = process.env.REACT_APP_API_BASE_URL || '/api/public';
-const BASE_URL = rawBaseUrl.replace(/\/$/, '');
+const rawBaseUrl = process.env.REACT_APP_API_BASE_URL;
+
+function resolveBaseUrl() {
+  const fallback = '/api/public';
+  const trimmed = (rawBaseUrl || fallback).replace(/\/+$/, '');
+
+  // Si el usuario configuró solo el dominio (ej: https://mi-backend.com)
+  // agregamos automáticamente el segmento /api/public que exige el backend.
+  if (trimmed.endsWith('/api/public')) return trimmed;
+  if (trimmed.endsWith('/api')) return `${trimmed}/public`;
+  return `${trimmed}/api/public`;
+}
+
+const BASE_URL = resolveBaseUrl();
 let currentShopSlug = null;
 
 function sanitizeSlug(value) {
