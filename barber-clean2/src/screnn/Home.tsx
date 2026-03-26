@@ -13,7 +13,9 @@ import {
   StatusBar,
   Alert,
   Platform,
+  Share,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { getUserProfile } from '../services/authStorage';
 import {
   fetchAppointments,
@@ -29,6 +31,8 @@ type Props = {
   navigation: any;
 };
 
+const PUBLIC_BOOKING_BASE = 'https://barberappbycodex.com'; // cambia a tu dominio público si usás otro
+
 function Home({ navigation }: Props) {
   const [fullName, setFullName] = useState('');
   const [shopSlug, setShopSlug] = useState('');
@@ -38,6 +42,11 @@ function Home({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const shareLink = useMemo(() => {
+    if (!shopSlug) return '';
+    const base = PUBLIC_BOOKING_BASE.replace(/\/+$/, '');
+    return `${base}/${shopSlug}`;
+  }, [shopSlug]);
 
   const isToday = selectedDate.toDateString() === new Date().toDateString();
 
@@ -112,7 +121,14 @@ function Home({ navigation }: Props) {
 
   const greetingName = fullName || 'Barbería';
 
-  const handleCopyLink = () => {
+  const handleCopyLink = async () => {
+    if (!shareLink) return;
+    Clipboard.setString(shareLink);
+    try {
+      await Share.share({ message: shareLink });
+    } catch (_e) {
+      // Si falla el sheet de compartir, al menos ya lo copiamos
+    }
     Alert.alert('¡Copiado!', 'El link de turnos se copió al portapapeles.');
   };
 
@@ -257,7 +273,7 @@ function Home({ navigation }: Props) {
                 Enlace de autogestión para clientes
               </Text>
               <Text style={styles.shareSubtitle}>
-                tubarberia.com/book/{shopSlug}
+                {shareLink}
               </Text>
             </View>
             <Copy color="#B89016" size={20} />
