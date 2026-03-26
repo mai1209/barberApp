@@ -1,6 +1,8 @@
 import jwt from "jsonwebtoken";
 
-const DEFAULT_EXP = "1h"; // podés usar "15m", "7d", etc.
+// Duración por defecto del token (antes 1h). Podés sobreescribir con JWT_EXPIRES_IN.
+// Formatos válidos: "365d", "12h", "3600" (segundos).
+const DEFAULT_EXP = "365d";
 
 
 

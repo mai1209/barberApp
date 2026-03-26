@@ -16,8 +16,9 @@ app.use(cors({
   origin: function (origin, callback) {
     const whitelist = [
       "http://localhost:3000",
+      "https://barberappbycodex.com",
       "https://barber-app-evf4.vercel.app",
-      "https://barberappbycodex.com"
+      
     ];
     // Si el origin está en la lista O si no hay origin (App móvil), permitimos
     if (!origin || whitelist.indexOf(origin) !== -1) {

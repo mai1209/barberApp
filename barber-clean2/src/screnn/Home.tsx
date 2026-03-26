@@ -1,5 +1,10 @@
-// Home.tsx
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -14,14 +19,13 @@ import {
   Alert,
   Platform,
   Share,
+  PanResponder,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { getUserProfile } from '../services/authStorage';
 import {
   fetchAppointments,
-  fetchBarbers,
   Appointment,
-  Barber,
   updateAppointmentStatus,
   deleteAppointment,
 } from '../services/api';
@@ -31,26 +35,34 @@ type Props = {
   navigation: any;
 };
 
-const PUBLIC_BOOKING_BASE = 'https://barberappbycodex.com'; // cambia a tu dominio público si usás otro
+const PUBLIC_BOOKING_BASE = 'https://barberappbycodex.com';
 
 function Home({ navigation }: Props) {
   const [fullName, setFullName] = useState('');
   const [shopSlug, setShopSlug] = useState('');
-  const [barbers, setBarbers] = useState<Barber[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
+
+  const selectedDateRef = useRef(selectedDate);
+
+  useEffect(() => {
+    selectedDateRef.current = selectedDate;
+  }, [selectedDate]);
+
   const shareLink = useMemo(() => {
     if (!shopSlug) return '';
     const base = PUBLIC_BOOKING_BASE.replace(/\/+$/, '');
     return `${base}/${shopSlug}`;
   }, [shopSlug]);
 
-  const isToday = selectedDate.toDateString() === new Date().toDateString();
+  const isToday = useMemo(() => {
+    return isSameDay(selectedDate, new Date());
+  }, [selectedDate]);
 
-  const formattedDate = useMemo(
+  const formattedHeaderDate = useMemo(
     () =>
       new Intl.DateTimeFormat('es-AR', {
         weekday: 'long',
@@ -60,16 +72,38 @@ function Home({ navigation }: Props) {
     [selectedDate],
   );
 
+  const weekDays = useMemo(() => {
+    return Array.from({ length: 7 }, (_, index) => {
+      const offset = index - 3;
+      const date = addDays(selectedDate, offset);
+
+      return {
+        key: `${date.toISOString()}-${index}`,
+        date,
+        isSelected: isSameDay(date, selectedDate),
+        isToday: isSameDay(date, new Date()),
+        dayName: new Intl.DateTimeFormat('es-AR', {
+          weekday: 'short',
+        }).format(date),
+        dayNumber: new Intl.DateTimeFormat('es-AR', {
+          day: '2-digit',
+        }).format(date),
+      };
+    });
+  }, [selectedDate]);
+
   const loadData = useCallback(
-    async (isRefresh = false) => {
+    async (isRefresh = false, targetDate?: Date) => {
+      const activeDate = targetDate ?? selectedDateRef.current;
+
       try {
         if (!isRefresh) setLoading(true);
         setError('');
-        const [barbersRes, appointmentsRes] = await Promise.all([
-          fetchBarbers(),
-          fetchAppointments({ date: selectedDate.toISOString().slice(0, 10) }),
-        ]);
-        setBarbers(barbersRes.barbers);
+
+        const appointmentsRes = await fetchAppointments({
+          date: activeDate.toISOString().slice(0, 10),
+        });
+
         setAppointments(
           appointmentsRes.appointments.filter(a => a.status !== 'cancelled'),
         );
@@ -80,62 +114,80 @@ function Home({ navigation }: Props) {
         setRefreshing(false);
       }
     },
-    [selectedDate],
+    [],
   );
 
   useEffect(() => {
     let isMounted = true;
+
     (async () => {
       const storedUser = await getUserProfile<{
         fullName?: string;
         shopSlug?: string;
       }>();
+
       if (isMounted) {
         if (storedUser?.fullName) setFullName(storedUser.fullName);
         if (storedUser?.shopSlug) setShopSlug(storedUser.shopSlug);
       }
     })();
-    return () => { isMounted = false; };
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadData();
-      const intervalId = setInterval(() => loadData(true), 15000);
+      loadData(false, selectedDateRef.current);
+
+      const intervalId = setInterval(() => {
+        loadData(true, selectedDateRef.current);
+      }, 15000);
+
       return () => clearInterval(intervalId);
     }, [loadData]),
   );
 
+  useEffect(() => {
+    loadData(false, selectedDate);
+  }, [selectedDate, loadData]);
+
   const handleRefresh = () => {
     setRefreshing(true);
-    loadData(true);
+    loadData(true, selectedDate);
   };
 
   const handleShiftDate = (days: number) => {
-    setSelectedDate(prev => {
-      const next = new Date(prev);
-      next.setDate(prev.getDate() + days);
-      return next;
-    });
+    setSelectedDate(prev => addDays(prev, days));
+  };
+
+  const handleSelectDate = (date: Date) => {
+    setSelectedDate(date);
+  };
+
+  const handleGoToToday = () => {
+    setSelectedDate(new Date());
   };
 
   const greetingName = fullName || 'Barbería';
 
   const handleCopyLink = async () => {
     if (!shareLink) return;
+
     Clipboard.setString(shareLink);
+
     try {
       await Share.share({ message: shareLink });
-    } catch (_e) {
-      // Si falla el sheet de compartir, al menos ya lo copiamos
-    }
+    } catch (_e) {}
+
     Alert.alert('¡Copiado!', 'El link de turnos se copió al portapapeles.');
   };
 
   const handleComplete = async (appointmentId: string) => {
     try {
       await updateAppointmentStatus(appointmentId, 'completed');
-      await loadData(true);
+      await loadData(true, selectedDateRef.current);
     } catch (err: any) {
       setError(err?.message ?? 'No se pudo actualizar');
     }
@@ -153,83 +205,124 @@ function Home({ navigation }: Props) {
           onPress: async () => {
             try {
               await deleteAppointment(appointmentId);
-              await loadData(true);
+              await loadData(true, selectedDateRef.current);
             } catch (err: any) {
               setError(err?.message ?? 'No se pudo liberar el turno');
             }
           },
         },
-      ]
+      ],
     );
   };
 
-  const renderAppointmentCard = (appointment: Appointment) => {
+  const datePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) =>
+          Math.abs(gestureState.dx) > 18 && Math.abs(gestureState.dy) < 10,
+        onPanResponderRelease: (_, gestureState) => {
+          if (gestureState.dx < -40) {
+            handleShiftDate(1);
+          } else if (gestureState.dx > 40) {
+            handleShiftDate(-1);
+          }
+        },
+      }),
+    [],
+  );
+
+  const renderAppointmentCard = (appointment: Appointment, index: number) => {
     const barberName =
       appointment.barber && typeof appointment.barber === 'object'
         ? appointment.barber.fullName
         : 'Sin asignar';
+
     const isCompleted = appointment.status === 'completed';
 
     return (
       <View
         key={appointment._id}
-        style={[styles.appointmentCard, isCompleted && styles.cardCompleted]}
+        style={[
+          styles.appointmentCard,
+          isCompleted && styles.appointmentCardCompleted,
+          { marginTop: index === 0 ? 0 : 14 },
+        ]}
       >
-        <View style={styles.cardHeader}>
-          <View>
-            <Text style={styles.cardTime}>
+        <View
+          style={[
+            styles.cardGlowLine,
+            isCompleted && styles.cardGlowLineCompleted,
+          ]}
+        />
+
+        <View style={styles.cardHeaderRow}>
+          <View style={styles.cardTimeBox}>
+            <Text style={styles.cardTimeMain}>
               {formatTimeOnly(appointment.startTime)}
             </Text>
-            <Text style={styles.cardService}>
-              {appointment.service}
-              {appointment.durationMinutes ? ` · ${appointment.durationMinutes}min` : ''}
-            </Text>
+            <Text style={styles.cardTimeSub}>HORARIO</Text>
           </View>
-          <View
-            style={[
-              styles.statusTag,
-              isCompleted ? styles.statusTagCompleted : styles.statusTagPending,
-            ]}
-          >
-            <Text
-              style={[
-                styles.statusTagText,
-                isCompleted ? styles.textCompleted : styles.textPending,
-              ]}
-            >
-              {isCompleted ? '✓ Completado' : '• Pendiente'}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.cardBody}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Cliente:</Text>
-            <Text style={styles.infoValue}>{appointment.customerName}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Barbero:</Text>
-            <Text style={styles.infoValue}>{barberName}</Text>
-          </View>
-          {appointment.notes ? (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Teléfono:</Text>
-              <Text style={styles.infoValue}>{appointment.notes}</Text>
+
+          <View style={styles.cardHeaderContent}>
+            <View style={styles.cardTitleRow}>
+              <View style={{ flex: 1, paddingRight: 10 }}>
+                <Text style={styles.cardServiceTitle}>
+                  {appointment.service}
+                </Text>
+                <Text style={styles.cardDurationText}>
+                  {appointment.durationMinutes
+                    ? `${appointment.durationMinutes} min`
+                    : 'Duración no definida'}
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.cardStatusPill,
+                  isCompleted
+                    ? styles.cardStatusPillCompleted
+                    : styles.cardStatusPillPending,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.cardStatusText,
+                    isCompleted
+                      ? styles.cardStatusTextCompleted
+                      : styles.cardStatusTextPending,
+                  ]}
+                >
+                  {isCompleted ? 'Completado' : 'Pendiente'}
+                </Text>
+              </View>
             </View>
-          ) : null}
+
+            <View style={styles.cardInfoPanel}>
+              <InfoLine label="Cliente" value={appointment.customerName} />
+              <InfoLine label="Barbero" value={barberName} />
+              {appointment.notes ? (
+                <InfoLine label="Teléfono Cliente" value={appointment.notes} />
+              ) : null}
+            </View>
+          </View>
         </View>
+
         {!isCompleted && (
-          <View style={styles.btn}>
+          <View style={styles.cardButtonsRow}>
             <Pressable
-              style={styles.btnComplete}
+              style={[styles.cardActionBtn, styles.cardActionPrimary]}
               onPress={() => handleComplete(appointment._id)}
             >
-              <Text style={styles.btnCompleteText}>Finalizar Atención</Text>
+              <Text style={styles.cardActionPrimaryText}>
+                Finalizar Atención
+              </Text>
             </Pressable>
+
             <Pressable
-              style={[styles.btnComplete, styles.btnRelease]}
+              style={[styles.cardActionBtn, styles.cardActionSecondary]}
               onPress={() => handleRelease(appointment._id)}
             >
-              <Text style={styles.btnCompleteText}>Liberar Turno</Text>
+              <Text style={styles.cardActionSecondaryText}>Liberar</Text>
             </Pressable>
           </View>
         )}
@@ -240,11 +333,13 @@ function Home({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
+
       <View style={styles.topHeader}>
         <View>
           <Text style={styles.welcomeText}>¡Hola,</Text>
           <Text style={styles.nameText}>{greetingName}!</Text>
         </View>
+
         <Image
           source={require('../assets/LogoOrion.png')}
           style={styles.logo}
@@ -265,100 +360,146 @@ function Home({ navigation }: Props) {
       >
         {!!error && <Text style={styles.errorText}>{error}</Text>}
 
-        {/* LINK DE COMPARTIR */}
         {shopSlug ? (
           <Pressable style={styles.shareCard} onPress={handleCopyLink}>
             <View style={styles.shareTextContent}>
               <Text style={styles.shareTitle}>
                 Enlace de autogestión para clientes
               </Text>
-              <Text style={styles.shareSubtitle}>
-                {shareLink}
-              </Text>
+              <Text style={styles.shareSubtitle}>{shareLink}</Text>
             </View>
             <Copy color="#B89016" size={20} />
           </Pressable>
         ) : null}
 
-        {/* EQUIPO */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tu Equipo</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.barbersList}
-          >
-            {barbers.map(barber => (
-              <Pressable
-                key={barber._id}
-                style={styles.barberAvatarCard}
-                onPress={() =>
-                  navigation.navigate('Barber-Home', {
-                    barberId: barber._id,
-                    barberName: barber.fullName,
-                  })
-                }
-              >
-                <View style={styles.avatarCircle}>
-                  <Text style={styles.avatarText}>
-                    {barber.fullName.charAt(0)}
-                  </Text>
-                </View>
-                <Text style={styles.barberNameLabel}>
-                  {barber.fullName.split(' ')[0]}
-                </Text>
+          <View style={styles.agendaTopRow}>
+            <Text style={styles.sectionTitle}>Agenda total de turnos</Text>
+
+            {!isToday && (
+              <Pressable style={styles.todayButton} onPress={handleGoToToday}>
+                <Text style={styles.todayButtonText}>Ir a hoy</Text>
               </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* AGENDA */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Agenda del día</Text>
-
-          {/* SELECTOR DE FECHA */}
-          <View style={styles.dateSelectorCard}>
-            <Pressable
-              style={styles.dateArrowBtn}
-              onPress={() => handleShiftDate(-1)}
-            >
-              <Text style={styles.dateArrowText}>‹</Text>
-            </Pressable>
-
-            <View style={styles.dateCenterBlock}>
-              {isToday && (
-                <Text style={styles.dateTodayLabel}>HOY</Text>
-              )}
-              <Text style={styles.dateDayText}>
-                {formattedDate.split(',')[0]}
-              </Text>
-              <Text style={styles.dateFullText}>
-                {formattedDate.split(',').slice(1).join(',').trim()}
-              </Text>
-            </View>
-
-            <Pressable
-              style={styles.dateArrowBtn}
-              onPress={() => handleShiftDate(1)}
-            >
-              <Text style={styles.dateArrowText}>›</Text>
-            </Pressable>
+            )}
           </View>
 
-          <View style={{ marginTop: 15 }}>
+          <View style={styles.dateHeroCard} {...datePanResponder.panHandlers}>
+            <View style={styles.dateHeroHeader}>
+              <Pressable
+                style={styles.dateCircleBtn}
+                onPress={() => handleShiftDate(-1)}
+              >
+                <Text style={styles.dateCircleBtnText}>‹</Text>
+              </Pressable>
+
+              <View style={styles.dateHeroTextWrap}>
+                <View style={styles.dateBadgeRow}>
+                  <View style={styles.dateHeroBadge}>
+                    <Text style={styles.dateHeroBadgeText}>
+                      {isToday ? 'HOY' : 'AGENDA'}
+                    </Text>
+                  </View>
+                  <Text style={styles.dateHeroSwipeHint}>Deslizá o tocá</Text>
+                </View>
+
+                <Text style={styles.dateHeroTitle}>
+                  {capitalize(formattedHeaderDate.split(',')[0])}
+                </Text>
+                <Text style={styles.dateHeroSubtitle}>
+                  {capitalize(
+                    formattedHeaderDate.split(',').slice(1).join(',').trim(),
+                  )}
+                </Text>
+              </View>
+
+              <Pressable
+                style={styles.dateCircleBtn}
+                onPress={() => handleShiftDate(1)}
+              >
+                <Text style={styles.dateCircleBtnText}>›</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.weekStripContent}
+            >
+              {weekDays.map(item => (
+                <Pressable
+                  key={item.key}
+                  style={[
+                    styles.weekDayChip,
+                    item.isSelected && styles.weekDayChipActive,
+                  ]}
+                  onPress={() => handleSelectDate(item.date)}
+                >
+                  <Text
+                    style={[
+                      styles.weekDayName,
+                      item.isSelected && styles.weekDayNameActive,
+                    ]}
+                  >
+                    {capitalize(item.dayName.replace('.', ''))}
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.weekDayNumber,
+                      item.isSelected && styles.weekDayNumberActive,
+                    ]}
+                  >
+                    {item.dayNumber}
+                  </Text>
+
+                  {item.isToday && !item.isSelected ? (
+                    <View style={styles.weekTodayDot} />
+                  ) : null}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+
+          <View style={{ marginTop: 16 }}>
             {loading && !appointments.length ? (
               <ActivityIndicator color="#B89016" style={{ marginTop: 40 }} />
             ) : appointments.length ? (
               appointments.map(renderAppointmentCard)
             ) : (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No hay turnos programados.</Text>
+                <Text style={styles.emptyTitle}>Sin turnos por ahora</Text>
+                <Text style={styles.emptyText}>
+                  No hay turnos programados para esta fecha.
+                </Text>
               </View>
             )}
           </View>
         </View>
       </ScrollView>
     </View>
+  );
+}
+
+function InfoLine({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.infoLineRow}>
+      <Text style={styles.infoLineLabel}>{label}</Text>
+      <Text style={styles.infoLineValue}>{value}</Text>
+    </View>
+  );
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function isSameDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
   );
 }
 
@@ -370,8 +511,17 @@ function formatTimeOnly(value: string) {
   });
 }
 
+function capitalize(text: string) {
+  if (!text) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent' },
+  container: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+
   topHeader: {
     paddingHorizontal: 25,
     paddingTop: Platform.OS === 'ios' ? 60 : 20,
@@ -380,9 +530,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  welcomeText: { color: '#888', fontSize: 16, fontWeight: '500' },
-  nameText: { color: '#fff', fontSize: 28, fontWeight: '800' },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 120 },
+
+  welcomeText: {
+    color: '#888',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+
+  nameText: {
+    color: '#fff',
+    fontSize: 28,
+    fontWeight: '800',
+  },
+
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 120,
+  },
+
   shareCard: {
     backgroundColor: '#1C1C1C',
     borderRadius: 20,
@@ -394,7 +559,11 @@ const styles = StyleSheet.create({
     borderColor: '#333',
     marginTop: 20,
   },
-  shareTextContent: { flex: 1 },
+
+  shareTextContent: {
+    flex: 1,
+  },
+
   shareTitle: {
     color: '#888',
     fontSize: 11,
@@ -402,132 +571,399 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
-  shareSubtitle: { color: '#fff', fontSize: 14, marginTop: 2, fontWeight: '500' },
-  section: { marginTop: 25 },
+
+  shareSubtitle: {
+    color: '#fff',
+    fontSize: 14,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+
+  section: {
+    marginTop: 25,
+  },
+
   sectionTitle: {
     color: '#fff',
     fontSize: 18,
     fontWeight: '700',
-    marginBottom: 15,
   },
-  barbersList: { paddingRight: 20 },
-  barberAvatarCard: { alignItems: 'center', marginRight: 20 },
-  avatarCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#1C1C1C',
-    borderWidth: 1,
-    borderColor: '#333',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { color: '#B89016', fontSize: 20, fontWeight: 'bold' },
-  barberNameLabel: { color: '#888', fontSize: 12, marginTop: 8, fontWeight: '600' },
 
-  // SELECTOR DE FECHA
-  dateSelectorCard: {
+  agendaTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#1C1C1C',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
+    marginBottom: 14,
   },
-  dateArrowBtn: {
-    width: 50,
-    height: 50,
+
+  todayButton: {
+    backgroundColor: 'rgba(184, 144, 22, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(184, 144, 22, 0.25)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+
+  todayButtonText: {
+    color: '#B89016',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  dateHeroCard: {
+    backgroundColor: '#1C1C1C',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+    paddingTop: 15,
+    paddingBottom: 13,
+    overflow: 'hidden',
+  },
+
+  dateHeroHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+  },
+
+  dateCircleBtn: {
+    width: 44,
+    height: 44,
     borderRadius: 16,
-    backgroundColor: '#252525',
+    backgroundColor: '#181818',
+    borderWidth: 1,
+    borderColor: '#303030',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#333',
   },
-  dateArrowText: {
+
+  dateCircleBtnText: {
     color: '#B89016',
-    fontSize: 32,
-    fontWeight: 'bold',
-    lineHeight: 36,
+    fontSize: 26,
+    fontWeight: '700',
+    lineHeight: 28,
+    marginTop: -2,
   },
-  dateCenterBlock: {
+
+  dateHeroTextWrap: {
     flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
   },
-  dateTodayLabel: {
+
+  dateBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+
+  dateHeroBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(184, 144, 22, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(184, 144, 22, 0.22)',
+  },
+
+  dateHeroBadgeText: {
     color: '#B89016',
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 2,
-    marginBottom: 2,
+    letterSpacing: 1.2,
   },
-  dateDayText: {
+
+  dateHeroSwipeHint: {
+    color: '#5F5F5F',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  dateHeroTitle: {
     color: '#fff',
+    fontSize: 20,
+    fontWeight: '800',
+  },
+
+  dateHeroSubtitle: {
+    color: '#8E8E8E',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 3,
+  },
+
+  weekStripContent: {
+    paddingHorizontal: 14,
+    paddingTop: 15,
+  },
+
+  weekDayChip: {
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+    backgroundColor: '#181818',
+    borderWidth: 1,
+    borderColor: '#2D2D2D',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 9,
+    position: 'relative',
+  },
+
+  weekDayChipActive: {
+    backgroundColor: 'rgba(184, 144, 22, 0.14)',
+    borderColor: 'rgba(184, 144, 22, 0.32)',
+  },
+
+  weekDayName: {
+    color: '#7A7A7A',
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 5,
+  },
+
+  weekDayNameActive: {
+    color: '#E7D2A0',
+  },
+
+  weekDayNumber: {
+    color: '#F2F2F2',
     fontSize: 18,
     fontWeight: '800',
-    textTransform: 'capitalize',
   },
-  dateFullText: {
-    color: '#666',
-    fontSize: 12,
-    marginTop: 2,
-    textTransform: 'capitalize',
+
+  weekDayNumberActive: {
+    color: '#B89016',
+  },
+
+  weekTodayDot: {
+    position: 'absolute',
+    bottom: 9,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#B89016',
   },
 
   appointmentCard: {
+    position: 'relative',
     backgroundColor: '#1C1C1C',
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 15,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: '#252525',
+    padding: 15,
+    overflow: 'hidden',
   },
-  cardCompleted: { opacity: 0.6 },
-  cardHeader: {
+
+  appointmentCardCompleted: {
+    opacity: 0.72,
+  },
+
+  cardGlowLine: {
+    position: 'absolute',
+    left: 0,
+    top: 16,
+    bottom: 16,
+    width: 4,
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
+    backgroundColor: '#B89016',
+  },
+
+  cardGlowLineCompleted: {
+    backgroundColor: '#31C96C',
+  },
+
+  cardHeaderRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 15,
   },
-  cardTime: { color: '#B89016', fontSize: 20, fontWeight: '800' },
-  cardService: { color: '#fff', fontSize: 14, fontWeight: '600', marginTop: 2 },
-  statusTag: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  statusTagPending: { backgroundColor: 'rgba(255, 255, 255, 0.05)' },
-  statusTagCompleted: { backgroundColor: 'rgba(46, 204, 113, 0.1)' },
-  statusTagText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
-  textPending: { color: '#f1c40f' },
-  textCompleted: { color: '#00ff6aff', opacity: 4 },
-  cardBody: {
-    gap: 8,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#252525',
-  },
-  infoRow: { flexDirection: 'row', gap: 10 },
-  infoLabel: { color: '#666', fontSize: 13 },
-  infoValue: { color: '#ddd', fontSize: 13, fontWeight: '600' },
-  btnComplete: {
-    backgroundColor: '#252525',
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 10,
+
+  cardTimeBox: {
+    width: 78,
+    minHeight: 78,
+    borderRadius: 18,
+    backgroundColor: '#181818',
     borderWidth: 1,
-    borderColor: '#333',
-    width: 140,
-    paddingVertical: 7,
-    paddingHorizontal: 2,
+    borderColor: '#2E2E2E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
-  btnRelease: { marginTop: 8 },
-  btnCompleteText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  emptyContainer: { padding: 40, alignItems: 'center' },
-  emptyText: { color: '#444', fontSize: 14, fontWeight: '500' },
-  errorText: { color: '#ff7b7b', fontSize: 13, fontWeight: '600', marginTop: 20 },
-  logo: { width: 70, height: 70 },
-  btn: { flexDirection: 'row', flex: 1, justifyContent: 'space-between' },
+
+  cardTimeMain: {
+    color: '#B89016',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+
+  cardTimeSub: {
+    color: '#676767',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginTop: 4,
+  },
+
+  cardHeaderContent: {
+    flex: 1,
+  },
+
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+
+  cardServiceTitle: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+
+  cardDurationText: {
+    color: '#7C7C7C',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 4,
+  },
+
+  cardStatusPill: {
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderWidth: 1,
+  },
+
+  cardStatusPillPending: {
+    backgroundColor: 'rgba(184, 144, 22, 0.10)',
+    borderColor: 'rgba(184, 144, 22, 0.22)',
+  },
+
+  cardStatusPillCompleted: {
+    backgroundColor: 'rgba(49, 201, 108, 0.10)',
+    borderColor: 'rgba(49, 201, 108, 0.22)',
+  },
+
+  cardStatusText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+
+  cardStatusTextPending: {
+    color: '#E7C975',
+  },
+
+  cardStatusTextCompleted: {
+    color: '#66DA92',
+  },
+
+  cardInfoPanel: {
+    backgroundColor: '#181818',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#262626',
+    padding: 11,
+    gap: 9,
+  },
+
+  infoLineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 14,
+  },
+
+  infoLineLabel: {
+    color: '#6B6B6B',
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0,
+  },
+
+  infoLineValue: {
+    flex: 1,
+    textAlign: 'right',
+    color: '#ECECEC',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  cardButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 13,
+  },
+
+  cardActionBtn: {
+    borderRadius: 15,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+
+  cardActionPrimary: {
+    flex: 1.5,
+    backgroundColor: '#B89016',
+    borderColor: '#B89016',
+  },
+
+  cardActionSecondary: {
+    flex: 1,
+    backgroundColor: '#222',
+    borderColor: '#333',
+  },
+
+  cardActionPrimaryText: {
+    color: '#111',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
+  cardActionSecondaryText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  emptyContainer: {
+    backgroundColor: '#171717',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#252525',
+    paddingVertical: 36,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+
+  emptyTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+
+  emptyText: {
+    color: '#6A6A6A',
+    fontSize: 13,
+    marginTop: 6,
+    textAlign: 'center',
+  },
+
+  errorText: {
+    color: '#ff7b7b',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 20,
+  },
+
+  logo: {
+    width: 70,
+    height: 70,
+  },
 });
 
 export default Home;

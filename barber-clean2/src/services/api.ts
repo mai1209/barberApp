@@ -10,7 +10,7 @@ type RequestOptions = {
 
 // 1. CONFIGURACIÓN DE IPs
 // Usa tu IP LAN para dispositivos físicos. 10.0.2.2 solo funciona en emulador Android.
-const LAN_IP = "192.168.100.54"; // ajusta si tu IP cambió
+const LAN_IP = "192.168.100.46"; // ajusta si tu IP cambió
 const ANDROID_EMULATOR_HOST = "10.0.2.2";
 
 const isAndroid = Platform.OS === "android";

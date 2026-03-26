@@ -304,13 +304,18 @@ function BookingForm({ shopSlug }) {
     [currentDuration, occupiedSlots, selectedDate],
   );
 
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
     const serviceName = selectedService?.name || "Servicio";
+    
+    // Detectamos si estamos en localhost
+    const isDev = window.location.hostname === "localhost";
+
     if (!selectedBarber || !selectedSlot) {
       alert("Por favor selecciona barbero y horario");
       return;
     }
+
     try {
       setSaving(true);
       const y = selectedDate.getFullYear();
@@ -319,6 +324,7 @@ function BookingForm({ shopSlug }) {
       const [hh, mm] = selectedSlot.split(":").map(Number);
       const localDate = new Date(y, mo, d, hh, mm, 0, 0);
       const finalDateUTC = localDate.toISOString();
+
       await createAppointment({
         barberId: selectedBarber,
         customerName: customerName.trim(),
@@ -328,7 +334,15 @@ function BookingForm({ shopSlug }) {
         notes: phone.trim(),
         email: email.trim(), 
       });
-      alert("¡Listo! Tu turno fue reservado. Revisá tu email para ver los detalles de la confirmación.");
+
+      // --- MENSAJE PERSONALIZADO ---
+      if (isDev) {
+        alert("🛠️ [TEST EXITOSO]: Turno creado en Localhost. No te preocupes por el mail real ahora.");
+      } else {
+        alert("¡Listo! Tu turno fue reservado. Revisá tu email para ver los detalles de la confirmación.");
+      }
+      // -----------------------------
+
       setSelectedSlot(null);
       await loadSlots();
     } catch (err) {
@@ -336,7 +350,7 @@ function BookingForm({ shopSlug }) {
     } finally {
       setSaving(false);
     }
-  };
+};
 
   // 5. LOADING STATE
   if (!slugReady || loadingBarbers) {
