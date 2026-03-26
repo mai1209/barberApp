@@ -38,10 +38,10 @@ export async function listAppointments(req, res, next) {
   try {
     const { date } = req.query;
     const { startOfDay, endOfDay } = buildDayRange(date);
+    const ownerId = req.user.id;
 
-    // Traemos todos los turnos del día (para este tenant) sin filtrar por owner
-    // porque hay casos en los que el owner no coincide con el usuario logueado (ej: staff).
     const appointments = await AppointmentModel.find({
+      owner: ownerId,
       startTime: { $gte: startOfDay, $lte: endOfDay },
     })
       .populate({ path: "barber", select: "fullName" })

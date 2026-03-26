@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -14,12 +14,24 @@ import {
   RefreshControl,
 } from "react-native";
 import { fetchBarbers, Barber } from "../services/api";
+import { useTheme } from "../context/ThemeContext";
+import type { Theme } from "../context/ThemeContext";
+
+const hexToRgba = (hex: string, alpha: number) => {
+  const sanitized = hex.replace("#", "");
+  const bigint = parseInt(sanitized.length === 3 ? sanitized.repeat(2) : sanitized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
 type Props = {
   navigation: any;
 };
 
 function ListBarber({ navigation }: Props) {
+  const { theme } = useTheme();
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -55,6 +67,8 @@ function ListBarber({ navigation }: Props) {
     });
   };
 
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   return (
     <KeyboardAvoidingView
       style={styles.screen}
@@ -68,14 +82,14 @@ function ListBarber({ navigation }: Props) {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor="#B89016"
+              tintColor={theme.primary}
             />
           }
         >
           {/* Header Unificado */}
           <View style={styles.header}>
-            <Image style={styles.logo} source={require("../assets/LogoOrion.png")} />
-            <Text style={styles.headerSubtitle}>EQUIPO PROFESIONAL</Text>
+            <Image style={styles.logo} source={theme.logo} />
+            <Text style={[styles.headerSubtitle, { color: theme.primary }]}>EQUIPO PROFESIONAL</Text>
             <Text style={styles.headerTitle}>Barberos</Text>
           </View>
 
@@ -83,7 +97,7 @@ function ListBarber({ navigation }: Props) {
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             {loading && !barbers.length ? (
-              <ActivityIndicator color="#B89016" style={{ marginVertical: 40 }} />
+              <ActivityIndicator color={theme.primary} style={{ marginVertical: 40 }} />
             ) : (
               <View style={styles.listContainer}>
                 {barbers.map((barber) => (
@@ -127,110 +141,111 @@ function ListBarber({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "transparent" },
-  scrollContent: { paddingBottom: 60 },
-  
-  header: { 
-    marginTop: Platform.OS === 'ios' ? 70 : 20 , 
-    paddingHorizontal: 25, 
-    alignItems: 'center',
-    marginBottom: 20 
-  },
-  logo: { width: 50, height: 50, marginBottom: 15, resizeMode: 'contain' },
-  headerSubtitle: { 
-    color: "#B89016", 
-    fontSize: 12, 
-    fontWeight: "700", 
-    letterSpacing: 2,
-    textTransform: 'uppercase'
-  },
-  headerTitle: { color: "#fff", fontSize: 32, fontWeight: "800", marginTop: 5 },
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: theme.background },
+    scrollContent: { paddingBottom: 60 },
+    
+    header: { 
+      marginTop: Platform.OS === 'ios' ? 70 : 20 , 
+      paddingHorizontal: 25, 
+      alignItems: 'center',
+      marginBottom: 20 
+    },
+    logo: { width: 50, height: 50, marginBottom: 15, resizeMode: 'contain' },
+    headerSubtitle: { 
+      color: theme.primary, 
+      fontSize: 12, 
+      fontWeight: "700", 
+      letterSpacing: 2,
+      textTransform: 'uppercase'
+    },
+    headerTitle: { color: "#fff", fontSize: 32, fontWeight: "800", marginTop: 5 },
 
-  mainCard: { 
-    marginHorizontal: 15, 
-    backgroundColor: "#1C1C1C", 
-    borderRadius: 32, 
-    padding: 20, 
-    borderWidth: 1,
-    borderColor: '#252525'
-  },
+    mainCard: { 
+      marginHorizontal: 15, 
+      backgroundColor: theme.card, 
+      borderRadius: 32, 
+      padding: 20, 
+      borderWidth: 1,
+      borderColor: hexToRgba(theme.primary, 0.2)
+    },
 
-  listContainer: { gap: 12 },
+    listContainer: { gap: 12 },
 
-  barberItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#252525",
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#333",
-  },
-  barberItemPressed: {
-    borderColor: "#B89016",
-    backgroundColor: "#2a2a2a",
-  },
-  barberInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 15,
-  },
-  avatarCircle: {
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
-    backgroundColor: "#121212",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#444",
-  },
-  avatarText: {
-    color: "#B89016",
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  barberName: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  barberStatus: {
-    color: "#666",
-    fontSize: 11,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-  chevron: {
-    color: "#B89016",
-    fontSize: 28,
-    fontWeight: "300",
-  },
+    barberItem: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      backgroundColor: theme.card,
+      padding: 16,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: "#333",
+    },
+    barberItemPressed: {
+      borderColor: theme.primary,
+      backgroundColor: hexToRgba(theme.primary, 0.12),
+    },
+    barberInfo: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 15,
+    },
+    avatarCircle: {
+      width: 45,
+      height: 45,
+      borderRadius: 22.5,
+      backgroundColor: theme.background,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: "#444",
+    },
+    avatarText: {
+      color: theme.primary,
+      fontSize: 18,
+      fontWeight: "800",
+    },
+    barberName: {
+      color: "#fff",
+      fontSize: 16,
+      fontWeight: "700",
+    },
+    barberStatus: {
+      color: "#888",
+      fontSize: 11,
+      fontWeight: "600",
+      marginTop: 2,
+    },
+    chevron: {
+      color: theme.primary,
+      fontSize: 28,
+      fontWeight: "300",
+    },
 
-  addBtn: {
-    backgroundColor: "transparent",
-    paddingVertical: 18,
-    borderRadius: 20,
-    marginTop: 25,
-    borderWidth: 2,
-    borderColor: "#B89016",
-    alignItems: "center",
-  },
-  addBtnText: {
-    color: "#B89016",
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  
-  errorText: {
-    color: "#ff8080",
-    textAlign: "center",
-    marginBottom: 15,
-    fontWeight: '600'
-  },
+    addBtn: {
+      backgroundColor: "transparent",
+      paddingVertical: 18,
+      borderRadius: 20,
+      marginTop: 25,
+      borderWidth: 2,
+      borderColor: theme.primary,
+      alignItems: "center",
+    },
+    addBtnText: {
+      color: theme.primary,
+      fontSize: 15,
+      fontWeight: "700",
+    },
+    
+    errorText: {
+      color: "#ff8080",
+      textAlign: "center",
+      marginBottom: 15,
+      fontWeight: '600'
+    },
 
-});
+  });
 
 export default ListBarber;

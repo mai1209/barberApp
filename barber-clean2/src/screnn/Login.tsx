@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -17,8 +17,18 @@ import {
 import { loginUser, savePushTokenApi } from "../services/api"; // Importado savePushTokenApi
 import { saveToken, saveUserProfile } from "../services/authStorage";
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Importado
+import { useTheme } from "../context/ThemeContext";
+import type { Theme } from "../context/ThemeContext";
+
+const AUTH_THEME = {
+  primary: "#FF1493",
+  card: "#1C1C1C",
+  background: "#121212",
+  logo: require("../assets/logo.png"),
+} as const;
 
 function Login({ navigation }: any) {
+  const { setShopSlug } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -42,6 +52,7 @@ function Login({ navigation }: any) {
       const res = await loginUser({ email, password });
       await saveToken(res.token);
       await saveUserProfile(res.user);
+      if (res.user?.shopSlug) setShopSlug(res.user.shopSlug);
 
       // 2. Intentar guardar el Push Token en el Backend (incluye refresh recientes)
       try {
@@ -66,6 +77,8 @@ function Login({ navigation }: any) {
     }
   };
 
+  const styles = useMemo(() => createStyles(AUTH_THEME), []);
+
   return (
     <KeyboardAvoidingView
       style={styles.screen}
@@ -74,7 +87,7 @@ function Login({ navigation }: any) {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           <View style={styles.header}>
-            <Image style={styles.logo} source={require("../assets/logo.png")} />
+            <Image style={styles.logo} source={AUTH_THEME.logo} />
             <Text style={styles.headerSubtitle}>BIENVENIDO A</Text>
             <Text style={styles.headerTitle}>BarberApp</Text>
           </View>
@@ -139,31 +152,31 @@ function Login({ navigation }: any) {
   );
 }
 
-// ... (Tus estilos se mantienen iguales)
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#121212" },
-  scrollContent: { paddingBottom: 40 },
-  header: { marginTop: 80, alignItems: "center", marginBottom: 40 },
-  logo: { width: 90, height: 90, marginBottom: 15, resizeMode: "contain" },
-  headerSubtitle: { color: "#FF1493", fontSize: 12, fontWeight: "700", letterSpacing: 3 },
-  headerTitle: { color: "#fff", fontSize: 36, fontWeight: "800" },
-  loginCard: { marginHorizontal: 20, backgroundColor: "#1C1C1C", borderRadius: 32, padding: 25, borderWidth: 1, borderColor: "#252525", elevation: 10 },
-  instructionText: { color: "#888", textAlign: "center", marginBottom: 25, fontSize: 14 },
-  inputContainer: { marginBottom: 15 },
-  inputLabel: { color: "#666", fontSize: 12, fontWeight: "700", textTransform: "uppercase", marginBottom: 8, marginLeft: 5 },
-  input: { backgroundColor: "#252525", borderRadius: 16, padding: 16, color: "#fff", fontSize: 16, borderWidth: 1, borderColor: "#333" },
-  inputFocused: { borderColor: "#FF1493" },
-  passwordWrapper: { position: "relative" },
-  passwordInput: { paddingRight: 55 },
-  eyeBtn: { position: "absolute", right: 15, top: 15, height: 30, justifyContent: "center" },
-  eyeIcon: { fontSize: 20 },
-  loginBtn: { backgroundColor: "#FF1493", borderRadius: 20, paddingVertical: 18, alignItems: "center", marginTop: 10 },
-  loginBtnText: { color: "#fff", fontSize: 18, fontWeight: "800" },
-  registerBtn: { marginTop: 25, alignItems: "center" },
-  registerText: { color: "#666", fontSize: 14 },
-  registerTextBold: { color: "#fff", fontWeight: "700" },
-  errorText: { color: "#ff6b6b", textAlign: "center", marginBottom: 15, fontWeight: "600" },
-  codexText: { color: "#333", textAlign: "center", marginTop: 30, fontSize: 12, fontWeight: "bold", letterSpacing: 1 },
-});
+const createStyles = (theme: Theme | typeof AUTH_THEME) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: theme.background },
+    scrollContent: { paddingBottom: 40 },
+    header: { marginTop: 80, alignItems: "center", marginBottom: 40 },
+    logo: { width: 90, height: 90, marginBottom: 15, resizeMode: "contain" },
+    headerSubtitle: { color: theme.primary, fontSize: 12, fontWeight: "700", letterSpacing: 3 },
+    headerTitle: { color: "#fff", fontSize: 36, fontWeight: "800" },
+    loginCard: { marginHorizontal: 20, backgroundColor: theme.card, borderRadius: 32, padding: 25, borderWidth: 1, borderColor: "#252525", elevation: 10 },
+    instructionText: { color: "#888", textAlign: "center", marginBottom: 25, fontSize: 14 },
+    inputContainer: { marginBottom: 15 },
+    inputLabel: { color: "#666", fontSize: 12, fontWeight: "700", textTransform: "uppercase", marginBottom: 8, marginLeft: 5 },
+    input: { backgroundColor: "#252525", borderRadius: 16, padding: 16, color: "#fff", fontSize: 16, borderWidth: 1, borderColor: "#333" },
+    inputFocused: { borderColor: theme.primary },
+    passwordWrapper: { position: "relative" },
+    passwordInput: { paddingRight: 55 },
+    eyeBtn: { position: "absolute", right: 15, top: 15, height: 30, justifyContent: "center" },
+    eyeIcon: { fontSize: 20 },
+    loginBtn: { backgroundColor: theme.primary, borderRadius: 20, paddingVertical: 18, alignItems: "center", marginTop: 10 },
+    loginBtnText: { color: "#fff", fontSize: 18, fontWeight: "800" },
+    registerBtn: { marginTop: 25, alignItems: "center" },
+    registerText: { color: "#666", fontSize: 14 },
+    registerTextBold: { color: "#fff", fontWeight: "700" },
+    errorText: { color: "#ff6b6b", textAlign: "center", marginBottom: 15, fontWeight: "600" },
+    codexText: { color: "#333", textAlign: "center", marginTop: 30, fontSize: 12, fontWeight: "bold", letterSpacing: 1 },
+  });
 
 export default Login;

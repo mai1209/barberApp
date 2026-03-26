@@ -1,17 +1,25 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Defs, Ellipse, LinearGradient, Rect, Stop } from 'react-native-svg';
+import { useTheme } from '../context/ThemeContext';
 
 function BrownScreenGradient() {
+  const { theme } = useTheme();
+  const [c0, c1, c2, c3] = theme.gradientColors;
+  const base = c0 ?? theme.background;
+
   return (
-    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.base]}>
+    <View
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFill, styles.base, { backgroundColor: base }]}
+    >
       <Svg width="100%" height="100%" style={StyleSheet.absoluteFillObject}>
         <Defs>
           <LinearGradient id="brown-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor="#812917" />
-            <Stop offset="35%" stopColor="#4D190E" />
-            <Stop offset="70%" stopColor="#B33A21" />
-            <Stop offset="100%" stopColor="#802A17" />
+            <Stop offset="0%" stopColor={c0} />
+            <Stop offset="35%" stopColor={c1 ?? c0} />
+            <Stop offset="70%" stopColor={c2 ?? c1 ?? c0} />
+            <Stop offset="100%" stopColor={c3 ?? c2 ?? c0} />
           </LinearGradient>
         </Defs>
 

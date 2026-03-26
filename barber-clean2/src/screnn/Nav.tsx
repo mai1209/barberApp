@@ -9,6 +9,8 @@ import {
   Platform,
 } from 'react-native';
 import { House, Plus, UserRound, Settings } from 'lucide-react-native';
+import { useTheme } from '../context/ThemeContext';
+import type { Theme } from '../context/ThemeContext';
 
 type MainRoute = 'Home' | 'List-Barber' | 'Reservas';
 
@@ -37,11 +39,13 @@ const NavButton = ({
   onPress,
   label,
   Icon,
+  theme,
 }: {
   isActive: boolean;
   onPress: () => void;
   label: string;
   Icon: any;
+  theme: Theme;
 }) => {
   const animValue = useRef(new Animated.Value(isActive ? 1 : 0)).current;
 
@@ -58,7 +62,7 @@ const NavButton = ({
   const activeButtonStyle = {
     backgroundColor: animValue.interpolate({
       inputRange: [0, 1],
-      outputRange: ['transparent', '#B89016'],
+      outputRange: ['transparent', theme.primary],
     }),
     paddingHorizontal: animValue.interpolate({
       inputRange: [0, 1],
@@ -92,17 +96,24 @@ function Nav({ currentRouteName, onNavigate }: Props) {
     return null;
   }
 
+  const { theme } = useTheme();
   const activeRoute = resolveActiveRoute(currentRouteName);
 
   return (
-    <View style={styles.safeArea}>
-      <View style={styles.floatingContainer}>
+    <View style={[styles.safeArea]}>
+      <View
+        style={[
+          styles.floatingContainer,
+          { backgroundColor: theme.card, shadowColor: theme.primary },
+        ]}
+      >
         <View style={styles.navInner}>
           <NavButton
             isActive={activeRoute === 'Home'}
             onPress={() => onNavigate('Home')}
             label="Inicio"
             Icon={House}
+            theme={theme}
           />
 
           <NavButton
@@ -110,6 +121,7 @@ function Nav({ currentRouteName, onNavigate }: Props) {
             onPress={() => onNavigate('Reservas')}
             label="Nuevo Turno"
             Icon={Plus}
+            theme={theme}
           />
 
           <NavButton
@@ -117,13 +129,16 @@ function Nav({ currentRouteName, onNavigate }: Props) {
             onPress={() => onNavigate('List-Barber')}
             label="Barberos"
             Icon={UserRound}
+            theme={theme}
           />
 
-          <NavButton label="Ajustes" Icon={Settings} />
+          <NavButton label="Ajustes" Icon={Settings} theme={theme} />
         </View>
       </View>
       <View style={styles.footer}>
-        <Text style={styles.codexText}>BarberApp by CODEX®</Text>
+        <Text style={[styles.codexText, { color: theme.secondary }]}>
+          BarberApp by CODEX®
+        </Text>
       </View>
     </View>
   );
@@ -140,7 +155,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   floatingContainer: {
-    backgroundColor: '#1C1C1C',
     borderRadius: 35,
     width: '92%', // Un poquito más ancho para dar aire
     maxWidth: 380,

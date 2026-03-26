@@ -22,6 +22,8 @@ import {
   PanResponder,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
+import { useTheme } from '../context/ThemeContext';
+import type { Theme } from '../context/ThemeContext';
 import { getUserProfile } from '../services/authStorage';
 import {
   fetchAppointments,
@@ -36,8 +38,17 @@ type Props = {
 };
 
 const PUBLIC_BOOKING_BASE = 'https://barberappbycodex.com';
+const hexToRgba = (hex: string, alpha: number) => {
+  const sanitized = hex.replace('#', '');
+  const bigint = parseInt(sanitized.length === 3 ? sanitized.repeat(2) : sanitized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
 function Home({ navigation }: Props) {
+  const { theme, setShopSlug: setThemeSlug } = useTheme();
   const [fullName, setFullName] = useState('');
   const [shopSlug, setShopSlug] = useState('');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -57,6 +68,7 @@ function Home({ navigation }: Props) {
     const base = PUBLIC_BOOKING_BASE.replace(/\/+$/, '');
     return `${base}/${shopSlug}`;
   }, [shopSlug]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const isToday = useMemo(() => {
     return isSameDay(selectedDate, new Date());
@@ -128,7 +140,10 @@ function Home({ navigation }: Props) {
 
       if (isMounted) {
         if (storedUser?.fullName) setFullName(storedUser.fullName);
-        if (storedUser?.shopSlug) setShopSlug(storedUser.shopSlug);
+        if (storedUser?.shopSlug) {
+          setShopSlug(storedUser.shopSlug);
+          setThemeSlug(storedUser.shopSlug);
+        }
       }
     })();
 
@@ -341,7 +356,7 @@ function Home({ navigation }: Props) {
         </View>
 
         <Image
-          source={require('../assets/LogoOrion.png')}
+          source={theme.logo}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -354,7 +369,7 @@ function Home({ navigation }: Props) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor="#B89016"
+            tintColor={theme.primary}
           />
         }
       >
@@ -368,13 +383,13 @@ function Home({ navigation }: Props) {
               </Text>
               <Text style={styles.shareSubtitle}>{shareLink}</Text>
             </View>
-            <Copy color="#B89016" size={20} />
+            <Copy color={theme.primary} size={20} />
           </Pressable>
         ) : null}
 
         <View style={styles.section}>
           <View style={styles.agendaTopRow}>
-            <Text style={styles.sectionTitle}>Agenda total de turnos</Text>
+            <Text style={styles.sectionTitle}>Agenda colectiva de turnos</Text>
 
             {!isToday && (
               <Pressable style={styles.todayButton} onPress={handleGoToToday}>
@@ -462,7 +477,7 @@ function Home({ navigation }: Props) {
 
           <View style={{ marginTop: 16 }}>
             {loading && !appointments.length ? (
-              <ActivityIndicator color="#B89016" style={{ marginTop: 40 }} />
+              <ActivityIndicator color={theme.primary} style={{ marginTop: 40 }} />
             ) : appointments.length ? (
               appointments.map(renderAppointmentCard)
             ) : (
@@ -481,6 +496,8 @@ function Home({ navigation }: Props) {
 }
 
 function InfoLine({ label, value }: { label: string; value: string }) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   return (
     <View style={styles.infoLineRow}>
       <Text style={styles.infoLineLabel}>{label}</Text>
@@ -516,454 +533,455 @@ function capitalize(text: string) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-
-  topHeader: {
-    paddingHorizontal: 25,
-    paddingTop: Platform.OS === 'ios' ? 60 : 20,
-    backgroundColor: 'transparent',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-
-  welcomeText: {
-    color: '#888',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-
-  nameText: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '800',
-  },
-
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 120,
-  },
-
-  shareCard: {
-    backgroundColor: '#1C1C1C',
-    borderRadius: 20,
-    padding: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#333',
-    marginTop: 20,
-  },
-
-  shareTextContent: {
-    flex: 1,
-  },
-
-  shareTitle: {
-    color: '#888',
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-
-  shareSubtitle: {
-    color: '#fff',
-    fontSize: 14,
-    marginTop: 2,
-    fontWeight: '500',
-  },
-
-  section: {
-    marginTop: 25,
-  },
-
-  sectionTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-
-  agendaTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-  },
-
-  todayButton: {
-    backgroundColor: 'rgba(184, 144, 22, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(184, 144, 22, 0.25)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-  },
-
-  todayButtonText: {
-    color: '#B89016',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-
-  dateHeroCard: {
-    backgroundColor: '#1C1C1C',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-    paddingTop: 15,
-    paddingBottom: 13,
-    overflow: 'hidden',
-  },
-
-  dateHeroHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-  },
-
-  dateCircleBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 16,
-    backgroundColor: '#181818',
-    borderWidth: 1,
-    borderColor: '#303030',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  dateCircleBtnText: {
-    color: '#B89016',
-    fontSize: 26,
-    fontWeight: '700',
-    lineHeight: 28,
-    marginTop: -2,
-  },
-
-  dateHeroTextWrap: {
-    flex: 1,
-    paddingHorizontal: 12,
-  },
-
-  dateBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-
-  dateHeroBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(184, 144, 22, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(184, 144, 22, 0.22)',
-  },
-
-  dateHeroBadgeText: {
-    color: '#B89016',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-
-  dateHeroSwipeHint: {
-    color: '#5F5F5F',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-
-  dateHeroTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '800',
-  },
-
-  dateHeroSubtitle: {
-    color: '#8E8E8E',
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 3,
-  },
-
-  weekStripContent: {
-    paddingHorizontal: 14,
-    paddingTop: 15,
-  },
-
-  weekDayChip: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
-    backgroundColor: '#181818',
-    borderWidth: 1,
-    borderColor: '#2D2D2D',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 9,
-    position: 'relative',
-  },
-
-  weekDayChipActive: {
-    backgroundColor: 'rgba(184, 144, 22, 0.14)',
-    borderColor: 'rgba(184, 144, 22, 0.32)',
-  },
-
-  weekDayName: {
-    color: '#7A7A7A',
-    fontSize: 11,
-    fontWeight: '700',
-    marginBottom: 5,
-  },
-
-  weekDayNameActive: {
-    color: '#E7D2A0',
-  },
-
-  weekDayNumber: {
-    color: '#F2F2F2',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-
-  weekDayNumberActive: {
-    color: '#B89016',
-  },
-
-  weekTodayDot: {
-    position: 'absolute',
-    bottom: 9,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#B89016',
-  },
-
-  appointmentCard: {
-    position: 'relative',
-    backgroundColor: '#1C1C1C',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#252525',
-    padding: 15,
-    overflow: 'hidden',
-  },
-
-  appointmentCardCompleted: {
-    opacity: 0.72,
-  },
-
-  cardGlowLine: {
-    position: 'absolute',
-    left: 0,
-    top: 16,
-    bottom: 16,
-    width: 4,
-    borderTopRightRadius: 10,
-    borderBottomRightRadius: 10,
-    backgroundColor: '#B89016',
-  },
-
-  cardGlowLineCompleted: {
-    backgroundColor: '#31C96C',
-  },
-
-  cardHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-
-  cardTimeBox: {
-    width: 78,
-    minHeight: 78,
-    borderRadius: 18,
-    backgroundColor: '#181818',
-    borderWidth: 1,
-    borderColor: '#2E2E2E',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-
-  cardTimeMain: {
-    color: '#B89016',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-
-  cardTimeSub: {
-    color: '#676767',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1,
-    marginTop: 4,
-  },
-
-  cardHeaderContent: {
-    flex: 1,
-  },
-
-  cardTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-
-  cardServiceTitle: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-
-  cardDurationText: {
-    color: '#7C7C7C',
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 4,
-  },
-
-  cardStatusPill: {
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    borderWidth: 1,
-  },
-
-  cardStatusPillPending: {
-    backgroundColor: 'rgba(184, 144, 22, 0.10)',
-    borderColor: 'rgba(184, 144, 22, 0.22)',
-  },
-
-  cardStatusPillCompleted: {
-    backgroundColor: 'rgba(49, 201, 108, 0.10)',
-    borderColor: 'rgba(49, 201, 108, 0.22)',
-  },
-
-  cardStatusText: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
-
-  cardStatusTextPending: {
-    color: '#E7C975',
-  },
-
-  cardStatusTextCompleted: {
-    color: '#66DA92',
-  },
-
-  cardInfoPanel: {
-    backgroundColor: '#181818',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#262626',
-    padding: 11,
-    gap: 9,
-  },
-
-  infoLineRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 14,
-  },
-
-  infoLineLabel: {
-    color: '#6B6B6B',
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0,
-  },
-
-  infoLineValue: {
-    flex: 1,
-    textAlign: 'right',
-    color: '#ECECEC',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-
-  cardButtonsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 13,
-  },
-
-  cardActionBtn: {
-    borderRadius: 15,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-
-  cardActionPrimary: {
-    flex: 1.5,
-    backgroundColor: '#B89016',
-    borderColor: '#B89016',
-  },
-
-  cardActionSecondary: {
-    flex: 1,
-    backgroundColor: '#222',
-    borderColor: '#333',
-  },
-
-  cardActionPrimaryText: {
-    color: '#111',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-
-  cardActionSecondaryText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-
-  emptyContainer: {
-    backgroundColor: '#171717',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#252525',
-    paddingVertical: 36,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-  },
-
-  emptyTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-
-  emptyText: {
-    color: '#6A6A6A',
-    fontSize: 13,
-    marginTop: 6,
-    textAlign: 'center',
-  },
-
-  errorText: {
-    color: '#ff7b7b',
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: 20,
-  },
-
-  logo: {
-    width: 70,
-    height: 70,
-  },
-});
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+
+    topHeader: {
+      paddingHorizontal: 25,
+      paddingTop: Platform.OS === 'ios' ? 60 : 20,
+      backgroundColor: 'transparent',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+
+    welcomeText: {
+      color: '#888',
+      fontSize: 16,
+      fontWeight: '500',
+    },
+
+    nameText: {
+      color: '#fff',
+      fontSize: 28,
+      fontWeight: '800',
+    },
+
+    scrollContent: {
+      paddingHorizontal: 20,
+      paddingBottom: 120,
+    },
+
+    shareCard: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 15,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderWidth: 1,
+      borderColor: hexToRgba(theme.primary, 0.2),
+      marginTop: 20,
+    },
+
+    shareTextContent: {
+      flex: 1,
+    },
+
+    shareTitle: {
+      color: '#888',
+      fontSize: 11,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 0.3,
+    },
+
+    shareSubtitle: {
+      color: '#fff',
+      fontSize: 14,
+      marginTop: 2,
+      fontWeight: '500',
+    },
+
+    section: {
+      marginTop: 25,
+    },
+
+    sectionTitle: {
+      color: '#fff',
+      fontSize: 18,
+      fontWeight: '700',
+    },
+
+    agendaTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 14,
+    },
+
+    todayButton: {
+      backgroundColor: hexToRgba(theme.primary, 0.12),
+      borderWidth: 1,
+      borderColor: hexToRgba(theme.primary, 0.25),
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 999,
+    },
+
+    todayButtonText: {
+      color: theme.primary,
+      fontSize: 12,
+      fontWeight: '700',
+    },
+
+    dateHeroCard: {
+      backgroundColor: theme.card,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: '#2A2A2A',
+      paddingTop: 15,
+      paddingBottom: 13,
+      overflow: 'hidden',
+    },
+
+    dateHeroHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+    },
+
+    dateCircleBtn: {
+      width: 44,
+      height: 44,
+      borderRadius: 16,
+      backgroundColor: theme.background,
+      borderWidth: 1,
+      borderColor: '#303030',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+
+    dateCircleBtnText: {
+      color: theme.primary,
+      fontSize: 26,
+      fontWeight: '700',
+      lineHeight: 28,
+      marginTop: -2,
+    },
+
+    dateHeroTextWrap: {
+      flex: 1,
+      paddingHorizontal: 12,
+    },
+
+    dateBadgeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+    },
+
+    dateHeroBadge: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: hexToRgba(theme.primary, 0.12),
+      borderWidth: 1,
+      borderColor: hexToRgba(theme.primary, 0.22),
+    },
+
+    dateHeroBadgeText: {
+      color: theme.primary,
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 1.2,
+    },
+
+    dateHeroSwipeHint: {
+      color: '#5F5F5F',
+      fontSize: 11,
+      fontWeight: '600',
+    },
+
+    dateHeroTitle: {
+      color: '#fff',
+      fontSize: 20,
+      fontWeight: '800',
+    },
+
+    dateHeroSubtitle: {
+      color: '#8E8E8E',
+      fontSize: 12,
+      fontWeight: '500',
+      marginTop: 3,
+    },
+
+    weekStripContent: {
+      paddingHorizontal: 14,
+      paddingTop: 15,
+    },
+
+    weekDayChip: {
+      width: 64,
+      height: 64,
+      borderRadius: 18,
+      backgroundColor: theme.background,
+      borderWidth: 1,
+      borderColor: '#2D2D2D',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 9,
+      position: 'relative',
+    },
+
+    weekDayChipActive: {
+      backgroundColor: hexToRgba(theme.primary, 0.14),
+      borderColor: hexToRgba(theme.primary, 0.32),
+    },
+
+    weekDayName: {
+      color: '#7A7A7A',
+      fontSize: 11,
+      fontWeight: '700',
+      marginBottom: 5,
+    },
+
+    weekDayNameActive: {
+      color: '#E7D2A0',
+    },
+
+    weekDayNumber: {
+      color: '#F2F2F2',
+      fontSize: 18,
+      fontWeight: '800',
+    },
+
+    weekDayNumberActive: {
+      color: theme.primary,
+    },
+
+    weekTodayDot: {
+      position: 'absolute',
+      bottom: 9,
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: theme.primary,
+    },
+
+    appointmentCard: {
+      position: 'relative',
+      backgroundColor: theme.card,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: '#252525',
+      padding: 15,
+      overflow: 'hidden',
+    },
+
+    appointmentCardCompleted: {
+      opacity: 0.72,
+    },
+
+    cardGlowLine: {
+      position: 'absolute',
+      left: 0,
+      top: 16,
+      bottom: 16,
+      width: 4,
+      borderTopRightRadius: 10,
+      borderBottomRightRadius: 10,
+      backgroundColor: theme.primary,
+    },
+
+    cardGlowLineCompleted: {
+      backgroundColor: '#31C96C',
+    },
+
+    cardHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+    },
+
+    cardTimeBox: {
+      width: 78,
+      minHeight: 78,
+      borderRadius: 18,
+      backgroundColor: theme.background,
+      borderWidth: 1,
+      borderColor: '#2E2E2E',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+
+    cardTimeMain: {
+      color: theme.primary,
+      fontSize: 11,
+      fontWeight: '800',
+    },
+
+    cardTimeSub: {
+      color: '#676767',
+      fontSize: 9,
+      fontWeight: '800',
+      letterSpacing: 1,
+      marginTop: 4,
+    },
+
+    cardHeaderContent: {
+      flex: 1,
+    },
+
+    cardTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      marginBottom: 12,
+    },
+
+    cardServiceTitle: {
+      color: '#fff',
+      fontSize: 15,
+      fontWeight: '800',
+    },
+
+    cardDurationText: {
+      color: '#7C7C7C',
+      fontSize: 12,
+      fontWeight: '500',
+      marginTop: 4,
+    },
+
+    cardStatusPill: {
+      borderRadius: 999,
+      paddingHorizontal: 9,
+      paddingVertical: 6,
+      borderWidth: 1,
+    },
+
+    cardStatusPillPending: {
+      backgroundColor: hexToRgba(theme.primary, 0.1),
+      borderColor: hexToRgba(theme.primary, 0.22),
+    },
+
+    cardStatusPillCompleted: {
+      backgroundColor: 'rgba(49, 201, 108, 0.10)',
+      borderColor: 'rgba(49, 201, 108, 0.22)',
+    },
+
+    cardStatusText: {
+      fontSize: 10,
+      fontWeight: '800',
+    },
+
+    cardStatusTextPending: {
+      color: '#E7C975',
+    },
+
+    cardStatusTextCompleted: {
+      color: '#66DA92',
+    },
+
+    cardInfoPanel: {
+      backgroundColor: theme.background,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: '#262626',
+      padding: 11,
+      gap: 9,
+    },
+
+    infoLineRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 14,
+    },
+
+    infoLineLabel: {
+      color: '#6B6B6B',
+      fontSize: 10,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 0,
+    },
+
+    infoLineValue: {
+      flex: 1,
+      textAlign: 'right',
+      color: '#ECECEC',
+      fontSize: 12,
+      fontWeight: '600',
+    },
+
+    cardButtonsRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 13,
+    },
+
+    cardActionBtn: {
+      borderRadius: 15,
+      paddingVertical: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+    },
+
+    cardActionPrimary: {
+      flex: 1.5,
+      backgroundColor: theme.primary,
+      borderColor: theme.primary,
+    },
+
+    cardActionSecondary: {
+      flex: 1,
+      backgroundColor: '#222',
+      borderColor: '#333',
+    },
+
+    cardActionPrimaryText: {
+      color: '#111',
+      fontSize: 12,
+      fontWeight: '800',
+    },
+
+    cardActionSecondaryText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '700',
+    },
+
+    emptyContainer: {
+      backgroundColor: theme.card,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: '#252525',
+      paddingVertical: 36,
+      paddingHorizontal: 20,
+      alignItems: 'center',
+    },
+
+    emptyTitle: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '700',
+    },
+
+    emptyText: {
+      color: '#6A6A6A',
+      fontSize: 13,
+      marginTop: 6,
+      textAlign: 'center',
+    },
+
+    errorText: {
+      color: '#ff7b7b',
+      fontSize: 13,
+      fontWeight: '600',
+      marginTop: 20,
+    },
+
+    logo: {
+      width: 70,
+      height: 70,
+    },
+  });
 
 export default Home;

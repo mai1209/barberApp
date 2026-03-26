@@ -8,16 +8,10 @@ import {
 
 const router = Router();
 
-// 1. ESTA RUTA DEBE SER PÚBLICA (Para que la web vea a Xime, Kevin, etc.)
+// Rutas privadas (la web pública usa /api/public/shops/:slug/*)
+router.use(requireAuth);
 router.get("/", listBarbers);
-
-// 2. ESTA TAMBIÉN DEBE SER PÚBLICA (Para que la web vea qué turnos están ocupados)
 router.get("/:barberId/appointments", listBarberAppointments);
-
-// --- A partir de aquí, SI pedimos autenticación ---
-router.use(requireAuth); 
-
-// 3. SOLO EL ADMIN PUEDE CREAR UN BARBERO
 router.post("/", createBarber);
 
 export default router;

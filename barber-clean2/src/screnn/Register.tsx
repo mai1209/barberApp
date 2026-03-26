@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -16,8 +16,18 @@ import {
 } from 'react-native';
 
 import { registerUser } from '../services/api';
+import { useTheme } from '../context/ThemeContext';
+import type { Theme } from '../context/ThemeContext';
+
+const AUTH_THEME = {
+  primary: "#FF1493",
+  card: "#1C1C1C",
+  background: "#121212",
+  logo: require("../assets/logo.png"),
+} as const;
 
 function Register({ navigation }: any) {
+  const { } = useTheme(); // se mantiene el hook por consistencia, pero usamos tema fijo para auth
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,6 +40,7 @@ function Register({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const styles = useMemo(() => createStyles(AUTH_THEME), []);
 
   const handleRegister = async () => {
     if (loading) return;
@@ -72,7 +83,7 @@ function Register({ navigation }: any) {
         >
           {/* Header */}
           <View style={styles.header}>
-            <Image style={styles.logo} source={require('../assets/logo.png')} />
+            <Image style={styles.logo} source={AUTH_THEME.logo} />
             <Text style={styles.headerSubtitle}>ÚNETE A</Text>
             <Text style={styles.headerTitle}>BarberApp</Text>
           </View>
@@ -204,92 +215,93 @@ function Register({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#121212' },
-  scrollContent: { paddingBottom: 50 },
+const createStyles = (theme: Theme | typeof AUTH_THEME) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: theme.background },
+    scrollContent: { paddingBottom: 50 },
 
-  header: { marginTop: 60, alignItems: 'center', marginBottom: 30 },
-  logo: { width: 70, height: 70, marginBottom: 15, resizeMode: 'contain' },
-  headerSubtitle: {
-    color: '#FF1493',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 3,
-  },
-  headerTitle: { color: '#fff', fontSize: 32, fontWeight: '800' },
+    header: { marginTop: 60, alignItems: 'center', marginBottom: 30 },
+    logo: { width: 70, height: 70, marginBottom: 15, resizeMode: 'contain' },
+    headerSubtitle: {
+      color: theme.primary,
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 3,
+    },
+    headerTitle: { color: '#fff', fontSize: 32, fontWeight: '800' },
 
-  registerCard: {
-    marginHorizontal: 20,
-    backgroundColor: '#1C1C1C',
-    borderRadius: 30,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: '#252525',
-  },
-  instructionText: {
-    color: '#888',
-    textAlign: 'center',
-    marginBottom: 20,
-    fontSize: 14,
-  },
+    registerCard: {
+      marginHorizontal: 20,
+      backgroundColor: theme.card,
+      borderRadius: 30,
+      padding: 22,
+      borderWidth: 1,
+      borderColor: '#252525',
+    },
+    instructionText: {
+      color: '#888',
+      textAlign: 'center',
+      marginBottom: 20,
+      fontSize: 14,
+    },
 
-  inputContainer: { marginBottom: 12 },
-  inputLabel: {
-    color: '#666',
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    marginBottom: 6,
-    marginLeft: 4,
-  },
-  input: {
-    backgroundColor: '#252525',
-    borderRadius: 14,
-    padding: 14,
-    color: '#fff',
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  inputFocused: { borderColor: '#FF1493' },
+    inputContainer: { marginBottom: 12 },
+    inputLabel: {
+      color: '#666',
+      fontSize: 11,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      marginBottom: 6,
+      marginLeft: 4,
+    },
+    input: {
+      backgroundColor: '#252525',
+      borderRadius: 14,
+      padding: 14,
+      color: '#fff',
+      fontSize: 16,
+      borderWidth: 1,
+      borderColor: '#333',
+    },
+    inputFocused: { borderColor: theme.primary },
 
-  passwordWrapper: { position: 'relative' },
-  passwordInput: { paddingRight: 50 },
-  eyeBtn: {
-    position: 'absolute',
-    right: 15,
-    top: 12,
-    height: 30,
-    justifyContent: 'center',
-  },
-  eyeIcon: { fontSize: 18 },
+    passwordWrapper: { position: 'relative' },
+    passwordInput: { paddingRight: 50 },
+    eyeBtn: {
+      position: 'absolute',
+      right: 15,
+      top: 12,
+      height: 30,
+      justifyContent: 'center',
+    },
+    eyeIcon: { fontSize: 18 },
 
-  registerBtn: {
-    backgroundColor: '#FF1493',
-    borderRadius: 18,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 15,
-  },
-  registerBtnText: { color: '#fff', fontSize: 17, fontWeight: '800' },
+    registerBtn: {
+      backgroundColor: theme.primary,
+      borderRadius: 18,
+      paddingVertical: 16,
+      alignItems: 'center',
+      marginTop: 15,
+    },
+    registerBtnText: { color: '#fff', fontSize: 17, fontWeight: '800' },
 
-  loginLink: { marginTop: 20, alignItems: 'center' },
-  loginLinkText: { color: '#666', fontSize: 13 },
-  loginLinkBold: { color: '#fff', fontWeight: '700' },
+    loginLink: { marginTop: 20, alignItems: 'center' },
+    loginLinkText: { color: '#666', fontSize: 13 },
+    loginLinkBold: { color: '#fff', fontWeight: '700' },
 
-  errorText: {
-    color: '#ff6b6b',
-    textAlign: 'center',
-    marginBottom: 10,
-    fontWeight: '600',
-  },
-  codexText: {
-    color: '#333',
-    textAlign: 'center',
-    marginTop: 25,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-});
+    errorText: {
+      color: '#ff6b6b',
+      textAlign: 'center',
+      marginBottom: 10,
+      fontWeight: '600',
+    },
+    codexText: {
+      color: '#333',
+      textAlign: 'center',
+      marginTop: 25,
+      fontSize: 11,
+      fontWeight: '700',
+    },
+  });
 
 export default Register;

@@ -5,6 +5,7 @@ import messaging from '@react-native-firebase/messaging';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import StackNavigator from './src/navigation/StackNavigation';
 import { savePushTokenApi } from './src/services/api';
+import { ThemeProvider } from './src/context/ThemeContext';
 
 export const navigationRef = createNavigationContainerRef();
 
@@ -77,19 +78,21 @@ useEffect(() => {
 }, []);
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#020203' }}>
-      <NavigationContainer
-        theme={appNavigationTheme}
-        ref={navigationRef}
-        onReady={() => {
-          setCurrentRouteName(navigationRef.getCurrentRoute()?.name);
-        }}
-        onStateChange={() => {
-          setCurrentRouteName(navigationRef.getCurrentRoute()?.name);
-        }}
-      >
-        <StackNavigator currentRouteName={currentRouteName} />
-      </NavigationContainer>
-    </View>
+    <ThemeProvider>
+      <View style={{ flex: 1, backgroundColor: '#020203' }}>
+        <NavigationContainer
+          theme={appNavigationTheme}
+          ref={navigationRef}
+          onReady={() => {
+            setCurrentRouteName(navigationRef.getCurrentRoute()?.name);
+          }}
+          onStateChange={() => {
+            setCurrentRouteName(navigationRef.getCurrentRoute()?.name);
+          }}
+        >
+          <StackNavigator currentRouteName={currentRouteName} />
+        </NavigationContainer>
+      </View>
+    </ThemeProvider>
   );
 }

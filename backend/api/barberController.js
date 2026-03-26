@@ -31,19 +31,13 @@ function deriveScheduleRange(barberDoc) {
 
 export async function listBarbers(req, res, next) {
   try {
-    // 1. LÓGICA DE FILTRO:
-    // Si hay usuario logueado (Admin), filtramos por SU ID.
-    // Si NO hay usuario (Web Pública), traemos todos los ACTIVOS.
-    let query = { isActive: true };
+    const ownerId = req.user?.id;
+    if (!ownerId) return res.status(401).json({ error: "Auth requerida" });
 
-    if (req.user && req.user.id) {
-      query.owner = req.user.id;
-    }
-
-    console.log("--- DEBUG BACKEND ---");
-    console.log("Ejecutando query:", query);
-
-    const barbersDocs = await BarberModel.find(query).lean();
+    const barbersDocs = await BarberModel.find({
+      owner: ownerId,
+      isActive: true,
+    }).lean();
 
     console.log("Documentos encontrados en DB:", barbersDocs.length);
 
@@ -117,14 +111,20 @@ export async function listBarberAppointments(req, res, next) {
     const { barberId } = req.params;
     const { date } = req.query;
     const { startOfDay, endOfDay } = buildDayRange(date);
+    const ownerId = req.user?.id;
+    if (!ownerId) return res.status(401).json({ error: "Auth requerida" });
 
-    // Buscamos al barbero y traemos sus días de trabajo (workDays)
-    const barber = await BarberModel.findById(barberId).lean();
+    // Buscamos al barbero del owner y traemos sus días de trabajo (workDays)
+    const barber = await BarberModel.findOne({
+      _id: barberId,
+      owner: ownerId,
+    }).lean();
     if (!barber)
       return res.status(404).json({ error: "Barbero no encontrado" });
 
     // Buscamos los turnos ya ocupados para ese día
     const appointments = await AppointmentModel.find({
+      owner: ownerId,
       barber: barberId,
       startTime: { $gte: startOfDay, $lte: endOfDay },
       status: { $ne: "cancelled" },

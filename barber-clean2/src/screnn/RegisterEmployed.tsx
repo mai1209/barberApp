@@ -15,6 +15,17 @@ import {
   Modal,
 } from 'react-native';
 import { createBarber } from '../services/api';
+import { useTheme } from '../context/ThemeContext';
+import type { Theme } from '../context/ThemeContext';
+
+const hexToRgba = (hex: string, alpha: number) => {
+  const sanitized = hex.replace('#', '');
+  const bigint = parseInt(sanitized.length === 3 ? sanitized.repeat(2) : sanitized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
 type Props = {
   navigation: any;
@@ -40,6 +51,7 @@ type ActivePicker =
   | null;
 
 function RegisterEmployed({ navigation }: Props) {
+  const { theme } = useTheme();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -59,6 +71,7 @@ function RegisterEmployed({ navigation }: Props) {
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const toggleDay = (id: number) => {
     setSelectedDays(prev =>
@@ -413,6 +426,8 @@ function RegisterEmployed({ navigation }: Props) {
         initialValueMinutes={pickerInitialValue}
         onClose={() => setActivePicker(null)}
         onConfirm={handlePickerConfirm}
+        theme={theme}
+        styles={styles}
       />
     </>
   );
@@ -424,6 +439,8 @@ function TimeSelectModal({
   initialValueMinutes,
   onConfirm,
   onClose,
+  theme,
+  styles,
 }: any) {
   const [selected, setSelected] = useState(initialValueMinutes);
   const TIME_OPTIONS = useMemo(
@@ -441,7 +458,7 @@ function TimeSelectModal({
           <View style={styles.modalHeaderRow}>
             <Text style={styles.modalTitle}>{title}</Text>
             <Pressable onPress={onClose}>
-              <Text style={{ color: '#B89016', fontWeight: 'bold' }}>
+              <Text style={{ color: theme.primary, fontWeight: 'bold' }}>
                 CERRAR
               </Text>
             </Pressable>
@@ -490,152 +507,153 @@ function formatMinutes(totalMinutes: number) {
   )}`;
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#000' },
-  scrollContent: {
-    paddingBottom: 130,
-    paddingTop: Platform.OS === 'ios' ? 20 : 0,
-  },
-  header: {
-    marginTop: 50,
-    paddingHorizontal: 25,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  headerSubtitle: {
-    color: '#B89016',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 2,
-  },
-  headerTitle: { color: '#fff', fontSize: 32, fontWeight: '800', marginTop: 5 },
-  mainCard: {
-    marginHorizontal: 15,
-    backgroundColor: '#1C1C1C',
-    borderRadius: 32,
-    padding: 24,
-    gap: 20,
-    borderWidth: 1,
-    borderColor: '#252525',
-  },
-  section: { gap: 12 },
-  sectionLabel: {
-    color: '#666',
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    marginLeft: 4,
-  },
-  input: {
-    backgroundColor: '#252525',
-    borderRadius: 16,
-    padding: 16,
-    color: '#fff',
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  inputFocused: { borderColor: '#B89016' },
-  daysRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  dayCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#252525',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  dayCircleActive: { backgroundColor: '#B89016', borderColor: '#B89016' },
-  dayText: { color: '#888', fontSize: 13, fontWeight: '700' },
-  dayTextActive: { color: '#fff' },
-  timeRow: { flexDirection: 'row', gap: 12 },
-  timeCard: {
-    flex: 1,
-    backgroundColor: '#252525',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  timeLabel: { color: '#888', fontSize: 11, textTransform: 'uppercase' },
-  timeValue: { color: '#fff', fontSize: 18, fontWeight: '700', marginTop: 4 },
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: theme.background },
+    scrollContent: {
+      paddingBottom: 130,
+      paddingTop: Platform.OS === 'ios' ? 20 : 0,
+    },
+    header: {
+      marginTop: 50,
+      paddingHorizontal: 25,
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    headerSubtitle: {
+      color: theme.primary,
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 2,
+    },
+    headerTitle: { color: '#fff', fontSize: 32, fontWeight: '800', marginTop: 5 },
+    mainCard: {
+      marginHorizontal: 15,
+      backgroundColor: theme.card,
+      borderRadius: 32,
+      padding: 24,
+      gap: 20,
+      borderWidth: 1,
+      borderColor: '#252525',
+    },
+    section: { gap: 12 },
+    sectionLabel: {
+      color: '#666',
+      fontSize: 11,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      marginLeft: 4,
+    },
+    input: {
+      backgroundColor: '#252525',
+      borderRadius: 16,
+      padding: 16,
+      color: '#fff',
+      fontSize: 16,
+      borderWidth: 1,
+      borderColor: '#333',
+    },
+    inputFocused: { borderColor: theme.primary },
+    daysRow: { flexDirection: 'row', justifyContent: 'space-between' },
+    dayCircle: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: '#252525',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: '#333',
+    },
+    dayCircleActive: { backgroundColor: theme.primary, borderColor: theme.primary },
+    dayText: { color: '#888', fontSize: 13, fontWeight: '700' },
+    dayTextActive: { color: '#fff' },
+    timeRow: { flexDirection: 'row', gap: 12 },
+    timeCard: {
+      flex: 1,
+      backgroundColor: '#252525',
+      borderRadius: 16,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: '#333',
+    },
+    timeLabel: { color: '#888', fontSize: 11, textTransform: 'uppercase' },
+    timeValue: { color: '#fff', fontSize: 18, fontWeight: '700', marginTop: 4 },
 
-  // TURNO CORTADO
-  shiftHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  splitToggle: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: '#252525',
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  splitToggleActive: {
-    backgroundColor: 'rgba(184,144,22,0.15)',
-    borderColor: '#B89016',
-  },
-  splitToggleText: { color: '#666', fontSize: 12, fontWeight: '700' },
-  splitToggleTextActive: { color: '#B89016' },
-  shiftBlock: { gap: 8 },
-  shiftLabel: {
-    color: '#B89016',
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  shiftDivider: { height: 1, backgroundColor: '#252525', marginVertical: 4 },
+    // TURNO CORTADO
+    shiftHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    splitToggle: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 12,
+      backgroundColor: '#252525',
+      borderWidth: 1,
+      borderColor: '#333',
+    },
+    splitToggleActive: {
+      backgroundColor: hexToRgba(theme.primary, 0.15),
+      borderColor: theme.primary,
+    },
+    splitToggleText: { color: '#666', fontSize: 12, fontWeight: '700' },
+    splitToggleTextActive: { color: theme.primary },
+    shiftBlock: { gap: 8 },
+    shiftLabel: {
+      color: theme.primary,
+      fontSize: 11,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    shiftDivider: { height: 1, backgroundColor: '#252525', marginVertical: 4 },
 
-  submitBtn: {
-    backgroundColor: '#B89016',
-    borderRadius: 20,
-    paddingVertical: 18,
-    alignItems: 'center',
-  },
-  submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.9)',
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    backgroundColor: '#1C1C1C',
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    padding: 24,
-    minHeight: 450,
-  },
-  modalHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
-  wheelsWrapper: {
-    height: 250,
-    backgroundColor: '#252525',
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  timeOption: { paddingVertical: 15, alignItems: 'center' },
-  timeOptionActive: { backgroundColor: '#B89016' },
-  timeOptionLabel: { color: '#aaa', fontSize: 18 },
-  timeOptionLabelActive: { color: '#fff', fontWeight: '900' },
-  modalActions: { marginTop: 25 },
-  modalBtn: {
-    paddingVertical: 16,
-    backgroundColor: '#B89016',
-    borderRadius: 16,
-    alignItems: 'center',
-  },
-  modalBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
-});
+    submitBtn: {
+      backgroundColor: theme.primary,
+      borderRadius: 20,
+      paddingVertical: 18,
+      alignItems: 'center',
+    },
+    submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.9)',
+      justifyContent: 'flex-end',
+    },
+    modalSheet: {
+      backgroundColor: theme.card,
+      borderTopLeftRadius: 32,
+      borderTopRightRadius: 32,
+      padding: 24,
+      minHeight: 450,
+    },
+    modalHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    modalTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
+    wheelsWrapper: {
+      height: 250,
+      backgroundColor: '#252525',
+      borderRadius: 20,
+      overflow: 'hidden',
+    },
+    timeOption: { paddingVertical: 15, alignItems: 'center' },
+    timeOptionActive: { backgroundColor: theme.primary },
+    timeOptionLabel: { color: '#aaa', fontSize: 18 },
+    timeOptionLabelActive: { color: '#fff', fontWeight: '900' },
+    modalActions: { marginTop: 25 },
+    modalBtn: {
+      paddingVertical: 16,
+      backgroundColor: theme.primary,
+      borderRadius: 16,
+      alignItems: 'center',
+    },
+    modalBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  });
 
 export default RegisterEmployed;

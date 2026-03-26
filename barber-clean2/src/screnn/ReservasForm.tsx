@@ -22,6 +22,24 @@ import {
   fetchServices,
   ServiceOption,
 } from '../services/api';
+import { useTheme } from '../context/ThemeContext';
+import type { Theme } from '../context/ThemeContext';
+
+const hexToRgba = (hex: string, alpha: number) => {
+  const sanitized = hex.replace('#', '');
+  const bigint = parseInt(sanitized.length === 3 ? sanitized.repeat(2) : sanitized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const formatPrice = (value?: number) =>
+  new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
 
 const SHOP_TZ = 'America/Argentina/Cordoba';
 
@@ -50,6 +68,7 @@ const DAY_NAMES = [
 type SlotGroup = { label: string; slots: string[] };
 
 function ReservasForm({ navigation }: any) {
+  const { theme } = useTheme();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
@@ -58,14 +77,13 @@ function ReservasForm({ navigation }: any) {
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [selectedBarber, setSelectedBarber] = useState<string | null>(null);
   const [services, setServices] = useState<ServiceOption[]>([]);
-  const [selectedService, setSelectedService] = useState<ServiceOption | null>(
-    null,
-  );
+  const [selectedService, setSelectedService] = useState<ServiceOption | null>(null);
   const [servicePickerVisible, setServicePickerVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   useEffect(() => {
     async function load() {
@@ -276,7 +294,7 @@ function ReservasForm({ navigation }: any) {
   if (loading)
     return (
       <View style={[styles.screen, { justifyContent: 'center' }]}>
-        <ActivityIndicator size="large" color="#B89016" />
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
 
@@ -300,7 +318,9 @@ function ReservasForm({ navigation }: any) {
                   }}
                 >
                   <Text style={styles.serviceItemText}>{s.name}</Text>
-                  <Text style={{ color: '#666' }}>{s.durationMinutes} min</Text>
+                  <Text style={{ color: '#666' }}>
+                    {s.durationMinutes} min · {formatPrice(s.price)}
+                  </Text>
                 </Pressable>
               ))}
             </ScrollView>
@@ -310,7 +330,7 @@ function ReservasForm({ navigation }: any) {
             >
               <Text
                 style={{
-                  color: '#B89016',
+                  color: theme.primary,
                   textAlign: 'center',
                   fontWeight: 'bold',
                 }}
@@ -341,9 +361,16 @@ function ReservasForm({ navigation }: any) {
                 style={styles.selector}
                 onPress={() => setServicePickerVisible(true)}
               >
-                <Text style={styles.selectorMainText}>
-                  {selectedService?.name || 'Seleccionar...'}
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.selectorMainText}>
+                    {selectedService?.name || 'Seleccionar...'}
+                  </Text>
+                  {selectedService ? (
+                    <Text style={styles.selectorMeta}>
+                      {selectedService.durationMinutes} min · {formatPrice(selectedService.price)}
+                    </Text>
+                  ) : null}
+                </View>
                 <Text style={styles.arrowIcon}>▼</Text>
               </Pressable>
             </View>
@@ -522,185 +549,188 @@ function ReservasForm({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#000' },
-  scrollContent: { paddingBottom: 150 },
-  header: {
-    marginTop: Platform.OS === 'ios' ? 60 : 20,
-    paddingHorizontal: 25,
-    marginBottom: 20,
-  },
-  headerSubtitle: {
-    color: '#B89016',
-    fontSize: 14,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  headerTitle: { color: '#fff', fontSize: 32, fontWeight: '800' },
-  mainCard: {
-    marginHorizontal: 15,
-    backgroundColor: '#1C1C1C',
-    borderRadius: 32,
-    padding: 20,
-    gap: 20,
-  },
-  section: { gap: 10 },
-  sectionLabel: {
-    color: '#888',
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  selector: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: '#252525',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  selectorMainText: { color: '#fff', fontWeight: '600', fontSize: 16 },
-  arrowIcon: { color: '#B89016', fontSize: 14 },
-  input: {
-    backgroundColor: '#252525',
-    borderRadius: 16,
-    padding: 16,
-    color: '#fff',
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#333',
-    marginBottom: 5,
-  },
-  inputFocused: { borderColor: '#B89016' },
-  barberCard: { alignItems: 'center', marginRight: 20, width: 85 },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#333',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  avatarActive: { borderColor: '#B89016', backgroundColor: '#B89016' },
-  avatarText: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
-  barberName: { color: '#666', marginTop: 6, fontSize: 14, fontWeight: '600' },
-  barberNameActive: { color: '#fff' },
-  barberSchedule: { color: '#444', fontSize: 10, marginTop: 2 },
-  dateHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  dateControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#252525',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  navBtn: { color: '#B89016', fontSize: 28, fontWeight: 'bold' },
-  dateText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-    textTransform: 'capitalize',
-  },
-  timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  timeChip: {
-    width: '22%',
-    paddingVertical: 14,
-    backgroundColor: '#252525',
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  timeChipActive: { backgroundColor: '#B89016', borderColor: '#B89016' },
-  timeChipBooked: {
-    backgroundColor: '#1a1a1a',
-    borderColor: '#2a2a2a',
-    opacity: 0.5,
-  },
-  timeText: { color: '#fff', fontWeight: '700' },
-  timeTextBooked: { color: '#444', textDecorationLine: 'line-through' },
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: theme.background },
+    scrollContent: { paddingBottom: 150 },
+    header: {
+      marginTop: Platform.OS === 'ios' ? 60 : 20,
+      paddingHorizontal: 25,
+      marginBottom: 20,
+    },
+    headerSubtitle: {
+      color: theme.primary,
+      fontSize: 14,
+      fontWeight: '600',
+      textTransform: 'uppercase',
+    },
+    headerTitle: { color: '#fff', fontSize: 32, fontWeight: '800' },
+    mainCard: {
+      marginHorizontal: 15,
+      backgroundColor: theme.card,
+      borderRadius: 32,
+      padding: 20,
+      gap: 20,
+    },
+    section: { gap: 10 },
+    sectionLabel: {
+      color: '#888',
+      fontSize: 11,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    selector: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: '#252525',
+      borderRadius: 16,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: '#333',
+    },
+    selectorMainText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+    selectorMeta: { color: '#777', fontSize: 12, marginTop: 2 },
+    arrowIcon: { color: theme.primary, fontSize: 14 },
+    input: {
+      backgroundColor: '#252525',
+      borderRadius: 16,
+      padding: 16,
+      color: '#fff',
+      fontSize: 16,
+      borderWidth: 1,
+      borderColor: '#333',
+      marginBottom: 5,
+    },
+    inputFocused: { borderColor: theme.primary },
+    barberCard: { alignItems: 'center', marginRight: 20, width: 85 },
+    avatar: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: '#333',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: 'transparent',
+    },
+    avatarActive: { borderColor: theme.primary, backgroundColor: theme.primary },
+    avatarText: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
+    barberName: { color: '#666', marginTop: 6, fontSize: 14, fontWeight: '600' },
+    barberNameActive: { color: '#fff' },
+    barberSchedule: { color: '#444', fontSize: 10, marginTop: 2 },
+    dateHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 5,
+    },
+    dateControls: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: '#252525',
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    navBtn: { color: theme.primary, fontSize: 28, fontWeight: 'bold' },
+    dateText: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '700',
+      textTransform: 'capitalize',
+    },
+    timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    timeChip: {
+      width: '22%',
+      paddingVertical: 14,
+      backgroundColor: '#252525',
+      borderRadius: 12,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: '#333',
+    },
+    timeChipActive: { backgroundColor: theme.primary, borderColor: theme.primary },
+    timeChipBooked: {
+      backgroundColor: '#1a1a1a',
+      borderColor: '#2a2a2a',
+      opacity: 0.5,
+    },
+    timeText: { color: '#fff', fontWeight: '700' },
+    timeTextBooked: { color: '#444', textDecorationLine: 'line-through' },
   timeDuration: { color: '#666', fontSize: 9, marginTop: 2, fontWeight: '600' },
-  shiftGroupLabel: {
-    color: '#B89016',
-    fontSize: 10,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  notWorkingBox: {
-    padding: 30,
-    backgroundColor: '#252525',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#333',
-    marginTop: 10,
-    alignItems: 'center',
-  },
-  notWorkingIcon: { fontSize: 24, marginBottom: 10 },
-  notWorkingText: {
-    color: '#B89016',
-    textAlign: 'center',
-    fontWeight: '800',
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  submitBtn: {
-    backgroundColor: '#B89016',
-    padding: 20,
-    borderRadius: 20,
-    alignItems: 'center',
-    marginTop: 10,
-    shadowColor: '#B89016',
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-  },
-  submitBtnText: {
-    color: '#fff',
-    fontWeight: '900',
-    fontSize: 17,
-    textTransform: 'uppercase',
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.9)',
-    justifyContent: 'center',
-    padding: 25,
-  },
-  modalCard: {
-    backgroundColor: '#1C1C1C',
-    borderRadius: 30,
-    padding: 25,
-    maxHeight: '70%',
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  modalTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '800',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  serviceItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: '#252525',
-  },
-  serviceItemText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-});
+    shiftGroupLabel: {
+      color: theme.primary,
+      fontSize: 10,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      marginBottom: 8,
+    },
+    notWorkingBox: {
+      padding: 30,
+      backgroundColor: '#252525',
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: '#333',
+      marginTop: 10,
+      alignItems: 'center',
+    },
+    notWorkingIcon: { fontSize: 24, marginBottom: 10 },
+    notWorkingText: {
+      color: theme.primary,
+      textAlign: 'center',
+      fontWeight: '800',
+      fontSize: 15,
+      lineHeight: 22,
+    },
+    submitBtn: {
+      backgroundColor: theme.primary,
+      padding: 20,
+      borderRadius: 20,
+      alignItems: 'center',
+      marginTop: 10,
+      shadowColor: theme.primary,
+      shadowOpacity: 0.3,
+      shadowRadius: 10,
+    },
+    submitBtnText: {
+      color: '#fff',
+      fontWeight: '900',
+      fontSize: 17,
+      textTransform: 'uppercase',
+    },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.9)',
+      justifyContent: 'center',
+      padding: 25,
+    },
+    modalCard: {
+      backgroundColor: theme.card,
+      borderRadius: 30,
+      padding: 25,
+      maxHeight: '70%',
+      borderWidth: 1,
+      borderColor: '#333',
+    },
+    modalTitle: {
+      color: '#fff',
+      fontSize: 20,
+      fontWeight: '800',
+      marginBottom: 20,
+      textAlign: 'center',
+    },
+    serviceItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: 18,
+      borderBottomWidth: 1,
+      borderBottomColor: '#252525',
+    },
+    serviceItemText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  });
 
 export default ReservasForm;

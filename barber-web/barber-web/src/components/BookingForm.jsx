@@ -25,6 +25,12 @@ const minutesToLabel = (totalMinutes) => {
 const SLOT_INTERVAL_MINUTES = 30;
 const DEFAULT_WORKING_RANGE = { start: 8 * 60, end: 22 * 60 };
 const DEFAULT_RANGE_LABEL = `${minutesToLabel(DEFAULT_WORKING_RANGE.start)} - ${minutesToLabel(DEFAULT_WORKING_RANGE.end)}`;
+const formatPrice = (value) =>
+  new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
 
 const labelToMinutes = (label) => {
   const [hours, minutes] = label.split(":").map(Number);
@@ -407,7 +413,7 @@ const handleSubmit = async (e) => {
                       {service.name}
                     </span>
                     <span className={styles.serviceItemMeta}>
-                      {service.durationMinutes} min
+                      {service.durationMinutes} min · {formatPrice(service.price)}
                     </span>
                   </div>
                 </button>
@@ -444,7 +450,7 @@ const handleSubmit = async (e) => {
                 {selectedService?.name || "Seleccionar servicio"}
               </span>
               <span className={styles.selectorSubText}>
-                {currentDuration} minutos de sesión
+                {currentDuration} minutos · {selectedService ? formatPrice(selectedService.price) : "..."}
               </span>
             </div>
             <span className={styles.arrowIcon}>▼</span>
