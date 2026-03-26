@@ -17,6 +17,7 @@ app.use(cors({
     const whitelist = [
       "http://localhost:3000",
       "https://barberappbycodex.com",
+      "https://www.barberappbycodex.com", 
       "https://barber-app-evf4.vercel.app",
       
     ];
