@@ -332,7 +332,7 @@ function RegisterEmployed({ navigation }: Props) {
                     >
                       <Text style={styles.timeLabel}>Inicio</Text>
                       <Text style={styles.timeValue}>
-                        {formatMinutes(startMinutes)}
+                        {formatMinutesAmPm(startMinutes)}
                       </Text>
                     </Pressable>
                     <Pressable
@@ -341,7 +341,7 @@ function RegisterEmployed({ navigation }: Props) {
                     >
                       <Text style={styles.timeLabel}>Fin</Text>
                       <Text style={styles.timeValue}>
-                        {formatMinutes(endMinutes)}
+                        {formatMinutesAmPm(endMinutes)}
                       </Text>
                     </Pressable>
                   </View>
@@ -357,7 +357,7 @@ function RegisterEmployed({ navigation }: Props) {
                         >
                           <Text style={styles.timeLabel}>Inicio</Text>
                           <Text style={styles.timeValue}>
-                            {formatMinutes(morningStart)}
+                            {formatMinutesAmPm(morningStart)}
                           </Text>
                         </Pressable>
                         <Pressable
@@ -366,7 +366,7 @@ function RegisterEmployed({ navigation }: Props) {
                         >
                           <Text style={styles.timeLabel}>Fin</Text>
                           <Text style={styles.timeValue}>
-                            {formatMinutes(morningEnd)}
+                            {formatMinutesAmPm(morningEnd)}
                           </Text>
                         </Pressable>
                       </View>
@@ -383,7 +383,7 @@ function RegisterEmployed({ navigation }: Props) {
                         >
                           <Text style={styles.timeLabel}>Inicio</Text>
                           <Text style={styles.timeValue}>
-                            {formatMinutes(afternoonStart)}
+                            {formatMinutesAmPm(afternoonStart)}
                           </Text>
                         </Pressable>
                         <Pressable
@@ -392,7 +392,7 @@ function RegisterEmployed({ navigation }: Props) {
                         >
                           <Text style={styles.timeLabel}>Fin</Text>
                           <Text style={styles.timeValue}>
-                            {formatMinutes(afternoonEnd)}
+                            {formatMinutesAmPm(afternoonEnd)}
                           </Text>
                         </Pressable>
                       </View>
@@ -442,13 +442,18 @@ function TimeSelectModal({
   theme,
   styles,
 }: any) {
-  const [selected, setSelected] = useState(initialValueMinutes);
-  const TIME_OPTIONS = useMemo(
-    () => Array.from({ length: (24 * 60) / 15 }, (_, i) => i * 15),
-    [],
-  );
+  const [period, setPeriod] = useState<'AM' | 'PM'>('AM');
+  const [hour, setHour] = useState(9);
+  const [minute, setMinute] = useState(0);
+  const HOURS = useMemo(() => Array.from({ length: 12 }, (_, i) => i + 1), []);
+  const MINUTES = useMemo(() => [0, 15, 30, 45], []);
+
   useEffect(() => {
-    if (visible) setSelected(initialValueMinutes);
+    if (!visible) return;
+    const parts = minutesToPickerParts(initialValueMinutes);
+    setPeriod(parts.period);
+    setHour(parts.hour);
+    setMinute(parts.minute);
   }, [visible, initialValueMinutes]);
 
   return (
@@ -463,31 +468,96 @@ function TimeSelectModal({
               </Text>
             </Pressable>
           </View>
-          <ScrollView style={styles.wheelsWrapper}>
-            {TIME_OPTIONS.map(m => (
-              <Pressable
-                key={m}
-                onPress={() => setSelected(m)}
-                style={[
-                  styles.timeOption,
-                  m === selected && styles.timeOptionActive,
-                ]}
-              >
-                <Text
+          <View style={styles.timePickerSummary}>
+            <Text style={styles.timePickerSummaryLabel}>Horario elegido</Text>
+            <Text style={styles.timePickerSummaryValue}>
+              {formatMinutesAmPm(
+                pickerPartsToMinutes({ period, hour, minute }),
+              )}
+            </Text>
+          </View>
+
+          <View style={styles.timePickerSection}>
+            <Text style={styles.timePickerSectionTitle}>Periodo</Text>
+            <View style={styles.periodRow}>
+              {(['AM', 'PM'] as const).map(item => (
+                <Pressable
+                  key={item}
+                  onPress={() => setPeriod(item)}
                   style={[
-                    styles.timeOptionLabel,
-                    m === selected && styles.timeOptionLabelActive,
+                    styles.periodChip,
+                    period === item && styles.periodChipActive,
                   ]}
                 >
-                  {formatMinutes(m)}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+                  <Text
+                    style={[
+                      styles.periodChipText,
+                      period === item && styles.periodChipTextActive,
+                    ]}
+                  >
+                    {item}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.timePickerSection}>
+            <Text style={styles.timePickerSectionTitle}>Hora</Text>
+            <View style={styles.pickerGrid}>
+              {HOURS.map(item => (
+                <Pressable
+                  key={item}
+                  onPress={() => setHour(item)}
+                  style={[
+                    styles.pickerChip,
+                    hour === item && styles.pickerChipActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.pickerChipText,
+                      hour === item && styles.pickerChipTextActive,
+                    ]}
+                  >
+                    {item}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.timePickerSection}>
+            <Text style={styles.timePickerSectionTitle}>Minutos</Text>
+            <View style={styles.pickerGrid}>
+              {MINUTES.map(item => (
+                <Pressable
+                  key={item}
+                  onPress={() => setMinute(item)}
+                  style={[
+                    styles.pickerChip,
+                    minute === item && styles.pickerChipActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.pickerChipText,
+                      minute === item && styles.pickerChipTextActive,
+                    ]}
+                  >
+                    {String(item).padStart(2, '0')}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
           <View style={styles.modalActions}>
             <Pressable
               style={styles.modalBtn}
-              onPress={() => onConfirm(selected)}
+              onPress={() =>
+                onConfirm(pickerPartsToMinutes({ period, hour, minute }))
+              }
             >
               <Text style={styles.modalBtnText}>Confirmar</Text>
             </Pressable>
@@ -505,6 +575,38 @@ function formatMinutes(totalMinutes: number) {
     2,
     '0',
   )}`;
+}
+
+function formatMinutesAmPm(totalMinutes: number) {
+  const hours24 = Math.floor(totalMinutes / 60) % 24;
+  const minutes = totalMinutes % 60;
+  const period = hours24 >= 12 ? 'PM' : 'AM';
+  const hours12 = hours24 % 12 || 12;
+  return `${hours12}:${String(minutes).padStart(2, '0')} ${period}`;
+}
+
+function minutesToPickerParts(totalMinutes: number) {
+  const hours24 = Math.floor(totalMinutes / 60) % 24;
+  const minutes = totalMinutes % 60;
+  return {
+    period: hours24 >= 12 ? 'PM' : 'AM',
+    hour: hours24 % 12 || 12,
+    minute: minutes,
+  };
+}
+
+function pickerPartsToMinutes({
+  period,
+  hour,
+  minute,
+}: {
+  period: 'AM' | 'PM';
+  hour: number;
+  minute: number;
+}) {
+  const normalizedHour = hour % 12;
+  const hours24 = period === 'PM' ? normalizedHour + 12 : normalizedHour;
+  return hours24 * 60 + minute;
 }
 
 const createStyles = (theme: Theme) =>
@@ -636,16 +738,89 @@ const createStyles = (theme: Theme) =>
       marginBottom: 20,
     },
     modalTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
-    wheelsWrapper: {
-      height: 250,
+    timePickerSummary: {
       backgroundColor: '#252525',
       borderRadius: 20,
-      overflow: 'hidden',
+      paddingVertical: 16,
+      paddingHorizontal: 18,
+      alignItems: 'center',
+      marginBottom: 16,
     },
-    timeOption: { paddingVertical: 15, alignItems: 'center' },
-    timeOptionActive: { backgroundColor: theme.primary },
-    timeOptionLabel: { color: '#aaa', fontSize: 18 },
-    timeOptionLabelActive: { color: '#fff', fontWeight: '900' },
+    timePickerSummaryLabel: {
+      color: '#8A8A8A',
+      fontSize: 11,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    timePickerSummaryValue: {
+      color: '#fff',
+      fontSize: 28,
+      fontWeight: '900',
+      marginTop: 6,
+    },
+    timePickerSection: {
+      marginTop: 10,
+    },
+    timePickerSectionTitle: {
+      color: '#A0A0A0',
+      fontSize: 12,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      marginBottom: 10,
+    },
+    periodRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    periodChip: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 16,
+      backgroundColor: '#252525',
+      borderWidth: 1,
+      borderColor: '#333',
+      alignItems: 'center',
+    },
+    periodChipActive: {
+      backgroundColor: theme.primary,
+      borderColor: theme.primary,
+    },
+    periodChipText: {
+      color: '#C0C0C0',
+      fontSize: 18,
+      fontWeight: '800',
+    },
+    periodChipTextActive: {
+      color: '#fff',
+    },
+    pickerGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    pickerChip: {
+      width: '22%',
+      paddingVertical: 14,
+      borderRadius: 16,
+      backgroundColor: '#252525',
+      borderWidth: 1,
+      borderColor: '#333',
+      alignItems: 'center',
+    },
+    pickerChipActive: {
+      backgroundColor: theme.primary,
+      borderColor: theme.primary,
+    },
+    pickerChipText: {
+      color: '#C0C0C0',
+      fontSize: 18,
+      fontWeight: '800',
+    },
+    pickerChipTextActive: {
+      color: '#fff',
+    },
     modalActions: { marginTop: 25 },
     modalBtn: {
       paddingVertical: 16,

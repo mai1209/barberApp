@@ -110,24 +110,9 @@ export async function publicListBarbers(req, res, next) {
     if (!shop) return res.status(404).json({ error: "Barbería no encontrada" });
     const ownerId = toObjectId(shop._id);
 
-    // ← AGREGAR ESTOS LOGS
-    console.log("shop._id:", shop._id);
-    console.log("ownerId:", ownerId);
-
-    // Buscar sin filtro de owner para ver qué hay
-    const todosLosBarberos = await BarberModel.find({ isActive: true }).lean();
-    console.log(
-      "Todos los barberos activos:",
-      todosLosBarberos.map((b) => ({
-        nombre: b.fullName,
-        owner: b.owner?.toString(),
-      })),
-    );
-
     const barbers = await BarberModel.find({ owner: ownerId, isActive: true })
       .sort({ createdAt: 1 })
       .lean();
-    console.log("Barberos del owner:", barbers.length);
 
     return res.json({
       shop: sanitizeShop(shop),

@@ -48,9 +48,8 @@ const hexToRgba = (hex: string, alpha: number) => {
 };
 
 function Home({ navigation }: Props) {
-  const { theme, setShopSlug: setThemeSlug } = useTheme();
+  const { theme, shopSlug, setShopSlug: setThemeSlug } = useTheme();
   const [fullName, setFullName] = useState('');
-  const [shopSlug, setShopSlug] = useState('');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -58,6 +57,7 @@ function Home({ navigation }: Props) {
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   const selectedDateRef = useRef(selectedDate);
+  const didInitDateEffect = useRef(false);
 
   useEffect(() => {
     selectedDateRef.current = selectedDate;
@@ -141,7 +141,6 @@ function Home({ navigation }: Props) {
       if (isMounted) {
         if (storedUser?.fullName) setFullName(storedUser.fullName);
         if (storedUser?.shopSlug) {
-          setShopSlug(storedUser.shopSlug);
           setThemeSlug(storedUser.shopSlug);
         }
       }
@@ -165,6 +164,10 @@ function Home({ navigation }: Props) {
   );
 
   useEffect(() => {
+    if (!didInitDateEffect.current) {
+      didInitDateEffect.current = true;
+      return;
+    }
     loadData(false, selectedDate);
   }, [selectedDate, loadData]);
 

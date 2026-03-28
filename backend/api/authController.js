@@ -129,6 +129,35 @@ export async function loginUser(req, res, next) {
   }
 }
 
+export async function getCurrentUser(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    const userDoc = await UserModel.findById(userId);
+    if (!userDoc || userDoc.isActive === false) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    if (!userDoc.shopSlug) {
+      const fallbackSlug = normalizeSlugCandidate(userDoc.fullName) || "barberia";
+      userDoc.shopSlug = await buildAvailableSlug(fallbackSlug);
+      await userDoc.save();
+    }
+
+    return res.json({
+      user: {
+        ...userDoc.toJSON(),
+        shopSlug: userDoc.shopSlug,
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 export async function savePushToken(req, res) {
   try {
     const userId = req.user?.id; // <--- Ahora sí vendrá en .id gracias al middleware

@@ -116,6 +116,10 @@ export function loginUser(payload: { email: string; password: string; }) {
   return request<{ token: string; user: any }>("/api/auth/login", { method: "POST", body: payload });
 }
 
+export function getCurrentUser() {
+  return request<{ user: any }>("/api/auth/me", { auth: true });
+}
+
 export function savePushTokenApi(token: string) {
   return request("/api/auth/save-push-token", { method: "POST", body: { token }, auth: true });
 }

@@ -59,5 +59,7 @@ const barberSchema = new mongoose.Schema(
   },
 );
 
+barberSchema.index({ owner: 1, isActive: 1, createdAt: 1 });
+
 export const BarberModel =
   mongoose.models.Barber ?? mongoose.model("Barber", barberSchema);

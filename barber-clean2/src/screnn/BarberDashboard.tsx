@@ -100,6 +100,7 @@ function BarberDashboard({ route, navigation }: Props) {
   const [error, setError] = useState('');
 
   const dateRef = useRef(date);
+  const didInitDateEffect = useRef(false);
 
   useEffect(() => {
     dateRef.current = date;
@@ -162,6 +163,10 @@ function BarberDashboard({ route, navigation }: Props) {
   );
 
   useEffect(() => {
+    if (!didInitDateEffect.current) {
+      didInitDateEffect.current = true;
+      return;
+    }
     loadAppointments();
   }, [date, loadAppointments]);
 

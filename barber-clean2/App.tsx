@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Alert, Platform, View } from 'react-native'; 
+import { ActivityIndicator, Alert, Platform, View } from 'react-native'; 
 import { DarkTheme, NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import messaging from '@react-native-firebase/messaging';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import StackNavigator from './src/navigation/StackNavigation';
-import { savePushTokenApi } from './src/services/api';
+import { getCurrentUser, savePushTokenApi } from './src/services/api';
+import {
+  getToken,
+  removeToken,
+  removeUserProfile,
+  saveUserProfile,
+} from './src/services/authStorage';
 import { ThemeProvider } from './src/context/ThemeContext';
 
 export const navigationRef = createNavigationContainerRef();
@@ -22,6 +28,51 @@ const appNavigationTheme = {
 
 export default function App() {
   const [currentRouteName, setCurrentRouteName] = useState<string | undefined>();
+  const [initialRouteName, setInitialRouteName] = useState<'Login' | 'Home'>('Login');
+  const [sessionReady, setSessionReady] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const bootstrapSession = async () => {
+      try {
+        const token = await getToken();
+
+        if (!token) {
+          if (isMounted) {
+            setInitialRouteName('Login');
+          }
+          return;
+        }
+
+        try {
+          const response = await getCurrentUser();
+          await saveUserProfile(response.user);
+
+          if (isMounted) {
+            setInitialRouteName('Home');
+          }
+        } catch (_error) {
+          await removeToken();
+          await removeUserProfile();
+
+          if (isMounted) {
+            setInitialRouteName('Login');
+          }
+        }
+      } finally {
+        if (isMounted) {
+          setSessionReady(true);
+        }
+      }
+    };
+
+    bootstrapSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
 useEffect(() => {
   const initNotifications = async () => {
@@ -75,8 +126,25 @@ useEffect(() => {
   };
 
   initNotifications();
-}, []);
+	}, []);
 
+  if (!sessionReady) {
+    return (
+      <ThemeProvider>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: '#020203',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <ActivityIndicator size="large" color="#B89016" />
+        </View>
+      </ThemeProvider>
+    );
+  }
+	
   return (
     <ThemeProvider>
       <View style={{ flex: 1, backgroundColor: '#020203' }}>
@@ -90,7 +158,10 @@ useEffect(() => {
             setCurrentRouteName(navigationRef.getCurrentRoute()?.name);
           }}
         >
-          <StackNavigator currentRouteName={currentRouteName} />
+          <StackNavigator
+            currentRouteName={currentRouteName}
+            initialRouteName={initialRouteName}
+          />
         </NavigationContainer>
       </View>
     </ThemeProvider>

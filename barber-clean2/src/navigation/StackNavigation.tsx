@@ -17,15 +17,17 @@ const Stack = createNativeStackNavigator();
 
 type Props = {
   currentRouteName?: string;
+  initialRouteName?: 'Login' | 'Home';
 };
 
-export default function StackNavigator({ currentRouteName }: Props) {
+export default function StackNavigator({ currentRouteName, initialRouteName = 'Login' }: Props) {
   return (
     <View style={styles.container}>
       <ScreenGradient />
 
       <View style={styles.stackContainer}>
         <Stack.Navigator
+          initialRouteName={initialRouteName}
           screenOptions={{
             headerShown: false,
             contentStyle: { backgroundColor: 'transparent' },

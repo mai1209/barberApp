@@ -8,4 +8,6 @@ const ServiceSchema = new Schema({
   isActive: { type: Boolean, default: true },
 });
 
+ServiceSchema.index({ owner: 1, isActive: 1, name: 1 });
+
 export const ServiceModel = model("Service", ServiceSchema);

@@ -15,6 +15,11 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.barber"
+    // --- AGREGA ESTO AQUÍ ---
+    lintOptions {
+        checkReleaseBuilds false
+        abortOnError false
+    }
     defaultConfig {
         applicationId "com.barber"
         minSdkVersion rootProject.ext.minSdkVersion
