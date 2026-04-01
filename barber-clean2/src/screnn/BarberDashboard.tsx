@@ -16,16 +16,22 @@ import {
   ActivityIndicator,
   Alert,
   PanResponder,
+  Linking,
+  Image,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   Appointment,
+  Barber,
+  fetchBarbers,
   fetchBarberAppointments,
   updateAppointmentStatus,
   deleteAppointment,
 } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
+import { Pencil, BarChart2, Plus } from 'lucide-react-native';
 
 const hexToRgba = (hex: string, alpha: number) => {
   const sanitized = hex.replace('#', '');
@@ -36,12 +42,16 @@ const hexToRgba = (hex: string, alpha: number) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
+const sanitizeWhatsappNumber = (value: string) =>
+  value.replace(/[^\d]/g, '');
+
 type Props = {
   navigation: any;
   route: {
     params: {
       barberId: string;
       barberName?: string;
+      barber?: Barber;
     };
   };
 };
@@ -75,6 +85,27 @@ function formatTimeOnly(value: string) {
   });
 }
 
+function buildCancellationMessage({
+  shopName,
+  customerName,
+  service,
+  startTime,
+}: {
+  shopName: string;
+  customerName: string;
+  service: string;
+  startTime: string;
+}) {
+  const dateLabel = new Date(startTime).toLocaleDateString('es-AR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'America/Argentina/Cordoba',
+  });
+  const timeLabel = formatTimeOnly(startTime);
+  return `Hola ${customerName}, te escribimos de ${shopName}. Tuvimos que cancelar tu turno de ${service} del ${dateLabel} a las ${timeLabel}. Responde este mensaje y te ofrecemos un nuevo horario.`;
+}
+
 function capitalize(text: string) {
   if (!text) return text;
   return text.charAt(0).toUpperCase() + text.slice(1);
@@ -92,15 +123,18 @@ function InfoLine({ label, value, styles }: { label: string; value: string; styl
 function BarberDashboard({ route, navigation }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const { barberId, barberName } = route.params;
+  const { barberId, barberName, barber: initialBarber } = route.params;
 
   const [date, setDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [barberProfile, setBarberProfile] = useState<Barber | null>(initialBarber ?? null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const dateRef = useRef(date);
   const didInitDateEffect = useRef(false);
+  const openedSwipeableIdRef = useRef<string | null>(null);
+  const swipeableRefs = useRef<Record<string, Swipeable | null>>({});
 
   useEffect(() => {
     dateRef.current = date;
@@ -141,10 +175,16 @@ function BarberDashboard({ route, navigation }: Props) {
   const loadAppointments = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetchBarberAppointments(barberId, dateParam);
+      const [appointmentsRes, barbersRes] = await Promise.all([
+        fetchBarberAppointments(barberId, dateParam),
+        fetchBarbers(),
+      ]);
 
       setAppointments(
-        res.appointments.filter((item: Appointment) => item.status !== 'cancelled'),
+        appointmentsRes.appointments.filter((item: Appointment) => item.status !== 'cancelled'),
+      );
+      setBarberProfile(
+        barbersRes.barbers.find((item: Barber) => item._id === barberId) ?? initialBarber ?? null,
       );
       setError('');
     } catch (err: any) {
@@ -182,6 +222,16 @@ function BarberDashboard({ route, navigation }: Props) {
     setDate(new Date());
   };
 
+  const handleEditProfile = () => {
+    navigation.navigate('Register-Employed', {
+      barber: barberProfile ?? {
+        _id: barberId,
+        fullName: barberName ?? 'Barbero',
+        workDays: [],
+      },
+    });
+  };
+
   const datePanResponder = useMemo(
     () =>
       PanResponder.create({
@@ -198,24 +248,45 @@ function BarberDashboard({ route, navigation }: Props) {
     [],
   );
 
-  const handleComplete = async (appointmentId: string) => {
-    try {
-      await updateAppointmentStatus(appointmentId, 'completed');
-
-      setAppointments(prev =>
-        prev.map(app =>
-          app._id === appointmentId ? { ...app, status: 'completed' } : app,
-        ),
-      );
-    } catch (err: any) {
-      Alert.alert('Error', err?.message ?? 'No se pudo actualizar el turno');
+  const handleSwipeableOpen = (appointmentId: string) => {
+    const previousId = openedSwipeableIdRef.current;
+    if (previousId && previousId !== appointmentId) {
+      swipeableRefs.current[previousId]?.close();
     }
+    openedSwipeableIdRef.current = appointmentId;
+  };
+
+  const handleComplete = async (appointmentId: string) => {
+    Alert.alert(
+      'Completar turno',
+      '¿Estás seguro que deseas completar el turno?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Completar',
+          onPress: async () => {
+            try {
+              await updateAppointmentStatus(appointmentId, 'completed');
+
+              setAppointments(prev =>
+                prev.map(app =>
+                  app._id === appointmentId ? { ...app, status: 'completed' } : app,
+                ),
+              );
+            } catch (err: any) {
+              Alert.alert('Error', err?.message ?? 'No se pudo actualizar el turno');
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleRelease = (appointmentId: string) => {
+    const appointment = appointments.find(item => item._id === appointmentId);
     Alert.alert(
       'Liberar Turno',
-      '¿Estás seguro que deseas liberar este turno?',
+      'Elegí si querés solo liberar el turno o cancelarlo avisando al cliente por WhatsApp.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -230,6 +301,39 @@ function BarberDashboard({ route, navigation }: Props) {
             }
           },
         },
+        {
+          text: 'Cancelar turno',
+          onPress: async () => {
+            try {
+              if (!appointment?.notes) {
+                Alert.alert('Falta WhatsApp', 'Este turno no tiene número de cliente cargado.');
+                return;
+              }
+
+              const phone = sanitizeWhatsappNumber(appointment.notes);
+              if (!phone) {
+                Alert.alert('WhatsApp inválido', 'El número del cliente no tiene un formato válido.');
+                return;
+              }
+
+              await deleteAppointment(appointmentId);
+              setAppointments(prev => prev.filter(app => app._id !== appointmentId));
+
+              const message = buildCancellationMessage({
+                shopName: barberName || 'la barbería',
+                customerName: appointment.customerName,
+                service: appointment.service,
+                startTime: appointment.startTime,
+              });
+
+              await Linking.openURL(
+                `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+              );
+            } catch (err: any) {
+              Alert.alert('Error', err?.message ?? 'No se pudo cancelar el turno');
+            }
+          },
+        },
       ],
     );
   };
@@ -237,9 +341,8 @@ function BarberDashboard({ route, navigation }: Props) {
   const renderAppointmentCard = (appointment: Appointment, index: number) => {
     const isCompleted = appointment.status === 'completed';
 
-    return (
+    const card = (
       <View
-        key={appointment._id}
         style={[
           styles.appointmentCard,
           isCompleted && styles.appointmentCardCompleted,
@@ -325,6 +428,39 @@ function BarberDashboard({ route, navigation }: Props) {
         )}
       </View>
     );
+
+    if (isCompleted) {
+      return <View key={appointment._id}>{card}</View>;
+    }
+
+    return (
+      <Swipeable
+        key={appointment._id}
+        ref={ref => {
+          swipeableRefs.current[appointment._id] = ref;
+        }}
+        overshootRight={false}
+        renderRightActions={() => (
+          <Pressable
+            style={[styles.swipeAction, { marginTop: index === 0 ? 0 : 14 }]}
+            onPress={() => {
+              swipeableRefs.current[appointment._id]?.close();
+              handleRelease(appointment._id);
+            }}
+          >
+            <Text style={styles.swipeActionText}>Liberar</Text>
+          </Pressable>
+        )}
+        onSwipeableOpen={() => handleSwipeableOpen(appointment._id)}
+        onSwipeableClose={() => {
+          if (openedSwipeableIdRef.current === appointment._id) {
+            openedSwipeableIdRef.current = null;
+          }
+        }}
+      >
+        {card}
+      </Swipeable>
+    );
   };
 
   return (
@@ -337,15 +473,55 @@ function BarberDashboard({ route, navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.headerSubtitle}>BARBER DASHBOARD</Text>
-          <Text style={styles.headerTitle}>{barberName || 'Mi Agenda'}</Text>
+            <Image style={styles.logo} source={theme.logo} />
+            <Text style={styles.headerSubtitle}>BARBER DASHBOARD</Text>
+            <Text style={styles.headerTitle}>
+                {barberProfile?.fullName || barberName || 'Mi Agenda'}
+            </Text>
 
-          <Pressable
-            onPress={() => navigation.navigate('Reservas')}
-            style={styles.addBtn}
-          >
-            <Text style={styles.addBtnText}>+ Nuevo Turno</Text>
-          </Pressable>
+            <View style={styles.headerActionsContainer}>
+                {/* Botón Principal: Nuevo Turno */}
+                <Pressable
+                    onPress={() => navigation.navigate('Reservas')}
+                    style={({ pressed }) => [
+                        styles.mainActionBtn,
+                        pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
+                    ]}
+                >
+                    <Plus size={20} color="#fff" strokeWidth={2} />
+                    <Text style={styles.mainActionBtnText}>NUEVO TURNO</Text>
+                </Pressable>
+
+                {/* Botones Secundarios: Editar y Métricas */}
+                <View style={styles.secondaryActionsRow}>
+                    <Pressable
+                        onPress={handleEditProfile}
+                        style={({ pressed }) => [
+                            styles.secondaryActionBtn,
+                            pressed && { backgroundColor: hexToRgba(theme.primary, 0.2) }
+                        ]}
+                    >
+                        <Pencil size={14} color={theme.primary} />
+                        <Text style={styles.secondaryActionText}>Editar Perfil</Text>
+                    </Pressable>
+
+                    <Pressable
+                        onPress={() =>
+                            navigation.navigate('Metrics', {
+                                barberId,
+                                barberName: barberProfile?.fullName || barberName || 'Mi Agenda',
+                            })
+                        }
+                        style={({ pressed }) => [
+                            styles.secondaryActionBtn,
+                            pressed && { backgroundColor: hexToRgba(theme.primary, 0.2) }
+                        ]}
+                    >
+                        <BarChart2 size={14} color={theme.primary} />
+                        <Text style={styles.secondaryActionText}>Métricas</Text>
+                    </Pressable>
+                </View>
+            </View>
         </View>
 
         <View style={styles.section}>
@@ -470,39 +646,80 @@ const makeStyles = (theme: Theme) =>
     },
 
     header: {
-      marginTop: Platform.OS === 'ios' ? 70 : 40,
-      paddingHorizontal: 25,
+      marginTop: Platform.OS === 'ios' ? 60 : 30,
+      paddingHorizontal: 20,
       alignItems: 'center',
-      marginBottom: 22,
+      marginBottom: 25,
     },
+    logo: { width: 45, height: 45, marginBottom: 12, resizeMode: 'contain' },
 
     headerSubtitle: {
       color: theme.primary,
-      fontSize: 12,
-      fontWeight: '700',
-      letterSpacing: 2,
+      fontSize: 11,
+      fontWeight: '800',
+      letterSpacing: 3,
+      textTransform: 'uppercase'
     },
 
     headerTitle: {
       color: '#fff',
-      fontSize: 28,
-      fontWeight: '800',
-      marginTop: 5,
+      fontSize: 26,
+      fontWeight: '900',
+      marginTop: 4,
       textAlign: 'center',
     },
 
-    addBtn: {
-      backgroundColor: theme.primary,
-      paddingVertical: 10,
-      paddingHorizontal: 25,
-      borderRadius: 20,
-      marginTop: 18,
+    // CONTENEDOR DE ACCIONES PRO
+    headerActionsContainer: {
+        width: '100%',
+        marginTop: 20,
+        gap: 10,
     },
 
-    addBtnText: {
-      color: '#fff',
-      fontWeight: '700',
-      fontSize: 14,
+    mainActionBtn: {
+        backgroundColor: theme.primary,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        borderRadius: 18,
+        gap: 8,
+        shadowColor: theme.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+
+    mainActionBtnText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 12,
+        letterSpacing: 1,
+    },
+
+    secondaryActionsRow: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+
+    secondaryActionBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: hexToRgba(theme.primary, 0.08),
+        borderWidth: 1,
+        borderColor: hexToRgba(theme.primary, 0.2),
+        paddingVertical: 12,
+        borderRadius: 16,
+        gap: 8,
+    },
+
+    secondaryActionText: {
+        color: theme.primary,
+        fontWeight: '700',
+        fontSize: 13,
     },
 
     section: {
@@ -845,7 +1062,7 @@ const makeStyles = (theme: Theme) =>
     },
 
     cardActionPrimaryText: {
-      color: '#111',
+      color: '#fff',
       fontSize: 12,
       fontWeight: '800',
     },
@@ -854,6 +1071,23 @@ const makeStyles = (theme: Theme) =>
       color: '#fff',
       fontSize: 12,
       fontWeight: '700',
+    },
+
+    swipeAction: {
+      width: 108,
+      borderRadius: 22,
+      backgroundColor: '#9D2121',
+      borderWidth: 1,
+      borderColor: '#C23A3A',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 10,
+    },
+
+    swipeActionText: {
+      color: '#fff',
+      fontSize: 13,
+      fontWeight: '800',
     },
 
     emptyContainer: {

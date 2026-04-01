@@ -20,7 +20,9 @@ import {
   Platform,
   Share,
   PanResponder,
+  Linking,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
@@ -47,8 +49,32 @@ const hexToRgba = (hex: string, alpha: number) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
+const sanitizeWhatsappNumber = (value: string) =>
+  value.replace(/[^\d]/g, '');
+
+function buildCancellationMessage({
+  shopName,
+  customerName,
+  service,
+  startTime,
+}: {
+  shopName: string;
+  customerName: string;
+  service: string;
+  startTime: string;
+}) {
+  const dateLabel = new Date(startTime).toLocaleDateString('es-AR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'America/Argentina/Cordoba',
+  });
+  const timeLabel = formatTimeOnly(startTime);
+  return `Hola ${customerName}, te escribimos de ${shopName}. Tuvimos que cancelar tu turno de ${service} del ${dateLabel} a las ${timeLabel}. Responde este mensaje y te ofrecemos un nuevo horario.`;
+}
+
 function Home({ navigation }: Props) {
-  const { theme, shopSlug, setShopSlug: setThemeSlug } = useTheme();
+  const { theme, shopSlug } = useTheme();
   const [fullName, setFullName] = useState('');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +84,8 @@ function Home({ navigation }: Props) {
 
   const selectedDateRef = useRef(selectedDate);
   const didInitDateEffect = useRef(false);
+  const openedSwipeableIdRef = useRef<string | null>(null);
+  const swipeableRefs = useRef<Record<string, Swipeable | null>>({});
 
   useEffect(() => {
     selectedDateRef.current = selectedDate;
@@ -140,9 +168,6 @@ function Home({ navigation }: Props) {
 
       if (isMounted) {
         if (storedUser?.fullName) setFullName(storedUser.fullName);
-        if (storedUser?.shopSlug) {
-          setThemeSlug(storedUser.shopSlug);
-        }
       }
     })();
 
@@ -203,18 +228,31 @@ function Home({ navigation }: Props) {
   };
 
   const handleComplete = async (appointmentId: string) => {
-    try {
-      await updateAppointmentStatus(appointmentId, 'completed');
-      await loadData(true, selectedDateRef.current);
-    } catch (err: any) {
-      setError(err?.message ?? 'No se pudo actualizar');
-    }
+    Alert.alert(
+      'Completar turno',
+      '¿Estás seguro que deseas completar el turno?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Completar',
+          onPress: async () => {
+            try {
+              await updateAppointmentStatus(appointmentId, 'completed');
+              await loadData(true, selectedDateRef.current);
+            } catch (err: any) {
+              setError(err?.message ?? 'No se pudo actualizar');
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleRelease = async (appointmentId: string) => {
+    const appointment = appointments.find(item => item._id === appointmentId);
     Alert.alert(
       'Liberar Turno',
-      '¿Estás seguro que deseas liberar este turno?',
+      'Elegí si querés solo liberar el turno o cancelarlo avisando al cliente por WhatsApp.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -226,6 +264,39 @@ function Home({ navigation }: Props) {
               await loadData(true, selectedDateRef.current);
             } catch (err: any) {
               setError(err?.message ?? 'No se pudo liberar el turno');
+            }
+          },
+        },
+        {
+          text: 'Cancelar turno',
+          onPress: async () => {
+            try {
+              if (!appointment?.notes) {
+                Alert.alert('Falta WhatsApp', 'Este turno no tiene número de cliente cargado.');
+                return;
+              }
+
+              const phone = sanitizeWhatsappNumber(appointment.notes);
+              if (!phone) {
+                Alert.alert('WhatsApp inválido', 'El número del cliente no tiene un formato válido.');
+                return;
+              }
+
+              await deleteAppointment(appointmentId);
+              await loadData(true, selectedDateRef.current);
+
+              const message = buildCancellationMessage({
+                shopName: greetingName,
+                customerName: appointment.customerName,
+                service: appointment.service,
+                startTime: appointment.startTime,
+              });
+
+              await Linking.openURL(
+                `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+              );
+            } catch (err: any) {
+              setError(err?.message ?? 'No se pudo cancelar el turno');
             }
           },
         },
@@ -249,6 +320,14 @@ function Home({ navigation }: Props) {
     [],
   );
 
+  const handleSwipeableOpen = (appointmentId: string) => {
+    const previousId = openedSwipeableIdRef.current;
+    if (previousId && previousId !== appointmentId) {
+      swipeableRefs.current[previousId]?.close();
+    }
+    openedSwipeableIdRef.current = appointmentId;
+  };
+
   const renderAppointmentCard = (appointment: Appointment, index: number) => {
     const barberName =
       appointment.barber && typeof appointment.barber === 'object'
@@ -257,9 +336,8 @@ function Home({ navigation }: Props) {
 
     const isCompleted = appointment.status === 'completed';
 
-    return (
+    const card = (
       <View
-        key={appointment._id}
         style={[
           styles.appointmentCard,
           isCompleted && styles.appointmentCardCompleted,
@@ -346,6 +424,39 @@ function Home({ navigation }: Props) {
         )}
       </View>
     );
+
+    if (isCompleted) {
+      return <View key={appointment._id}>{card}</View>;
+    }
+
+    return (
+      <Swipeable
+        key={appointment._id}
+        ref={ref => {
+          swipeableRefs.current[appointment._id] = ref;
+        }}
+        overshootRight={false}
+        renderRightActions={() => (
+          <Pressable
+            style={[styles.swipeAction, { marginTop: index === 0 ? 0 : 14 }]}
+            onPress={() => {
+              swipeableRefs.current[appointment._id]?.close();
+              handleRelease(appointment._id);
+            }}
+          >
+            <Text style={styles.swipeActionText}>Liberar</Text>
+          </Pressable>
+        )}
+        onSwipeableOpen={() => handleSwipeableOpen(appointment._id)}
+        onSwipeableClose={() => {
+          if (openedSwipeableIdRef.current === appointment._id) {
+            openedSwipeableIdRef.current = null;
+          }
+        }}
+      >
+        {card}
+      </Swipeable>
+    );
   };
 
   return (
@@ -389,6 +500,19 @@ function Home({ navigation }: Props) {
             <Copy color={theme.primary} size={20} />
           </Pressable>
         ) : null}
+
+        <Pressable
+          style={styles.metricsCard}
+          onPress={() => navigation.navigate('Owner-Metrics')}
+        >
+          <View style={styles.shareTextContent}>
+            <Text style={styles.shareTitle}>Métricas del mes</Text>
+            <Text style={styles.metricsSubtitle}>
+              Ver resumen general por barbero y total del local
+            </Text>
+          </View>
+          <Text style={styles.metricsCardAction}>Abrir</Text>
+        </Pressable>
 
         <View style={styles.section}>
           <View style={styles.agendaTopRow}>
@@ -553,7 +677,7 @@ const createStyles = (theme: Theme) =>
     },
 
     welcomeText: {
-      color: '#888',
+      color: '#fff',
       fontSize: 16,
       fontWeight: '500',
     },
@@ -581,6 +705,18 @@ const createStyles = (theme: Theme) =>
       marginTop: 20,
     },
 
+    metricsCard: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 15,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderWidth: 1,
+      borderColor: '#2A2A2A',
+      marginTop: 12,
+    },
+
     shareTextContent: {
       flex: 1,
     },
@@ -598,6 +734,19 @@ const createStyles = (theme: Theme) =>
       fontSize: 14,
       marginTop: 2,
       fontWeight: '500',
+    },
+
+    metricsSubtitle: {
+      color: '#CFCFCF',
+      fontSize: 14,
+      marginTop: 2,
+      fontWeight: '500',
+    },
+
+    metricsCardAction: {
+      color: theme.primary,
+      fontSize: 13,
+      fontWeight: '800',
     },
 
     section: {
@@ -940,7 +1089,7 @@ const createStyles = (theme: Theme) =>
     },
 
     cardActionPrimaryText: {
-      color: '#111',
+      color: '#fff',
       fontSize: 12,
       fontWeight: '800',
     },
@@ -949,6 +1098,23 @@ const createStyles = (theme: Theme) =>
       color: '#fff',
       fontSize: 12,
       fontWeight: '700',
+    },
+
+    swipeAction: {
+      width: 108,
+      borderRadius: 22,
+      backgroundColor: '#9D2121',
+      borderWidth: 1,
+      borderColor: '#C23A3A',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 10,
+    },
+
+    swipeActionText: {
+      color: '#fff',
+      fontSize: 13,
+      fontWeight: '800',
     },
 
     emptyContainer: {

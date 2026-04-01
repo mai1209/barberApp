@@ -4,31 +4,110 @@ import { AppointmentModel } from "../models/Appointment.js";
 import { ServiceModel } from "../models/Services.js";
 import { UserModel } from "../models/User.js";
 import admin from "../firebase.js";
-import nodemailer from "nodemailer";
-
-// 1. CONFIGURACIÓN DE NODEMAILER
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: "barberAppByCodex@gmail.com",
-    pass: "hywu gkkm mbej fwou", // Tu clave de 16 letras
-  },
-});
+import { sendAppMail } from "../services/mailer.js";
+import { getTimeZoneDayRange, getTimeZoneWeekday } from "../utils/timezone.js";
 
 // Función auxiliar para calcular rangos de fecha
 function buildDayRange(dateLike) {
-  if (typeof dateLike === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateLike)) {
-    const [year, month, day] = dateLike.split("-").map(Number);
-    const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
-    const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
-    return { startOfDay, endOfDay };
+  return getTimeZoneDayRange(dateLike);
+}
+
+function normalizePaymentMethod(value) {
+  return value === "transfer" ? "transfer" : "cash";
+}
+
+async function resolveServicePrice({ ownerId, serviceName, providedPrice }) {
+  const parsedPrice = Number(providedPrice);
+  if (Number.isFinite(parsedPrice) && parsedPrice >= 0) {
+    return parsedPrice;
   }
-  const date = dateLike ? new Date(dateLike) : new Date();
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(startOfDay);
-  endOfDay.setHours(23, 59, 59, 999);
-  return { startOfDay, endOfDay };
+
+  const serviceDoc = await ServiceModel.findOne({
+    owner: ownerId,
+    name: serviceName,
+  })
+    .select({ price: 1 })
+    .lean();
+
+  return Number(serviceDoc?.price || 0);
+}
+
+function monthStartFromOffset(baseDate, offset) {
+  return new Date(baseDate.getFullYear(), baseDate.getMonth() + offset, 1, 0, 0, 0, 0);
+}
+
+function buildMetricsRange(query = {}) {
+  const now = new Date();
+  const parsedYear = Number(query.year);
+  const year = Number.isInteger(parsedYear) && parsedYear >= 2024
+    ? parsedYear
+    : now.getFullYear();
+  const annual = String(query.annual ?? "").toLowerCase() === "true";
+
+  if (annual) {
+    const start = new Date(year, 0, 1, 0, 0, 0, 0);
+    const end = new Date(year + 1, 0, 1, 0, 0, 0, 0);
+    return {
+      mode: "annual",
+      year,
+      month: null,
+      key: String(year),
+      label: `Año ${year}`,
+      start,
+      end,
+    };
+  }
+
+  const parsedMonth = Number(query.month);
+  const month = Number.isInteger(parsedMonth) && parsedMonth >= 1 && parsedMonth <= 12
+    ? parsedMonth
+    : now.getMonth() + 1;
+  const start = new Date(year, month - 1, 1, 0, 0, 0, 0);
+  const end = new Date(year, month, 1, 0, 0, 0, 0);
+
+  return {
+    mode: "monthly",
+    year,
+    month,
+    key: `${year}-${String(month).padStart(2, "0")}`,
+    label: start.toLocaleDateString("es-AR", {
+      month: "long",
+      year: "numeric",
+    }),
+    start,
+    end,
+  };
+}
+
+function createMetricsBucket(base = {}) {
+  return {
+    appointmentsCount: 0,
+    totalRevenue: 0,
+    cashCount: 0,
+    cashRevenue: 0,
+    transferCount: 0,
+    transferRevenue: 0,
+    ...base,
+  };
+}
+
+function applyAppointmentMetrics(bucket, appointment, servicePriceMap) {
+  const fallbackPrice = servicePriceMap.get(
+    String(appointment.service || "").trim().toLowerCase(),
+  );
+  const finalPrice = Number(appointment.servicePrice ?? fallbackPrice ?? 0);
+  const method = normalizePaymentMethod(appointment.paymentMethod);
+
+  bucket.appointmentsCount += 1;
+  bucket.totalRevenue += finalPrice;
+
+  if (method === "transfer") {
+    bucket.transferCount += 1;
+    bucket.transferRevenue += finalPrice;
+  } else {
+    bucket.cashCount += 1;
+    bucket.cashRevenue += finalPrice;
+  }
 }
 
 // --- CONTROLADORES ---
@@ -58,7 +137,13 @@ export async function listAppointments(req, res, next) {
 export async function createAppointment(req, res, next) {
   try {
     const ownerId = req.user?.id; // Puede ser undefined en reserva pública
-    const { barberId, durationMinutes = 30, email } = req.body;
+    const {
+      barberId,
+      durationMinutes = 30,
+      email,
+      paymentMethod,
+      servicePrice,
+    } = req.body;
     
     const customerName = String(req.body?.customerName ?? "").trim();
     const service = String(req.body?.service ?? "").trim();
@@ -73,7 +158,7 @@ export async function createAppointment(req, res, next) {
     if (!barber) return res.status(404).json({ error: "Barbero no encontrado" });
 
     // 1. VALIDACIÓN DÍA LABORAL (usar horario local de la barbería)
-    const dayOfWeek = startTime.getDay();
+    const dayOfWeek = getTimeZoneWeekday(startTime);
     const barberWorkDays = (barber.workDays || []).map(Number);
     
     if (barberWorkDays.length > 0 && !barberWorkDays.includes(dayOfWeek)) {
@@ -82,6 +167,12 @@ export async function createAppointment(req, res, next) {
 
     const endTime = new Date(startTime.getTime() + durationMinutes * 60000);
     const finalOwnerId = ownerId || barber.owner;
+    const normalizedPaymentMethod = normalizePaymentMethod(paymentMethod);
+    const resolvedServicePrice = await resolveServicePrice({
+      ownerId: finalOwnerId,
+      serviceName: service,
+      providedPrice: servicePrice,
+    });
 
     // 2. VALIDACIÓN SOLAPAMIENTO
     const overlappingCandidates = await AppointmentModel.find({
@@ -109,7 +200,9 @@ export async function createAppointment(req, res, next) {
       service,
       startTime,
       durationMinutes,
+      servicePrice: resolvedServicePrice,
       notes,
+      paymentMethod: normalizedPaymentMethod,
       customerEmail: email || undefined,
     });
 
@@ -164,11 +257,7 @@ export async function createAppointment(req, res, next) {
 
 
 
-const mailOptions = {
-  from: `"BarberApp by CODEX®" <barberAppByCodex@gmail.com>`,
-  to: email,
-  subject: `✅ Turno Confirmado: ${service}`,
-  html: `
+      const mailHtml = `
     <div style="background-color: #121212; color: #ffffff; padding: 30px; font-family: sans-serif; border-radius: 15px; max-width: 500px; margin: auto; border: 1px solid #B89016;">
       
       <div style="text-align: center; margin-bottom: 25px;">
@@ -211,27 +300,214 @@ const mailOptions = {
         </p>
       </div>
     </div>
-  `
-};
+  `;
 
-
-
-
-
-
-
-
-
-
-      transporter.sendMail(mailOptions, (error, info) => {
-        if (error) console.log("Nodemailer Error:", error);
-        else console.log("Email enviado con éxito a:", email);
-      });
+      try {
+        await sendAppMail({
+          to: email,
+          subject: `✅ Turno Confirmado: ${service}`,
+          html: mailHtml,
+        });
+        console.log("Email enviado con exito a:", email);
+      } catch (mailErr) {
+        console.error("Error enviando email de turno:", mailErr.message);
+      }
     }
 
     return res.status(201).json({ appointment });
   } catch (err) {
     console.error("Error en createAppointment:", err);
+    return next(err);
+  }
+}
+
+export async function getAppointmentMetrics(req, res, next) {
+  try {
+    const ownerId = req.user.id;
+    const barberId = req.query.barberId ? String(req.query.barberId) : null;
+    const period = buildMetricsRange(req.query);
+
+    const filter = {
+      owner: ownerId,
+      status: "completed",
+      startTime: { $gte: period.start, $lt: period.end },
+    };
+
+    if (barberId) {
+      if (!mongoose.Types.ObjectId.isValid(barberId)) {
+        return res.status(400).json({ error: "Barbero inválido" });
+      }
+
+      filter.barber = barberId;
+    }
+
+    const [appointments, activeServices, barber] = await Promise.all([
+      AppointmentModel.find(filter)
+        .select({
+          barber: 1,
+          service: 1,
+          servicePrice: 1,
+          paymentMethod: 1,
+          startTime: 1,
+        })
+        .lean(),
+      ServiceModel.find({ owner: ownerId })
+        .select({ name: 1, price: 1 })
+        .lean(),
+      barberId
+        ? BarberModel.findOne({ _id: barberId, owner: ownerId })
+            .select({ fullName: 1 })
+            .lean()
+        : Promise.resolve(null),
+    ]);
+
+    const servicePriceMap = new Map(
+      activeServices.map((item) => [String(item.name || "").trim().toLowerCase(), Number(item.price || 0)]),
+    );
+
+    const totals = createMetricsBucket();
+    const monthlyMap = new Map();
+    const monthly = [];
+
+    if (period.mode === "annual") {
+      for (let monthIndex = 0; monthIndex < 12; monthIndex += 1) {
+        const monthDate = new Date(period.year, monthIndex, 1, 0, 0, 0, 0);
+        const entry = createMetricsBucket({
+          key: `${period.year}-${String(monthIndex + 1).padStart(2, "0")}`,
+          label: monthDate.toLocaleDateString("es-AR", {
+            month: "short",
+          }),
+        });
+        monthlyMap.set(entry.key, entry);
+        monthly.push(entry);
+      }
+    }
+
+    for (const appointment of appointments) {
+      applyAppointmentMetrics(totals, appointment, servicePriceMap);
+
+      if (period.mode === "annual") {
+        const date = new Date(appointment.startTime);
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+        const monthEntry = monthlyMap.get(key);
+        if (monthEntry) {
+          applyAppointmentMetrics(monthEntry, appointment, servicePriceMap);
+        }
+      }
+    }
+
+    return res.json({
+      barber: barber
+        ? {
+            _id: barber._id,
+            fullName: barber.fullName,
+          }
+        : null,
+      period: {
+        mode: period.mode,
+        key: period.key,
+        label: period.label,
+        year: period.year,
+        month: period.month,
+        from: period.start,
+        to: new Date(period.end.getTime() - 1),
+      },
+      totals,
+      monthly,
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function getCurrentMonthOverview(req, res, next) {
+  try {
+    const ownerId = req.user.id;
+    const period = buildMetricsRange(req.query);
+
+    const [appointments, activeServices, activeBarbers] = await Promise.all([
+      AppointmentModel.find({
+        owner: ownerId,
+        status: "completed",
+        startTime: { $gte: period.start, $lt: period.end },
+      })
+        .select({
+          barber: 1,
+          service: 1,
+          servicePrice: 1,
+          paymentMethod: 1,
+        })
+        .lean(),
+      ServiceModel.find({ owner: ownerId })
+        .select({ name: 1, price: 1 })
+        .lean(),
+      BarberModel.find({ owner: ownerId, isActive: true })
+        .select({ fullName: 1 })
+        .sort({ fullName: 1 })
+        .lean(),
+    ]);
+
+    const servicePriceMap = new Map(
+      activeServices.map((item) => [String(item.name || "").trim().toLowerCase(), Number(item.price || 0)]),
+    );
+
+    const barberMap = new Map(
+      activeBarbers.map((barber) => [
+        String(barber._id),
+        {
+          barberId: String(barber._id),
+          barberName: barber.fullName,
+          ...createMetricsBucket(),
+        },
+      ]),
+    );
+
+    for (const appointment of appointments) {
+      const barberId = String(appointment.barber || "");
+      if (!barberMap.has(barberId)) {
+        barberMap.set(barberId, {
+          barberId,
+          barberName: "Barbero eliminado",
+          ...createMetricsBucket(),
+        });
+      }
+
+      const entry = barberMap.get(barberId);
+      applyAppointmentMetrics(entry, appointment, servicePriceMap);
+    }
+
+    const byBarber = Array.from(barberMap.values()).sort((a, b) => {
+      if (b.totalRevenue !== a.totalRevenue) return b.totalRevenue - a.totalRevenue;
+      return b.appointmentsCount - a.appointmentsCount;
+    });
+
+    const totals = byBarber.reduce(
+      (acc, item) => {
+        acc.appointmentsCount += item.appointmentsCount;
+        acc.totalRevenue += item.totalRevenue;
+        acc.cashCount += item.cashCount;
+        acc.cashRevenue += item.cashRevenue;
+        acc.transferCount += item.transferCount;
+        acc.transferRevenue += item.transferRevenue;
+        return acc;
+      },
+      createMetricsBucket(),
+    );
+
+    return res.json({
+      period: {
+        mode: period.mode,
+        key: period.key,
+        label: period.label,
+        year: period.year,
+        month: period.month,
+        from: period.start,
+        to: new Date(period.end.getTime() - 1),
+      },
+      byBarber,
+      totals,
+    });
+  } catch (err) {
     return next(err);
   }
 }

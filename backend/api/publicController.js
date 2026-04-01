@@ -4,32 +4,11 @@ import { ServiceModel } from "../models/Services.js";
 import { UserModel } from "../models/User.js";
 import admin from "../firebase.js";
 import { BarberModel } from "../models/Barber.js";
-
-// ... tus otros imports ...
-import nodemailer from "nodemailer";
-
-// CONFIGURACIÓN DE CORREO (Asegurate de usar tus 16 letras)
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: "barberAppByCodex@gmail.com",
-    pass: "hywu gkkm mbej fwou",
-  },
-});
+import { sendAppMail } from "../services/mailer.js";
+import { getTimeZoneDayRange, getTimeZoneWeekday } from "../utils/timezone.js";
 
 function buildDayRange(dateParam) {
-  if (typeof dateParam === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
-    const [year, month, day] = dateParam.split("-").map(Number);
-    const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
-    const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
-    return { startOfDay, endOfDay };
-  }
-  const date = dateParam ? new Date(dateParam) : new Date();
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(startOfDay);
-  endOfDay.setHours(23, 59, 59, 999);
-  return { startOfDay, endOfDay };
+  return getTimeZoneDayRange(dateParam);
 }
 
 function normalizeSlug(value) {
@@ -54,6 +33,7 @@ function sanitizeBarber(barber) {
   return {
     _id: barber._id.toString(),
     fullName: barber.fullName,
+    photoUrl: barber.photoUrl || null,
     shift: barber.shift,
     scheduleRange: barber.scheduleRange || null,
     scheduleRanges: barber.scheduleRanges || [],
@@ -84,6 +64,26 @@ function sanitizeService(service) {
     durationMinutes: service.durationMinutes ?? 30,
     price: service.price ?? 0,
   };
+}
+
+function normalizePaymentMethod(value) {
+  return value === "transfer" ? "transfer" : "cash";
+}
+
+async function resolveServicePrice({ ownerId, serviceName, providedPrice }) {
+  const parsedPrice = Number(providedPrice);
+  if (Number.isFinite(parsedPrice) && parsedPrice >= 0) {
+    return parsedPrice;
+  }
+
+  const serviceDoc = await ServiceModel.findOne({
+    owner: ownerId,
+    name: serviceName,
+  })
+    .select({ price: 1 })
+    .lean();
+
+  return Number(serviceDoc?.price || 0);
 }
 
 export async function publicGetShop(req, res, next) {
@@ -186,6 +186,8 @@ export async function publicCreateAppointment(req, res, next) {
       durationMinutes,
       notes,
       email,
+      paymentMethod,
+      servicePrice,
     } = req.body;
 
     if (!barberId)
@@ -200,6 +202,11 @@ export async function publicCreateAppointment(req, res, next) {
     if (!barber)
       return res.status(404).json({ error: "Barbero no encontrado" });
     const appointmentDate = new Date(startTime);
+    const barberWorkDays = (barber.workDays || []).map(Number);
+
+    if (barberWorkDays.length > 0 && !barberWorkDays.includes(getTimeZoneWeekday(appointmentDate))) {
+      return res.status(400).json({ error: "El barbero no trabaja este día." });
+    }
 
     // --- VALIDACIÓN DE SOLAPAMIENTO (mismo criterio que la app) ---
     const endTime = new Date(
@@ -226,6 +233,13 @@ export async function publicCreateAppointment(req, res, next) {
       return res.status(409).json({ error: "El horario ya está ocupado" });
     }
 
+    const normalizedPaymentMethod = normalizePaymentMethod(paymentMethod);
+    const resolvedServicePrice = await resolveServicePrice({
+      ownerId,
+      serviceName: service,
+      providedPrice: servicePrice,
+    });
+
     // Guardamos en la base de datos
     const appointment = await AppointmentModel.create({
       owner: ownerId,
@@ -234,7 +248,9 @@ export async function publicCreateAppointment(req, res, next) {
       service,
       startTime: appointmentDate,
       durationMinutes: Number(durationMinutes) || 30,
+      servicePrice: resolvedServicePrice,
       notes,
+      paymentMethod: normalizedPaymentMethod,
       status: "pending",
       // Si querés guardar el email en la DB, podés agregarlo al modelo y ponerlo acá
     });
@@ -282,11 +298,7 @@ export async function publicCreateAppointment(req, res, next) {
       });
 
 
-const mailOptions = {
-  from: `"BarberApp by CODEX®" <barberAppByCodex@gmail.com>`,
-  to: email,
-  subject: `✅ Turno Confirmado: ${service}`,
-  html: `
+      const mailHtml = `
     <div style="background-color: #121212; color: #ffffff; padding: 30px; font-family: sans-serif; border-radius: 15px; max-width: 500px; margin: auto; border: 1px solid #B89016;">
       
       <div style="text-align: center; margin-bottom: 25px;">
@@ -329,14 +341,18 @@ const mailOptions = {
         </p>
       </div>
     </div>
-  `
-};
+  `;
 
-
-      transporter.sendMail(mailOptions, (error, info) => {
-        if (error) console.log("Nodemailer Error:", error);
-        else console.log("✅ Email de confirmación enviado a:", email);
-      });
+      try {
+        await sendAppMail({
+          to: email,
+          subject: `✅ Turno Confirmado: ${service}`,
+          html: mailHtml,
+        });
+        console.log("✅ Email de confirmacion enviado a:", email);
+      } catch (mailErr) {
+        console.error("Error enviando email de confirmacion:", mailErr.message);
+      }
     }
 
     return res.status(201).json({ message: "¡Reserva exitosa!", appointment });

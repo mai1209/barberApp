@@ -12,7 +12,7 @@ import { House, Plus, UserRound, Settings } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
 
-type MainRoute = 'Home' | 'List-Barber' | 'Reservas';
+type MainRoute = 'Home' | 'List-Barber' | 'Reservas' | 'Settings';
 
 type Props = {
   currentRouteName?: string;
@@ -31,6 +31,14 @@ function resolveActiveRoute(routeName?: string): MainRoute | undefined {
   }
   if (routeName === 'Home') return 'Home';
   if (routeName === 'Reservas') return 'Reservas';
+  if (
+    routeName === 'Settings' ||
+    routeName === 'Appearance-Settings' ||
+    routeName === 'Change-Password' ||
+    routeName === 'Recover-Password'
+  ) {
+    return 'Settings';
+  }
   return undefined;
 }
 
@@ -132,11 +140,17 @@ function Nav({ currentRouteName, onNavigate }: Props) {
             theme={theme}
           />
 
-          <NavButton label="Ajustes" Icon={Settings} theme={theme} />
+          <NavButton
+            isActive={activeRoute === 'Settings'}
+            onPress={() => onNavigate('Settings')}
+            label="Ajustes"
+            Icon={Settings}
+            theme={theme}
+          />
         </View>
       </View>
       <View style={styles.footer}>
-        <Text style={[styles.codexText, { color: theme.secondary }]}>
+        <Text style={styles.codexText }>
           BarberApp by CODEX®
         </Text>
       </View>
@@ -160,10 +174,6 @@ const styles = StyleSheet.create({
     maxWidth: 380,
     paddingVertical: 6,
     paddingHorizontal: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
     elevation: 10,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.05)',
@@ -176,18 +186,18 @@ const styles = StyleSheet.create({
   navItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 44, // Altura un poco más compacta
+    height: 44, 
     borderRadius: 22,
     justifyContent: 'center',
   },
   text: {
     color: '#fff',
-    fontSize: 12, // Fuente más chica para asegurar que entre
+    fontSize: 12, 
     fontWeight: '800',
     marginLeft: 6,
   },
   footer: {
-    marginTop: 8,
+    marginTop: 4,
   },
   codexText: {
     color: '#555',

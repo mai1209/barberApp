@@ -23,6 +23,19 @@ const minutesToLabel = (totalMinutes) => {
 };
 
 const SLOT_INTERVAL_MINUTES = 30;
+const SHOP_TZ = "America/Argentina/Cordoba";
+
+function formatTimeInShopTZ(value) {
+  const parts = new Intl.DateTimeFormat("es-AR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: SHOP_TZ,
+  }).formatToParts(new Date(value));
+  const hh = parts.find((part) => part.type === "hour")?.value ?? "00";
+  const mm = parts.find((part) => part.type === "minute")?.value ?? "00";
+  return `${hh}:${mm}`;
+}
 const DEFAULT_WORKING_RANGE = { start: 8 * 60, end: 22 * 60 };
 const DEFAULT_RANGE_LABEL = `${minutesToLabel(DEFAULT_WORKING_RANGE.start)} - ${minutesToLabel(DEFAULT_WORKING_RANGE.end)}`;
 const formatPrice = (value) =>
@@ -95,6 +108,7 @@ function BookingForm({ shopSlug }) {
   const [servicePickerOpen, setServicePickerOpen] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
   const [email, setEmail] = useState(""); // <-- AGREGAR ESTO
+  const [paymentMethod, setPaymentMethod] = useState("cash");
   const [loadingSlots, setLoadingSlots] = useState(false);
 
   const currentDuration =
@@ -240,15 +254,14 @@ function BookingForm({ shopSlug }) {
       if (res?.appointments) {
         res.appointments.forEach((app) => {
           if (app.status === "cancelled") return;
-          const start = new Date(app.startTime);
+          const startLabel = formatTimeInShopTZ(app.startTime);
+          const [baseHour, baseMinute] = startLabel.split(":").map(Number);
+          const startMinutes = baseHour * 60 + baseMinute;
           const occupiedDuration =
             app.durationMinutes ?? SLOT_INTERVAL_MINUTES;
           for (let o = 0; o < occupiedDuration; o += SLOT_INTERVAL_MINUTES) {
-            const slotTime = new Date(start.getTime() + o * 60000);
-            const h = slotTime.getHours();
-            const m = slotTime.getMinutes();
             busy.add(
-              `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
+              minutesToLabel(startMinutes + o),
             );
           }
         });
@@ -337,8 +350,10 @@ const handleSubmit = async (e) => {
         service: serviceName,
         startTime: finalDateUTC,
         durationMinutes: currentDuration,
+        servicePrice: selectedService?.price ?? 0,
         notes: phone.trim(),
-        email: email.trim(), 
+        email: email.trim(),
+        paymentMethod,
       });
 
       // --- MENSAJE PERSONALIZADO ---
@@ -494,6 +509,26 @@ const handleSubmit = async (e) => {
         </div>
 
         <div className={styles.fieldGroup}>
+          <label className={styles.label}>¿Cómo preferís pagar?</label>
+          <div className={styles.paymentMethodRow}>
+            <button
+              type="button"
+              className={`${styles.paymentMethodChip} ${paymentMethod === "cash" ? styles.paymentMethodChipActive : ""}`}
+              onClick={() => setPaymentMethod("cash")}
+            >
+              Efectivo
+            </button>
+            <button
+              type="button"
+              className={`${styles.paymentMethodChip} ${paymentMethod === "transfer" ? styles.paymentMethodChipActive : ""}`}
+              onClick={() => setPaymentMethod("transfer")}
+            >
+              Transferencia
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.fieldGroup}>
           <label className={styles.label}>Elegí tu Barbero</label>
           <div className={styles.barberGrid}>
             {barbers.length === 0 ? (
@@ -512,7 +547,15 @@ const handleSubmit = async (e) => {
                   }}
                 >
                   <div className={styles.barberAvatar}>
-                    {b.fullName.charAt(0)}
+                    {b.photoUrl ? (
+                      <img
+                        src={b.photoUrl}
+                        alt={b.fullName}
+                        className={styles.barberAvatarImage}
+                      />
+                    ) : (
+                      b.fullName.charAt(0)
+                    )}
                   </div>
                   <div className={styles.barberInfo}>
                     <span className={styles.barberName}>

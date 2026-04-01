@@ -36,10 +36,20 @@ const appointmentSchema = new mongoose.Schema(
       min: 15,
       max: 240,
     },
+    servicePrice: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     notes: {
       type: String,
       trim: true,
       maxlength: 500,
+    },
+    paymentMethod: {
+      type: String,
+      enum: ["cash", "transfer"],
+      default: "cash",
     },
     status: {
       type: String,
@@ -54,6 +64,7 @@ const appointmentSchema = new mongoose.Schema(
 );
 
 appointmentSchema.index({ owner: 1, barber: 1, startTime: 1 });
+appointmentSchema.index({ owner: 1, status: 1, startTime: 1 });
 
 export const AppointmentModel =
   mongoose.models.Appointment ??

@@ -1,4 +1,5 @@
 import React, {
+  useCallback,
   createContext,
   useContext,
   useEffect,
@@ -12,6 +13,19 @@ import {
 } from '../services/authStorage';
 import { getCurrentUser } from '../services/api';
 
+export type ThemeConfig = {
+  primary?: string | null;
+  secondary?: string | null;
+  card?: string | null;
+  gradientColors?: string[] | null;
+  logoDataUrl?: string | null;
+};
+
+type ThemeProfile = {
+  shopSlug?: string | null;
+  themeConfig?: ThemeConfig | null;
+};
+
 export type Theme = {
   primary: string;
   secondary: string;
@@ -21,20 +35,25 @@ export type Theme = {
   logo: any;
 };
 
+const DEFAULT_THEME: Theme = {
+  primary: '#FF1493',
+  secondary: '#FFFFFF',
+  background: 'transparent',
+  card: '#343434',
+  gradientColors: ['#F0EAD6', '#343434', '#1B1B1B', '#080808'],
+  logo: require('../assets/logo.png'),
+};
+
 const themes: Record<string, Theme> = {
+  codex: DEFAULT_THEME,
   orion: {
-    primary: '#B89016',
-    secondary: '#D8A63C',
-    background: 'transparent',
-    card: '#1C1C1C',
-    gradientColors: ['#812917', '#4D190E', '#B33A21', '#802A17'],
-    logo: require('../assets/LogoOrion.png'),
+    ...DEFAULT_THEME,
   },
   saiko: {
     primary: '#B07FFF',
     secondary: '#3F15B1',
     background: 'transparent',
-    card: '#1E1231',
+    card: '#1E1231', 
     gradientColors: ['#D8A6FF', '#B07FFF', '#6322D1', '#3F15B1'],
     logo: require('../assets/LogoKevin.png'),
   },
@@ -44,25 +63,65 @@ type ThemeContextValue = {
   theme: Theme;
   shopSlug: string | null;
   setShopSlug: (slug: string | null) => void;
+  applyUserTheme: (profile: ThemeProfile | null) => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue>({
-  theme: themes.orion,
+  theme: DEFAULT_THEME,
   shopSlug: null,
   setShopSlug: () => {},
+  applyUserTheme: () => {},
 });
+
+function buildThemeFromProfile(profile: ThemeProfile | null) {
+  const normalizedSlug = (profile?.shopSlug ?? '').trim().toLowerCase();
+  const presetTheme = themes[normalizedSlug] ?? DEFAULT_THEME;
+  const customTheme = profile?.themeConfig;
+
+  if (!customTheme) {
+    return {
+      resolvedSlug: profile?.shopSlug ?? null,
+      resolvedTheme: presetTheme,
+    };
+  }
+
+  const gradientColors =
+    Array.isArray(customTheme.gradientColors) && customTheme.gradientColors.length === 4
+      ? customTheme.gradientColors
+      : presetTheme.gradientColors;
+
+  return {
+    resolvedSlug: profile?.shopSlug ?? null,
+    resolvedTheme: {
+      ...presetTheme,
+      primary: customTheme.primary || presetTheme.primary,
+      secondary: customTheme.secondary || presetTheme.secondary,
+      card: customTheme.card || presetTheme.card,
+      gradientColors,
+      logo: customTheme.logoDataUrl
+        ? { uri: customTheme.logoDataUrl }
+        : presetTheme.logo,
+    },
+  };
+}
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [shopSlug, setShopSlug] = useState<string | null>(null);
-  const [theme, setTheme] = useState<Theme>(themes.orion);
+  const [theme, setTheme] = useState<Theme>(DEFAULT_THEME);
+
+  const applyUserTheme = useCallback((profile: ThemeProfile | null) => {
+    const { resolvedSlug, resolvedTheme } = buildThemeFromProfile(profile);
+    setShopSlug(resolvedSlug);
+    setTheme(resolvedTheme);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
 
     (async () => {
-      const profile = await getUserProfile<{ shopSlug?: string }>();
-      if (isMounted && profile?.shopSlug) {
-        setShopSlug(profile.shopSlug);
+      const profile = await getUserProfile<ThemeProfile>();
+      if (isMounted) {
+        applyUserTheme(profile);
       }
 
       const token = await getToken();
@@ -74,7 +133,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         await saveUserProfile(freshUser);
 
         if (isMounted) {
-          setShopSlug(freshUser?.shopSlug ?? null);
+          applyUserTheme(freshUser);
         }
       } catch (_error) {}
     })();
@@ -84,18 +143,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  useEffect(() => {
-    const normalized = (shopSlug ?? '').trim().toLowerCase();
-    setTheme(themes[normalized] ?? themes.orion);
-  }, [shopSlug]);
-
   const value = useMemo(
     () => ({
       theme,
       shopSlug,
       setShopSlug,
+      applyUserTheme,
     }),
-    [theme, shopSlug],
+    [theme, shopSlug, applyUserTheme],
   );
 
   return (

@@ -1,5 +1,6 @@
 import { BarberModel } from "../models/Barber.js";
 import { AppointmentModel } from "../models/Appointment.js";
+import { getTimeZoneDayRange } from "../utils/timezone.js";
 
 const DEFAULT_SCHEDULE_RANGE = "08:00 - 22:00";
 const SHIFT_RANGES = {
@@ -45,6 +46,9 @@ export async function listBarbers(req, res, next) {
     const barbers = barbersDocs.map((doc) => ({
       _id: doc._id,
       fullName: doc.fullName,
+      email: doc.email || undefined,
+      phone: doc.phone || undefined,
+      photoUrl: doc.photoUrl || null,
       scheduleRange: doc.scheduleRange || null,
       scheduleRanges: doc.scheduleRanges || [],
       isActive: doc.isActive,
@@ -66,6 +70,7 @@ export async function createBarber(req, res, next) {
       .trim()
       .toLowerCase();
     const phone = String(req.body?.phone ?? "").trim();
+    const photoUrl = String(req.body?.photoUrl ?? "").trim();
     const shift = normalizeShift(req.body?.shift);
 
     // 1. CAPTURAMOS LOS DÍAS DESDE EL BODY
@@ -91,6 +96,7 @@ const scheduleRange = sanitizeScheduleRange(req.body?.scheduleRange) || undefine
       fullName,
       email: email || undefined,
       phone: phone || undefined,
+      photoUrl: photoUrl || undefined,
       shift,
 scheduleRange: scheduleRange,
       scheduleRanges: req.body?.scheduleRanges || [],
@@ -101,6 +107,110 @@ scheduleRange: scheduleRange,
     return res.status(201).json({ barber: barber.toJSON() });
   } catch (err) {
     console.error("Error al crear barbero:", err);
+    return next(err);
+  }
+}
+
+export async function updateBarber(req, res, next) {
+  try {
+    const ownerId = req.user?.id;
+    const { barberId } = req.params;
+
+    if (!ownerId) return res.status(401).json({ error: "Auth requerida" });
+
+    const fullName = String(req.body?.fullName ?? "").trim();
+    const email = String(req.body?.email ?? "")
+      .trim()
+      .toLowerCase();
+    const phone = String(req.body?.phone ?? "").trim();
+    const photoUrl = String(req.body?.photoUrl ?? "").trim();
+    const shift = normalizeShift(req.body?.shift);
+    const rawWorkDays = Array.isArray(req.body?.workDays) ? req.body.workDays : [];
+    const cleanWorkDays = Array.from(new Set(rawWorkDays.map(Number))).sort(
+      (a, b) => a - b,
+    );
+    const scheduleRange = sanitizeScheduleRange(req.body?.scheduleRange) || undefined;
+    const scheduleRanges = Array.isArray(req.body?.scheduleRanges)
+      ? req.body.scheduleRanges
+          .map((item) => ({
+            label: String(item?.label ?? "").trim(),
+            start: String(item?.start ?? "").trim(),
+            end: String(item?.end ?? "").trim(),
+          }))
+          .filter((item) => item.start && item.end)
+      : [];
+
+    if (!fullName) {
+      return res
+        .status(400)
+        .json({ error: "El nombre del barbero es obligatorio" });
+    }
+
+    if (cleanWorkDays.length === 0) {
+      return res
+        .status(400)
+        .json({ error: "Selecciona al menos un día de trabajo." });
+    }
+
+    const barber = await BarberModel.findOneAndUpdate(
+      {
+        _id: barberId,
+        owner: ownerId,
+        isActive: true,
+      },
+      {
+        fullName,
+        email: email || undefined,
+        phone: phone || undefined,
+        photoUrl: photoUrl || undefined,
+        shift,
+        scheduleRange: scheduleRange ?? null,
+        scheduleRanges,
+        workDays: cleanWorkDays,
+      },
+      {
+        new: true,
+      },
+    ).lean();
+
+    if (!barber) {
+      return res.status(404).json({ error: "Barbero no encontrado" });
+    }
+
+    return res.json({ barber });
+  } catch (err) {
+    console.error("Error al actualizar barbero:", err);
+    return next(err);
+  }
+}
+
+export async function deactivateBarber(req, res, next) {
+  try {
+    const ownerId = req.user?.id;
+    const { barberId } = req.params;
+
+    if (!ownerId) return res.status(401).json({ error: "Auth requerida" });
+
+    const barber = await BarberModel.findOneAndUpdate(
+      {
+        _id: barberId,
+        owner: ownerId,
+        isActive: true,
+      },
+      {
+        isActive: false,
+      },
+      {
+        new: true,
+      },
+    ).lean();
+
+    if (!barber) {
+      return res.status(404).json({ error: "Barbero no encontrado" });
+    }
+
+    return res.json({ barber });
+  } catch (err) {
     return next(err);
   }
 }
@@ -145,17 +255,5 @@ export async function listBarberAppointments(req, res, next) {
   }
 }
 function buildDayRange(dateParam) {
-  if (typeof dateParam === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
-    const [year, month, day] = dateParam.split("-").map(Number);
-    const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
-    const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
-    return { startOfDay, endOfDay };
-  }
-
-  const date = dateParam ? new Date(dateParam) : new Date();
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(startOfDay);
-  endOfDay.setHours(23, 59, 59, 999);
-  return { startOfDay, endOfDay };
+  return getTimeZoneDayRange(dateParam);
 }

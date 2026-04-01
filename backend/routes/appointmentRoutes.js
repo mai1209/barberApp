@@ -5,7 +5,9 @@ import {
   listAppointments,
   updateAppointmentStatus,
   listServices,
-  deleteAppointment
+  deleteAppointment,
+  getAppointmentMetrics,
+  getCurrentMonthOverview,
 } from "../api/appointmentController.js";
 
 const router = Router();
@@ -13,6 +15,8 @@ const router = Router();
 router.use(requireAuth);
 
 router.get("/services", listServices);
+router.get("/metrics", getAppointmentMetrics);
+router.get("/month-overview", getCurrentMonthOverview);
 router.get("/", listAppointments);
 router.post("/", createAppointment);
 router.delete('/:appointmentId',  deleteAppointment);

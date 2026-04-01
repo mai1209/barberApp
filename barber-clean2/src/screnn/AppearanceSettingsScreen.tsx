@@ -1,0 +1,941 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
+import { ImagePlus, PaintBucket, Sparkles, SwatchBook } from 'lucide-react-native';
+import ColorPickerModal from '../components/ColorPickerModal';
+import { useTheme } from '../context/ThemeContext';
+import type { Theme } from '../context/ThemeContext';
+import { getUserProfile, saveUserProfile } from '../services/authStorage';
+import { updateThemeConfig } from '../services/api';
+
+const ACCENT_SWATCHES = [
+  '#FF1493',
+  '#F43F5E',
+  '#E11D48',
+  '#C026D3',
+  '#9333EA',
+  '#7C3AED',
+  '#2563EB',
+  '#0D9488',
+  '#16A34A',
+  '#CA8A04',
+  '#EA580C',
+  '#DC2626',
+];
+
+const TEXT_SWATCHES = [
+  '#FFFFFF',
+  '#F0EAD6',
+  '#EAEAEA',
+  '#FFD6EC',
+  '#DDE7FF',
+  '#D1FAE5',
+];
+
+const CARD_SWATCHES = [
+  '#343434',
+  '#2A2A2A',
+  '#1F1F1F',
+  '#3B1F33',
+  '#1E1231',
+  '#1A2740',
+  '#173333',
+];
+
+const GRADIENT_PRESETS = [
+  {
+    label: 'Codex base',
+    colors: ['#F0EAD6', '#343434', '#1B1B1B', '#080808'],
+  },
+  {
+    label: 'Rosa neon',
+    colors: ['#FFD9EC', '#FF1493', '#7A0C48', '#12040C'],
+  },
+  {
+    label: 'Lila estudio',
+    colors: ['#E9D5FF', '#B07FFF', '#6322D1', '#190B33'],
+  },
+  {
+    label: 'Azul premium',
+    colors: ['#DBEAFE', '#3B82F6', '#1D4ED8', '#0B1020'],
+  },
+  {
+    label: 'Verde urbano',
+    colors: ['#D1FAE5', '#10B981', '#065F46', '#071510'],
+  },
+  {
+    label: 'Cobre barber',
+    colors: ['#FED7AA', '#F97316', '#9A3412', '#1A0E08'],
+  },
+];
+
+const GRADIENT_SWATCHES = Array.from(
+  new Set(GRADIENT_PRESETS.flatMap(preset => preset.colors)),
+);
+
+type FormState = {
+  primary: string;
+  secondary: string;
+  card: string;
+  gradient0: string;
+  gradient1: string;
+  gradient2: string;
+  gradient3: string;
+  logoDataUrl: string | null;
+};
+
+type PickerField =
+  | 'primary'
+  | 'secondary'
+  | 'card'
+  | 'gradient0'
+  | 'gradient1'
+  | 'gradient2'
+  | 'gradient3'
+  | null;
+
+function normalizeHexInput(value: string) {
+  const cleaned = value.trim().replace(/[^#0-9a-fA-F]/g, '');
+  if (!cleaned) return '';
+  const prefixed = cleaned.startsWith('#') ? cleaned : `#${cleaned}`;
+  return prefixed.slice(0, 7).toUpperCase();
+}
+
+function isValidHexColor(value: string) {
+  return /^#[0-9A-F]{6}$/.test(value.trim().toUpperCase());
+}
+
+function buildInitialForm(theme: Theme, profile: any): FormState {
+  const customTheme = profile?.themeConfig ?? {};
+  const gradientColors =
+    Array.isArray(customTheme.gradientColors) && customTheme.gradientColors.length === 4
+      ? customTheme.gradientColors
+      : theme.gradientColors;
+
+  return {
+    primary: customTheme.primary ?? theme.primary,
+    secondary: customTheme.secondary ?? theme.secondary,
+    card: customTheme.card ?? theme.card,
+    gradient0: gradientColors[0] ?? theme.gradientColors[0],
+    gradient1: gradientColors[1] ?? theme.gradientColors[1],
+    gradient2: gradientColors[2] ?? theme.gradientColors[2],
+    gradient3: gradientColors[3] ?? theme.gradientColors[3],
+    logoDataUrl: customTheme.logoDataUrl ?? null,
+  };
+}
+
+function previewThemeFromForm(form: FormState, fallbackTheme: Theme): Theme {
+  return {
+    ...fallbackTheme,
+    primary: isValidHexColor(form.primary) ? form.primary : fallbackTheme.primary,
+    secondary: isValidHexColor(form.secondary) ? form.secondary : fallbackTheme.secondary,
+    card: isValidHexColor(form.card) ? form.card : fallbackTheme.card,
+    gradientColors: [
+      isValidHexColor(form.gradient0) ? form.gradient0 : fallbackTheme.gradientColors[0],
+      isValidHexColor(form.gradient1) ? form.gradient1 : fallbackTheme.gradientColors[1],
+      isValidHexColor(form.gradient2) ? form.gradient2 : fallbackTheme.gradientColors[2],
+      isValidHexColor(form.gradient3) ? form.gradient3 : fallbackTheme.gradientColors[3],
+    ],
+    logo: form.logoDataUrl ? { uri: form.logoDataUrl } : fallbackTheme.logo,
+  };
+}
+
+export default function AppearanceSettingsScreen({ navigation }: { navigation: any }) {
+  const { theme, applyUserTheme } = useTheme();
+  const [form, setForm] = useState<FormState>(() => buildInitialForm(theme, null));
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [pickerField, setPickerField] = useState<PickerField>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    (async () => {
+      const storedUser = await getUserProfile<any>();
+      if (isMounted) {
+        setForm(buildInitialForm(theme, storedUser));
+        setLoading(false);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [theme]);
+
+  const previewTheme = useMemo(() => previewThemeFromForm(form, theme), [form, theme]);
+  const styles = useMemo(() => createStyles(previewTheme), [previewTheme]);
+  const pickerConfig = useMemo(() => {
+    if (pickerField === 'primary') {
+      return {
+        title: 'Color de botones y acentos',
+        value: form.primary,
+        swatches: ACCENT_SWATCHES,
+      };
+    }
+    if (pickerField === 'secondary') {
+      return {
+        title: 'Color de textos destacados',
+        value: form.secondary,
+        swatches: TEXT_SWATCHES,
+      };
+    }
+    if (pickerField === 'card') {
+      return {
+        title: 'Color de tarjetas y paneles',
+        value: form.card,
+        swatches: CARD_SWATCHES,
+      };
+    }
+    if (pickerField === 'gradient0') {
+      return {
+        title: 'Fondo 1',
+        value: form.gradient0,
+        swatches: GRADIENT_SWATCHES,
+      };
+    }
+    if (pickerField === 'gradient1') {
+      return {
+        title: 'Fondo 2',
+        value: form.gradient1,
+        swatches: GRADIENT_SWATCHES,
+      };
+    }
+    if (pickerField === 'gradient2') {
+      return {
+        title: 'Fondo 3',
+        value: form.gradient2,
+        swatches: GRADIENT_SWATCHES,
+      };
+    }
+    if (pickerField === 'gradient3') {
+      return {
+        title: 'Fondo 4',
+        value: form.gradient3,
+        swatches: GRADIENT_SWATCHES,
+      };
+    }
+    return null;
+  }, [
+    pickerField,
+    form.primary,
+    form.secondary,
+    form.card,
+    form.gradient0,
+    form.gradient1,
+    form.gradient2,
+    form.gradient3,
+  ]);
+
+  const updateField = (field: keyof FormState, value: string | null) => {
+    setForm(current => ({
+      ...current,
+      [field]:
+        typeof value === 'string' && field !== 'logoDataUrl'
+          ? normalizeHexInput(value)
+          : value,
+    }));
+  };
+
+  const validateForm = () => {
+    const colorFields: Array<keyof FormState> = [
+      'primary',
+      'secondary',
+      'card',
+      'gradient0',
+      'gradient1',
+      'gradient2',
+      'gradient3',
+    ];
+
+    for (const field of colorFields) {
+      if (!isValidHexColor(String(form[field] ?? ''))) {
+        setError('Hay un color inválido en el modo avanzado.');
+        return false;
+      }
+    }
+
+    setError('');
+    return true;
+  };
+
+  const handlePickLogo = async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        selectionLimit: 1,
+        includeBase64: true,
+        quality: 0.7,
+        maxWidth: 600,
+        maxHeight: 600,
+      });
+
+      if (result.didCancel) return;
+
+      const asset = result.assets?.[0];
+      if (!asset?.base64 || !asset.type) {
+        Alert.alert('Logo inválido', 'No pudimos leer esa imagen. Probá con otra.');
+        return;
+      }
+
+      updateField('logoDataUrl', `data:${asset.type};base64,${asset.base64}`);
+    } catch (_error) {
+      Alert.alert('Error', 'No pudimos abrir la galería.');
+    }
+  };
+
+  const persistTheme = async (payload: {
+    primary: string | null;
+    secondary: string | null;
+    card: string | null;
+    gradientColors: string[] | null;
+    logoDataUrl: string | null;
+  }) => {
+    const response = await updateThemeConfig(payload);
+    await saveUserProfile(response.user);
+    applyUserTheme(response.user);
+  };
+
+  const handleSave = async () => {
+    if (saving || !validateForm()) return;
+
+    try {
+      setSaving(true);
+      await persistTheme({
+        primary: form.primary,
+        secondary: form.secondary,
+        card: form.card,
+        gradientColors: [form.gradient0, form.gradient1, form.gradient2, form.gradient3],
+        logoDataUrl: form.logoDataUrl,
+      });
+      Alert.alert('Aspecto guardado', 'La vista del local se actualizó correctamente.');
+    } catch (err: any) {
+      setError(err?.message ?? 'No se pudo guardar el aspecto.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (saving) return;
+    setError('');
+    navigation.goBack();
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centeredState}>
+        <ActivityIndicator color={previewTheme.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        <View style={styles.header}>
+          <Text style={styles.headerSubtitle}>PERSONALIZAR ASPECTO</Text>
+          <Text style={styles.headerTitle}>Elegí cómo se ve la app</Text>
+          <Text style={styles.headerText}>
+            Cada bloque dice exactamente qué cambia para que no haya dudas.
+          </Text>
+        </View>
+
+        <View style={styles.previewCard}>
+          <Text style={styles.previewEyebrow}>Vista previa</Text>
+          <View style={styles.previewHero}>
+            <Image style={styles.previewLogo} source={previewTheme.logo} />
+            <View style={styles.previewTextWrap}>
+              <Text style={styles.previewTitle}>Tu barbería</Text>
+              <Text style={styles.previewSubtitle}>Así se ven botones, textos y paneles.</Text>
+            </View>
+          </View>
+          <View style={styles.previewActions}>
+            <View style={[styles.previewButton, { backgroundColor: previewTheme.primary }]}>
+              <Text style={styles.previewButtonText}>Botón principal</Text>
+            </View>
+            <View style={styles.previewTag}>
+              <Text style={[styles.previewTagText, { color: previewTheme.secondary }]}>
+                Texto destacado
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <SectionCard title="Logo del local" icon={ImagePlus} theme={previewTheme}>
+          <Text style={styles.helperText}>
+            Este logo aparece en la app y ayuda a que el local se reconozca rápido.
+          </Text>
+          <View style={styles.logoBox}>
+            <Image
+              style={styles.logoPreview}
+              source={form.logoDataUrl ? { uri: form.logoDataUrl } : previewTheme.logo}
+            />
+          </View>
+          <View style={styles.row}>
+            <Pressable style={styles.secondaryBtn} onPress={handlePickLogo}>
+              <Text style={styles.secondaryBtnText}>Elegir imagen</Text>
+            </Pressable>
+            <Pressable style={styles.ghostBtnInline} onPress={() => updateField('logoDataUrl', null)}>
+              <Text style={styles.ghostBtnText}>Quitar</Text>
+            </Pressable>
+          </View>
+        </SectionCard>
+
+        <SectionCard title="Botones y acentos" icon={Sparkles} theme={previewTheme}>
+          <Text style={styles.helperText}>
+            Cambia el color de botones principales, detalles activos y acentos visuales.
+          </Text>
+          <ColorSelectorButton
+            label="Elegir color"
+            value={form.primary}
+            onPress={() => setPickerField('primary')}
+          />
+        </SectionCard>
+
+        <SectionCard title="Textos destacados" icon={SwatchBook} theme={previewTheme}>
+          <Text style={styles.helperText}>
+            Cambia el color de textos que querés remarcar, etiquetas activas y brillos.
+          </Text>
+          <ColorSelectorButton
+            label="Elegir color"
+            value={form.secondary}
+            onPress={() => setPickerField('secondary')}
+          />
+        </SectionCard>
+
+        <SectionCard title="Tarjetas y paneles" icon={PaintBucket} theme={previewTheme}>
+          <Text style={styles.helperText}>
+            Cambia el fondo de los paneles grandes, cajas y tarjetas de información.
+          </Text>
+          <ColorSelectorButton
+            label="Elegir color"
+            value={form.card}
+            onPress={() => setPickerField('card')}
+          />
+        </SectionCard>
+
+        <SectionCard title="Fondo general" icon={PaintBucket} theme={previewTheme}>
+          <Text style={styles.helperText}>
+            Elegí el degradado del fondo completo de la app.
+          </Text>
+          <GradientPresetField
+            value={[form.gradient0, form.gradient1, form.gradient2, form.gradient3]}
+            options={GRADIENT_PRESETS}
+            onSelect={colors => {
+              updateField('gradient0', colors[0]);
+              updateField('gradient1', colors[1]);
+              updateField('gradient2', colors[2]);
+              updateField('gradient3', colors[3]);
+            }}
+          />
+        </SectionCard>
+
+        <Pressable style={styles.advancedToggle} onPress={() => setShowAdvanced(current => !current)}>
+          <Text style={styles.advancedToggleText}>
+            {showAdvanced ? 'Ocultar modo avanzado' : 'Modo avanzado para ajustar colores finos'}
+          </Text>
+        </Pressable>
+
+        {showAdvanced ? (
+          <View style={styles.advancedPanel}>
+            <AdvancedColorField
+              label="Botones y acentos"
+              value={form.primary}
+              onPress={() => setPickerField('primary')}
+            />
+            <AdvancedColorField
+              label="Textos destacados"
+              value={form.secondary}
+              onPress={() => setPickerField('secondary')}
+            />
+            <AdvancedColorField
+              label="Tarjetas y paneles"
+              value={form.card}
+              onPress={() => setPickerField('card')}
+            />
+            <AdvancedColorField
+              label="Fondo 1"
+              value={form.gradient0}
+              onPress={() => setPickerField('gradient0')}
+            />
+            <AdvancedColorField
+              label="Fondo 2"
+              value={form.gradient1}
+              onPress={() => setPickerField('gradient1')}
+            />
+            <AdvancedColorField
+              label="Fondo 3"
+              value={form.gradient2}
+              onPress={() => setPickerField('gradient2')}
+            />
+            <AdvancedColorField
+              label="Fondo 4"
+              value={form.gradient3}
+              onPress={() => setPickerField('gradient3')}
+            />
+          </View>
+        ) : null}
+
+        {!!error && <Text style={styles.errorText}>{error}</Text>}
+        <Pressable
+          style={[styles.ghostBtn, saving && styles.disabledBtn]}
+          onPress={handleCancel}
+          disabled={saving}
+        >
+          <Text style={styles.ghostBtnText}>Cancelar</Text>
+        </Pressable>
+      </ScrollView>
+      <View style={styles.floatingActionWrap}>
+        <Pressable style={[styles.primaryBtn, saving && styles.disabledBtn]} onPress={handleSave} disabled={saving}>
+          {saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryBtnText}>Guardar aspecto</Text>}
+        </Pressable>
+      </View>
+      {pickerConfig ? (
+        <ColorPickerModal
+          visible
+          title={pickerConfig.title}
+          value={pickerConfig.value}
+          swatches={pickerConfig.swatches}
+          onClose={() => setPickerField(null)}
+          onConfirm={color => {
+            if (pickerField) {
+              updateField(pickerField, color);
+            }
+          }}
+        />
+      ) : null}
+    </KeyboardAvoidingView>
+  );
+}
+
+function SectionCard({
+  title,
+  icon: Icon,
+  theme,
+  children,
+}: {
+  title: string;
+  icon: React.ComponentType<any>;
+  theme: Theme;
+  children: React.ReactNode;
+}) {
+  const styles = createStyles(theme);
+
+  return (
+    <View style={styles.sectionCard}>
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionIconWrap}>
+          <Icon size={18} color={theme.primary} />
+        </View>
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
+      {children}
+    </View>
+  );
+}
+
+function ColorSelectorButton({
+  label,
+  value,
+  onPress,
+}: {
+  label: string;
+  value: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        marginTop: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#161616',
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: '#2A2A2A',
+        paddingVertical: 14,
+        paddingHorizontal: 14,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 10,
+            backgroundColor: value,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.16)',
+            marginRight: 12,
+          }}
+        />
+        <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>{label}</Text>
+      </View>
+      <Text style={{ color: '#A9B4C8', fontSize: 12, fontWeight: '700' }}>{value}</Text>
+    </Pressable>
+  );
+}
+
+function GradientPresetField({
+  value,
+  options,
+  onSelect,
+}: {
+  value: string[];
+  options: Array<{ label: string; colors: string[] }>;
+  onSelect: (value: string[]) => void;
+}) {
+  const selectedKey = value.join('|');
+
+  return (
+    <View style={{ gap: 10, marginTop: 10 }}>
+      {options.map(option => {
+        const isActive = option.colors.join('|') === selectedKey;
+        return (
+          <Pressable
+            key={option.label}
+            onPress={() => onSelect(option.colors)}
+            style={{
+              borderRadius: 18,
+              borderWidth: isActive ? 2 : 1,
+              borderColor: isActive ? '#FFFFFF' : 'rgba(255,255,255,0.08)',
+              padding: 12,
+              backgroundColor: '#141414',
+            }}
+          >
+            <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700', marginBottom: 10 }}>
+              {option.label}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {option.colors.map(color => (
+                <View key={color} style={{ flex: 1, height: 42, borderRadius: 12, backgroundColor: color }} />
+              ))}
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function AdvancedColorField({
+  label,
+  value,
+  onPress,
+}: {
+  label: string;
+  value: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        marginBottom: 12,
+        backgroundColor: '#171717',
+        borderWidth: 1,
+        borderColor: '#2B2B2B',
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}
+    >
+      <View>
+        <Text style={{ color: '#8E8E8E', fontSize: 12, fontWeight: '700', marginBottom: 8 }}>
+          {label}
+        </Text>
+        <Text style={{ color: '#F5F5F5', fontSize: 15, fontWeight: '700' }}>{value}</Text>
+      </View>
+      <View
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 12,
+          backgroundColor: value,
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.18)',
+        }}
+      />
+    </Pressable>
+  );
+}
+
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    centeredState: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#06080D',
+    },
+    scrollContent: {
+      paddingTop: Platform.OS === 'ios' ? 72 : 28,
+      paddingHorizontal: 20,
+      paddingBottom: 260,
+    },
+    header: {
+      marginBottom: 20,
+    },
+    headerSubtitle: {
+      color: theme.primary,
+      fontSize: 12,
+      fontWeight: '800',
+      letterSpacing: 2,
+    },
+    headerTitle: {
+      color: '#FFF',
+      fontSize: 30,
+      fontWeight: '800',
+      marginTop: 8,
+    },
+    headerText: {
+      color: '#fff',
+      fontSize: 14,
+      lineHeight: 20,
+      marginTop: 8,
+    },
+    previewCard: {
+      backgroundColor: theme.card,
+      borderRadius: 28,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.08)',
+      marginBottom: 16,
+    },
+    previewEyebrow: {
+      color: theme.primary,
+      fontSize: 11,
+      fontWeight: '800',
+      letterSpacing: 1.3,
+      textTransform: 'uppercase',
+      marginBottom: 14,
+    },
+    previewHero: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    previewLogo: {
+      width: 68,
+      height: 68,
+      borderRadius: 20,
+      marginRight: 14,
+      backgroundColor: 'rgba(255,255,255,0.05)',
+    },
+    previewTextWrap: {
+      flex: 1,
+    },
+    previewTitle: {
+      color: '#FFF',
+      fontSize: 21,
+      fontWeight: '800',
+    },
+    previewSubtitle: {
+      color: '#C8C8C8',
+      fontSize: 13,
+      marginTop: 4,
+    },
+    previewActions: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 18,
+      alignItems: 'center',
+    },
+    previewButton: {
+      borderRadius: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    previewButtonText: {
+      color: '#111',
+      fontWeight: '900',
+    },
+    previewTag: {
+      borderRadius: 16,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+      backgroundColor: 'rgba(255,255,255,0.06)',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.07)',
+    },
+    previewTagText: {
+      fontWeight: '800',
+    },
+    sectionCard: {
+      backgroundColor: theme.card,
+      borderRadius: 28,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.08)',
+      marginBottom: 16,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    sectionIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(255,255,255,0.06)',
+      marginRight: 10,
+    },
+    sectionTitle: {
+      color: '#FFF',
+      fontSize: 18,
+      fontWeight: '800',
+      flex: 1,
+    },
+    helperText: {
+      color: '#B8B8B8',
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    logoBox: {
+      height: 120,
+      borderRadius: 22,
+      backgroundColor: '#161616',
+      borderWidth: 1,
+      borderColor: '#2C2C2C',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 14,
+      marginBottom: 14,
+    },
+    logoPreview: {
+      width: 86,
+      height: 86,
+      resizeMode: 'contain',
+    },
+    row: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    secondaryBtn: {
+      flex: 1,
+      backgroundColor: 'rgba(255,255,255,0.07)',
+      borderRadius: 16,
+      paddingVertical: 14,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.08)',
+    },
+    secondaryBtnText: {
+      color: '#FFF',
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    ghostBtnInline: {
+      width: 92,
+      backgroundColor: '#161616',
+      borderRadius: 16,
+      paddingVertical: 14,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: '#2A2A2A',
+    },
+    advancedToggle: {
+      backgroundColor: '#161616',
+      borderRadius: 16,
+      paddingVertical: 13,
+      paddingHorizontal: 16,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: '#2A2A2A',
+      marginBottom: 14,
+    },
+    advancedToggleText: {
+      color: '#E8E8E8',
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    advancedPanel: {
+      marginBottom: 12,
+      padding: 14,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255,255,255,0.03)',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.06)',
+    },
+    primaryBtn: {
+      backgroundColor: theme.primary,
+      borderRadius: 18,
+      paddingVertical: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.22,
+      shadowRadius: 20,
+      elevation: 12,
+    },
+    primaryBtnText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '900',
+    },
+    ghostBtn: {
+      backgroundColor: '#161616',
+      borderRadius: 16,
+      paddingVertical: 14,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: '#2A2A2A',
+      marginTop: 2,
+    },
+    ghostBtnText: {
+      color: '#DDD',
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    errorText: {
+      color: '#FF8D8D',
+      fontSize: 13,
+      fontWeight: '700',
+      marginTop: 4,
+      marginBottom: 8,
+    },
+    disabledBtn: {
+      opacity: 0.7,
+    },
+    floatingActionWrap: {
+      position: 'absolute',
+      left: 20,
+      right: 20,
+      bottom: Platform.OS === 'ios' ? 116 : 102,
+      zIndex: 40,
+      elevation: 40,
+    },
+  });
+}

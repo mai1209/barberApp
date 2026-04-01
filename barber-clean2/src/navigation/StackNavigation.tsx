@@ -10,6 +10,12 @@ import RegisterEmployed from '../screnn/RegisterEmployed';
 import ListBarber from '../screnn/ListBarber';
 import Nav from '../screnn/Nav';
 import BarberDashboard from '../screnn/BarberDashboard';
+import MetricsScreen from '../screnn/MetricsScreen';
+import OwnerMetricsScreen from '../screnn/OwnerMetricsScreen';
+import AppearanceSettingsScreen from '../screnn/AppearanceSettingsScreen';
+import ChangePasswordScreen from '../screnn/ChangePasswordScreen';
+import RecoverPasswordScreen from '../screnn/RecoverPasswordScreen';
+import SettingsScreen from '../screnn/SettingsScreen';
 import ScreenGradient from '../components/ScreenGradient';
 import { navigationRef } from '../../App';
 
@@ -40,6 +46,12 @@ export default function StackNavigator({ currentRouteName, initialRouteName = 'L
           <Stack.Screen name="Register-Employed" component={RegisterEmployed} />
           <Stack.Screen name="List-Barber" component={ListBarber} />
           <Stack.Screen name="Barber-Home" component={BarberDashboard} />
+          <Stack.Screen name="Metrics" component={MetricsScreen} />
+          <Stack.Screen name="Owner-Metrics" component={OwnerMetricsScreen} />
+          <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="Appearance-Settings" component={AppearanceSettingsScreen} />
+          <Stack.Screen name="Change-Password" component={ChangePasswordScreen} />
+          <Stack.Screen name="Recover-Password" component={RecoverPasswordScreen} />
         </Stack.Navigator>
       </View>
 

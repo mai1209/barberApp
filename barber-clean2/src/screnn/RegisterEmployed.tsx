@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -13,8 +13,10 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  Image,
 } from 'react-native';
-import { createBarber } from '../services/api';
+import { launchImageLibrary } from 'react-native-image-picker';
+import { Barber, createBarber, updateBarber } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
 
@@ -29,6 +31,11 @@ const hexToRgba = (hex: string, alpha: number) => {
 
 type Props = {
   navigation: any;
+  route?: {
+    params?: {
+      barber?: Barber;
+    };
+  };
 };
 
 const DAYS_OF_WEEK = [
@@ -50,11 +57,14 @@ type ActivePicker =
   | 'afternoonEnd'
   | null;
 
-function RegisterEmployed({ navigation }: Props) {
+function RegisterEmployed({ navigation, route }: Props) {
   const { theme } = useTheme();
+  const barberToEdit = route?.params?.barber ?? null;
+  const isEditing = Boolean(barberToEdit?._id);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [photoUrl, setPhotoUrl] = useState('');
 
   // Horario corrido
   const [startMinutes, setStartMinutes] = useState(9 * 60);
@@ -72,6 +82,38 @@ function RegisterEmployed({ navigation }: Props) {
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const styles = useMemo(() => createStyles(theme), [theme]);
+
+  useEffect(() => {
+    if (!barberToEdit) return;
+
+    setFullName(barberToEdit.fullName ?? '');
+    setEmail(barberToEdit.email ?? '');
+    setPhone(barberToEdit.phone ?? '');
+    setPhotoUrl(barberToEdit.photoUrl ?? '');
+    setSelectedDays((barberToEdit.workDays || []).map(Number));
+
+    const hasSplitShift =
+      Array.isArray(barberToEdit.scheduleRanges) && barberToEdit.scheduleRanges.length > 0;
+
+    setSplitShift(hasSplitShift);
+
+    if (hasSplitShift) {
+      const morningRange = barberToEdit.scheduleRanges?.[0];
+      const afternoonRange = barberToEdit.scheduleRanges?.[1];
+      setMorningStart(parseTimeToMinutes(morningRange?.start, 8 * 60));
+      setMorningEnd(parseTimeToMinutes(morningRange?.end, 12 * 60));
+      setAfternoonStart(parseTimeToMinutes(afternoonRange?.start, 16 * 60));
+      setAfternoonEnd(parseTimeToMinutes(afternoonRange?.end, 22 * 60));
+    } else {
+      const [rangeStart, rangeEnd] = parseScheduleRange(
+        barberToEdit.scheduleRange,
+        9 * 60,
+        17 * 60,
+      );
+      setStartMinutes(rangeStart);
+      setEndMinutes(rangeEnd);
+    }
+  }, [barberToEdit]);
 
   const toggleDay = (id: number) => {
     setSelectedDays(prev =>
@@ -174,6 +216,7 @@ function RegisterEmployed({ navigation }: Props) {
         fullName: fullName.trim(),
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,
+        photoUrl: photoUrl.trim() || undefined,
         scheduleRange: !splitShift ? formattedRange : undefined,
         scheduleRanges: splitShift
           ? [
@@ -193,6 +236,23 @@ function RegisterEmployed({ navigation }: Props) {
         isActive: true,
       };
 
+      if (isEditing && barberToEdit?._id) {
+        const response = await updateBarber(barberToEdit._id, payload);
+        Alert.alert('Perfil actualizado', 'Los cambios del barbero ya quedaron guardados.', [
+          {
+            text: 'Volver',
+            onPress: () => {
+              navigation.replace('Barber-Home', {
+                barberId: response.barber._id,
+                barberName: response.barber.fullName,
+                barber: response.barber,
+              });
+            },
+          },
+        ]);
+        return;
+      }
+
       await createBarber(payload);
 
       Alert.alert('¡Éxito!', 'Nuevo barbero registrado.', [
@@ -205,6 +265,37 @@ function RegisterEmployed({ navigation }: Props) {
       Alert.alert('Error', err?.message || 'No se pudo guardar el registro.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePickPhoto = async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        selectionLimit: 1,
+        includeBase64: true,
+        maxWidth: 600,
+        maxHeight: 600,
+        quality: 0.7,
+      });
+
+      if (result.didCancel) return;
+
+      if (result.errorCode) {
+        Alert.alert('Error', result.errorMessage || 'No se pudo abrir la galería.');
+        return;
+      }
+
+      const asset = result.assets?.[0];
+      if (!asset?.base64) {
+        Alert.alert('Error', 'No se pudo leer la imagen seleccionada.');
+        return;
+      }
+
+      const mimeType = asset.type || 'image/jpeg';
+      setPhotoUrl(`data:${mimeType};base64,${asset.base64}`);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'No se pudo seleccionar la imagen.');
     }
   };
 
@@ -222,13 +313,42 @@ function RegisterEmployed({ navigation }: Props) {
           >
             <View style={styles.header}>
               <Text style={styles.headerSubtitle}>ADMINISTRACIÓN</Text>
-              <Text style={styles.headerTitle}>Nuevo Barbero</Text>
+              <Text style={styles.headerTitle}>
+                {isEditing ? 'Editar perfil' : 'Nuevo Barbero'}
+              </Text>
             </View>
 
             <View style={styles.mainCard}>
               {/* INFO PERSONAL */}
               <View style={styles.section}>
                 <Text style={styles.sectionLabel}>Información Personal</Text>
+                <View style={styles.photoPreviewWrap}>
+                  <Pressable
+                    style={styles.photoPreviewCircle}
+                    onPress={handlePickPhoto}
+                  >
+                    {photoUrl.trim() ? (
+                      <Image
+                        source={{ uri: photoUrl.trim() }}
+                        style={styles.photoPreviewImage}
+                      />
+                    ) : (
+                      <Text style={styles.photoPreviewInitial}>
+                        {fullName.trim().charAt(0).toUpperCase() || 'B'}
+                      </Text>
+                    )}
+                  </Pressable>
+                  <Pressable onPress={handlePickPhoto}>
+                    <Text style={styles.photoPreviewHint}>
+                      {photoUrl.trim() ? 'Cambiar foto' : 'Tocar para elegir foto'}
+                    </Text>
+                  </Pressable>
+                  {photoUrl.trim() ? (
+                    <Pressable onPress={() => setPhotoUrl('')}>
+                      <Text style={styles.photoRemoveText}>Quitar foto</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
                 <TextInput
                   style={[
                     styles.input,
@@ -411,7 +531,9 @@ function RegisterEmployed({ navigation }: Props) {
                   {loading ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
-                    <Text style={styles.submitBtnText}>Registrar Barbero</Text>
+                    <Text style={styles.submitBtnText}>
+                      {isEditing ? 'Guardar cambios' : 'Registrar Barbero'}
+                    </Text>
                   )}
                 </Pressable>
               </View>
@@ -585,7 +707,11 @@ function formatMinutesAmPm(totalMinutes: number) {
   return `${hours12}:${String(minutes).padStart(2, '0')} ${period}`;
 }
 
-function minutesToPickerParts(totalMinutes: number) {
+function minutesToPickerParts(totalMinutes: number): {
+  period: 'AM' | 'PM';
+  hour: number;
+  minute: number;
+} {
   const hours24 = Math.floor(totalMinutes / 60) % 24;
   const minutes = totalMinutes % 60;
   return {
@@ -607,6 +733,31 @@ function pickerPartsToMinutes({
   const normalizedHour = hour % 12;
   const hours24 = period === 'PM' ? normalizedHour + 12 : normalizedHour;
   return hours24 * 60 + minute;
+}
+
+function parseTimeToMinutes(value: string | undefined | null, fallback: number) {
+  if (!value) return fallback;
+  const [hour, minute] = String(value)
+    .trim()
+    .split(':')
+    .map(Number);
+
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+    return fallback;
+  }
+
+  return hour * 60 + minute;
+}
+
+function parseScheduleRange(value: string | undefined | null, fallbackStart: number, fallbackEnd: number) {
+  if (!value) return [fallbackStart, fallbackEnd] as const;
+  const parts = String(value).split('-');
+  if (parts.length < 2) return [fallbackStart, fallbackEnd] as const;
+
+  return [
+    parseTimeToMinutes(parts[0], fallbackStart),
+    parseTimeToMinutes(parts[1], fallbackEnd),
+  ] as const;
 }
 
 const createStyles = (theme: Theme) =>
@@ -656,6 +807,41 @@ const createStyles = (theme: Theme) =>
       borderColor: '#333',
     },
     inputFocused: { borderColor: theme.primary },
+    photoPreviewWrap: {
+      alignItems: 'center',
+      marginBottom: 6,
+      gap: 8,
+    },
+    photoPreviewCircle: {
+      width: 88,
+      height: 88,
+      borderRadius: 44,
+      backgroundColor: '#252525',
+      borderWidth: 1,
+      borderColor: '#333',
+      overflow: 'hidden',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    photoPreviewImage: {
+      width: '100%',
+      height: '100%',
+    },
+    photoPreviewInitial: {
+      color: theme.primary,
+      fontSize: 28,
+      fontWeight: '900',
+    },
+    photoPreviewHint: {
+      color: theme.primary,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    photoRemoveText: {
+      color: '#888',
+      fontSize: 12,
+      fontWeight: '600',
+    },
     daysRow: { flexDirection: 'row', justifyContent: 'space-between' },
     dayCircle: {
       width: 38,

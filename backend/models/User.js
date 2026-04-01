@@ -1,6 +1,22 @@
 
 import mongoose from "mongoose";
 
+const themeConfigSchema = new mongoose.Schema(
+  {
+    primary: { type: String, trim: true, default: null },
+    secondary: { type: String, trim: true, default: null },
+    card: { type: String, trim: true, default: null },
+    gradientColors: {
+      type: [String],
+      default: [],
+    },
+    logoDataUrl: { type: String, default: null },
+  },
+  {
+    _id: false,
+  },
+);
+
 const userSchema = new mongoose.Schema(
   {
     fullName: {
@@ -46,6 +62,20 @@ const userSchema = new mongoose.Schema(
       type:String,
       default:null,
     },
+    passwordResetCodeHash: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    passwordResetExpiresAt: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+    themeConfig: {
+      type: themeConfigSchema,
+      default: () => ({}),
+    },
   },
   {
     timestamps: true,
@@ -59,6 +89,8 @@ const userSchema = new mongoose.Schema(
 userSchema.method("toJSON", function toJSON() {
   const obj = this.toObject();
   delete obj.passwordHash;
+  delete obj.passwordResetCodeHash;
+  delete obj.passwordResetExpiresAt;
   return obj;
 });
 

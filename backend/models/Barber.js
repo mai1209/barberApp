@@ -24,6 +24,11 @@ const barberSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    photoUrl: {
+      type: String,
+      trim: true,
+      default: null,
+    },
        // ← AGREGAR ESTE CAMPO
     scheduleRange: {
       type: String,

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -13,6 +13,7 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  Image,
 } from 'react-native';
 import {
   fetchBarbers,
@@ -21,6 +22,7 @@ import {
   fetchBarberAppointments,
   fetchServices,
   ServiceOption,
+  PaymentMethod,
 } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
@@ -55,6 +57,28 @@ function formatTimeInShopTZ(value: string | number | Date): string {
   return `${hh}:${mm}`;
 }
 
+function formatDateInShopTZ(value: string | number | Date): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: SHOP_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(value));
+  const year = parts.find(p => p.type === 'year')?.value ?? '0000';
+  const month = parts.find(p => p.type === 'month')?.value ?? '00';
+  const day = parts.find(p => p.type === 'day')?.value ?? '00';
+  return `${year}-${month}-${day}`;
+}
+
+function labelToMinutes(label: string): number {
+  const [hour, minute] = label.split(':').map(Number);
+  return hour * 60 + minute;
+}
+
+function getCurrentMinutesInShopTZ(now: number): number {
+  return labelToMinutes(formatTimeInShopTZ(now));
+}
+
 const DAY_NAMES = [
   'Domingo',
   'Lunes',
@@ -78,12 +102,22 @@ function ReservasForm({ navigation }: any) {
   const [selectedBarber, setSelectedBarber] = useState<string | null>(null);
   const [services, setServices] = useState<ServiceOption[]>([]);
   const [selectedService, setSelectedService] = useState<ServiceOption | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [servicePickerVisible, setServicePickerVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
+  const [nowTick, setNowTick] = useState(() => Date.now());
   const styles = useMemo(() => createStyles(theme), [theme]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setNowTick(Date.now());
+    }, 30_000);
+
+    return () => clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -199,6 +233,32 @@ function ReservasForm({ navigation }: any) {
     [horarioGroups],
   );
 
+  const isTodayInShop = useMemo(
+    () => formatDateInShopTZ(selectedDate) === formatDateInShopTZ(nowTick),
+    [selectedDate, nowTick],
+  );
+
+  const currentMinutesInShop = useMemo(
+    () => getCurrentMinutesInShopTZ(nowTick),
+    [nowTick],
+  );
+
+  const isSlotUnavailable = useCallback(
+    (label: string) => {
+      if (bookedSlots.includes(label)) return true;
+      if (!isTodayInShop) return false;
+      return labelToMinutes(label) <= currentMinutesInShop;
+    },
+    [bookedSlots, isTodayInShop, currentMinutesInShop],
+  );
+
+  useEffect(() => {
+    if (!selectedSlot) return;
+    if (!allSlots.includes(selectedSlot) || isSlotUnavailable(selectedSlot)) {
+      setSelectedSlot(null);
+    }
+  }, [allSlots, selectedSlot, isSlotUnavailable]);
+
   const handleSubmit = async () => {
     if (!customerName.trim() || !selectedSlot) {
       Alert.alert('Error', 'Por favor ingresa tu nombre y elige un horario.');
@@ -221,9 +281,11 @@ function ReservasForm({ navigation }: any) {
         customerName: customerName.trim(),
         service: selectedService?.name || 'Corte',
         startTime: date.toISOString(),
+        servicePrice: selectedService?.price ?? 0,
         notes: phone,
         email: customerEmail.trim(),
         durationMinutes: selectedService?.durationMinutes ?? 30,
+        paymentMethod,
       });
       Alert.alert('¡Reserva Exitosa!', 'Tu turno ha sido agendado.', [
         { text: 'Cerrar', onPress: () => navigation.goBack() },
@@ -246,7 +308,7 @@ function ReservasForm({ navigation }: any) {
       <View style={styles.timeGrid}>
         {group.slots.length > 0 ? (
           group.slots.map(label => {
-            const isBooked = bookedSlots.includes(label);
+            const isBooked = isSlotUnavailable(label);
             const isSelected = selectedSlot === label;
             return (
               <Pressable
@@ -421,6 +483,45 @@ function ReservasForm({ navigation }: any) {
               />
             </View>
 
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>¿Cómo preferís pagar?</Text>
+              <View style={styles.paymentRow}>
+                <Pressable
+                  style={[
+                    styles.paymentChip,
+                    paymentMethod === 'cash' && styles.paymentChipActive,
+                  ]}
+                  onPress={() => setPaymentMethod('cash')}
+                >
+                  <Text
+                    style={[
+                      styles.paymentChipText,
+                      paymentMethod === 'cash' && styles.paymentChipTextActive,
+                    ]}
+                  >
+                    Efectivo
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  style={[
+                    styles.paymentChip,
+                    paymentMethod === 'transfer' && styles.paymentChipActive,
+                  ]}
+                  onPress={() => setPaymentMethod('transfer')}
+                >
+                  <Text
+                    style={[
+                      styles.paymentChipText,
+                      paymentMethod === 'transfer' && styles.paymentChipTextActive,
+                    ]}
+                  >
+                    Transferencia
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+
             {/* BARBEROS */}
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Tu Barbero</Text>
@@ -440,9 +541,16 @@ function ReservasForm({ navigation }: any) {
                         selectedBarber === b._id && styles.avatarActive,
                       ]}
                     >
-                      <Text style={styles.avatarText}>
-                        {b.fullName.charAt(0)}
-                      </Text>
+                      {b.photoUrl ? (
+                        <Image
+                          source={{ uri: b.photoUrl }}
+                          style={styles.avatarImage}
+                        />
+                      ) : (
+                        <Text style={styles.avatarText}>
+                          {b.fullName.charAt(0)}
+                        </Text>
+                      )}
                     </View>
                     <Text
                       style={[
@@ -604,6 +712,33 @@ const createStyles = (theme: Theme) =>
       marginBottom: 5,
     },
     inputFocused: { borderColor: theme.primary },
+    paymentRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    paymentChip: {
+      flex: 1,
+      backgroundColor: '#252525',
+      borderRadius: 16,
+      paddingVertical: 14,
+      paddingHorizontal: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: '#333',
+    },
+    paymentChipActive: {
+      backgroundColor: hexToRgba(theme.primary, 0.16),
+      borderColor: theme.primary,
+    },
+    paymentChipText: {
+      color: '#8B8B8B',
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    paymentChipTextActive: {
+      color: theme.primary,
+    },
     barberCard: { alignItems: 'center', marginRight: 20, width: 85 },
     avatar: {
       width: 64,
@@ -614,8 +749,13 @@ const createStyles = (theme: Theme) =>
       alignItems: 'center',
       borderWidth: 2,
       borderColor: 'transparent',
+      overflow: 'hidden',
     },
     avatarActive: { borderColor: theme.primary, backgroundColor: theme.primary },
+    avatarImage: {
+      width: '100%',
+      height: '100%',
+    },
     avatarText: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
     barberName: { color: '#666', marginTop: 6, fontSize: 14, fontWeight: '600' },
     barberNameActive: { color: '#fff' },

@@ -28,7 +28,7 @@ const AUTH_THEME = {
 } as const;
 
 function Login({ navigation }: any) {
-  const { setShopSlug } = useTheme();
+  const { applyUserTheme } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -52,7 +52,7 @@ function Login({ navigation }: any) {
       const res = await loginUser({ email, password });
       await saveToken(res.token);
       await saveUserProfile(res.user);
-      if (res.user?.shopSlug) setShopSlug(res.user.shopSlug);
+      applyUserTheme(res.user);
 
       // 2. Intentar guardar el Push Token en el Backend (incluye refresh recientes)
       try {

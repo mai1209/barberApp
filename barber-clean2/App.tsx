@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Platform, View } from 'react-native';
 import { DarkTheme, NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import messaging from '@react-native-firebase/messaging';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import StackNavigator from './src/navigation/StackNavigation';
 import { getCurrentUser, savePushTokenApi } from './src/services/api';
 import {
@@ -130,40 +131,44 @@ useEffect(() => {
 
   if (!sessionReady) {
     return (
-      <ThemeProvider>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: '#020203',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <ActivityIndicator size="large" color="#B89016" />
-        </View>
-      </ThemeProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <ThemeProvider>
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: '#020203',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <ActivityIndicator size="large" color="#B89016" />
+          </View>
+        </ThemeProvider>
+      </GestureHandlerRootView>
     );
   }
 	
   return (
-    <ThemeProvider>
-      <View style={{ flex: 1, backgroundColor: '#020203' }}>
-        <NavigationContainer
-          theme={appNavigationTheme}
-          ref={navigationRef}
-          onReady={() => {
-            setCurrentRouteName(navigationRef.getCurrentRoute()?.name);
-          }}
-          onStateChange={() => {
-            setCurrentRouteName(navigationRef.getCurrentRoute()?.name);
-          }}
-        >
-          <StackNavigator
-            currentRouteName={currentRouteName}
-            initialRouteName={initialRouteName}
-          />
-        </NavigationContainer>
-      </View>
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider>
+        <View style={{ flex: 1, backgroundColor: '#020203' }}>
+          <NavigationContainer
+            theme={appNavigationTheme}
+            ref={navigationRef}
+            onReady={() => {
+              setCurrentRouteName(navigationRef.getCurrentRoute()?.name);
+            }}
+            onStateChange={() => {
+              setCurrentRouteName(navigationRef.getCurrentRoute()?.name);
+            }}
+          >
+            <StackNavigator
+              currentRouteName={currentRouteName}
+              initialRouteName={initialRouteName}
+            />
+          </NavigationContainer>
+        </View>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
