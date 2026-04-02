@@ -16,6 +16,42 @@ function normalizePaymentMethod(value) {
   return value === "transfer" ? "transfer" : "cash";
 }
 
+function normalizeCollectedPaymentMethod(value) {
+  if (value == null || value === "") return null;
+  return normalizePaymentMethod(value);
+}
+
+function normalizePaymentStatus(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (["unpaid", "partial", "paid", "refunded"].includes(normalized)) {
+    return normalized;
+  }
+  return "unpaid";
+}
+
+function getEffectivePaymentMethod(appointment) {
+  return normalizePaymentMethod(
+    appointment.paymentMethodCollected || appointment.paymentMethod,
+  );
+}
+
+function getEffectivePaidAmount(appointment, fallbackPrice = 0) {
+  const paymentStatus = normalizePaymentStatus(appointment.paymentStatus);
+  if (paymentStatus === "unpaid" || paymentStatus === "refunded") {
+    return 0;
+  }
+
+  const paid = Number(appointment.amountPaid);
+  if (Number.isFinite(paid) && paid > 0) return paid;
+
+  const total = Number(appointment.amountTotal);
+  if (paymentStatus === "paid" && Number.isFinite(total) && total > 0) {
+    return total;
+  }
+
+  return Number(fallbackPrice || appointment.servicePrice || 0);
+}
+
 async function resolveServicePrice({ ownerId, serviceName, providedPrice }) {
   const parsedPrice = Number(providedPrice);
   if (Number.isFinite(parsedPrice) && parsedPrice >= 0) {
@@ -95,11 +131,15 @@ function applyAppointmentMetrics(bucket, appointment, servicePriceMap) {
   const fallbackPrice = servicePriceMap.get(
     String(appointment.service || "").trim().toLowerCase(),
   );
-  const finalPrice = Number(appointment.servicePrice ?? fallbackPrice ?? 0);
-  const method = normalizePaymentMethod(appointment.paymentMethod);
+  const finalPrice = getEffectivePaidAmount(appointment, fallbackPrice);
+  const method = getEffectivePaymentMethod(appointment);
 
   bucket.appointmentsCount += 1;
   bucket.totalRevenue += finalPrice;
+
+  if (!(finalPrice > 0)) {
+    return;
+  }
 
   if (method === "transfer") {
     bucket.transferCount += 1;
@@ -108,6 +148,38 @@ function applyAppointmentMetrics(bucket, appointment, servicePriceMap) {
     bucket.cashCount += 1;
     bucket.cashRevenue += finalPrice;
   }
+}
+
+function sanitizeHistoryAppointment(appointment, servicePriceMap) {
+  const fallbackPrice = servicePriceMap.get(
+    String(appointment.service || "").trim().toLowerCase(),
+  );
+  const finalPrice = getEffectivePaidAmount(appointment, fallbackPrice);
+
+  return {
+    _id: String(appointment._id),
+    startTime: appointment.startTime,
+    customerName: appointment.customerName,
+    service: appointment.service,
+    barberName:
+      appointment.barber && typeof appointment.barber === "object"
+        ? appointment.barber.fullName
+        : "Barbero eliminado",
+    phone: String(appointment.notes || "").trim(),
+    paymentMethod: getEffectivePaymentMethod(appointment),
+    price: finalPrice,
+    status: appointment.status,
+  };
+}
+
+function sanitizeService(service) {
+  return {
+    _id: String(service._id),
+    name: String(service.name || "").trim(),
+    durationMinutes: Number(service.durationMinutes || 30),
+    price: Number(service.price || 0),
+    isActive: Boolean(service.isActive ?? true),
+  };
 }
 
 // --- CONTROLADORES ---
@@ -201,8 +273,13 @@ export async function createAppointment(req, res, next) {
       startTime,
       durationMinutes,
       servicePrice: resolvedServicePrice,
+      amountTotal: resolvedServicePrice,
+      amountPaid: 0,
+      amountPending: resolvedServicePrice,
       notes,
       paymentMethod: normalizedPaymentMethod,
+      paymentMethodCollected: null,
+      paymentStatus: "unpaid",
       customerEmail: email || undefined,
     });
 
@@ -512,24 +589,151 @@ export async function getCurrentMonthOverview(req, res, next) {
   }
 }
 
+export async function getCustomerHistory(req, res, next) {
+  try {
+    const ownerId = req.user.id;
+    const period = buildMetricsRange(req.query);
+    const search = String(req.query.search ?? "").trim();
+    const paymentMethod = String(req.query.paymentMethod ?? "").trim();
+    const barberId = String(req.query.barberId ?? "").trim();
+
+    const filter = {
+      owner: ownerId,
+      status: "completed",
+      startTime: { $gte: period.start, $lt: period.end },
+    };
+
+    if (barberId) {
+      if (!mongoose.Types.ObjectId.isValid(barberId)) {
+        return res.status(400).json({ error: "Barbero inválido" });
+      }
+      filter.barber = barberId;
+    }
+
+    if (search) {
+      const safePattern = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(safePattern, "i");
+      filter.$or = [{ customerName: regex }, { notes: regex }, { service: regex }];
+    }
+
+    const [appointments, activeServices] = await Promise.all([
+      AppointmentModel.find(filter)
+        .populate({ path: "barber", select: "fullName" })
+        .sort({ startTime: -1 })
+        .limit(120)
+        .lean(),
+      ServiceModel.find({ owner: ownerId })
+        .select({ name: 1, price: 1 })
+        .lean(),
+    ]);
+
+    const servicePriceMap = new Map(
+      activeServices.map((item) => [
+        String(item.name || "").trim().toLowerCase(),
+        Number(item.price || 0),
+      ]),
+    );
+
+    let items = appointments.map(appointment =>
+      sanitizeHistoryAppointment(appointment, servicePriceMap),
+    );
+
+    if (paymentMethod === "cash" || paymentMethod === "transfer") {
+      items = items.filter(item => item.paymentMethod === paymentMethod);
+    }
+
+    const uniqueClients = new Set(
+      items.map(item =>
+        `${String(item.customerName || "").trim().toLowerCase()}|${String(item.phone || "").trim()}`,
+      ),
+    ).size;
+
+    const totalRevenue = items.reduce((acc, item) => acc + Number(item.price || 0), 0);
+
+    return res.json({
+      period: {
+        mode: period.mode,
+        key: period.key,
+        label: period.label,
+        year: period.year,
+        month: period.month,
+        from: period.start,
+        to: new Date(period.end.getTime() - 1),
+      },
+      summary: {
+        servicesCount: items.length,
+        uniqueClients,
+        totalRevenue,
+      },
+      items,
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 // ACTUALIZAR ESTADO (pending, completed, cancelled)
 export async function updateAppointmentStatus(req, res, next) {
   try {
     const ownerId = req.user.id;
     const { appointmentId } = req.params;
-    const { status } = req.body;
+    const {
+      status,
+      paymentMethodCollected,
+      paymentStatus,
+      amountPaid,
+    } = req.body;
 
     if (!["pending", "completed", "cancelled"].includes(status)) {
       return res.status(400).json({ error: "Estado inválido" });
     }
 
-    const appointment = await AppointmentModel.findOneAndUpdate(
-      { _id: appointmentId, owner: ownerId },
-      { status },
-      { new: true }
-    ).lean();
+    const appointmentDoc = await AppointmentModel.findOne({
+      _id: appointmentId,
+      owner: ownerId,
+    });
 
-    if (!appointment) return res.status(404).json({ error: "Turno no encontrado" });
+    if (!appointmentDoc) {
+      return res.status(404).json({ error: "Turno no encontrado" });
+    }
+
+    appointmentDoc.status = status;
+
+    if (status === "completed") {
+      const total = Number(
+        appointmentDoc.amountTotal ??
+          appointmentDoc.servicePrice ??
+          0,
+      );
+      const normalizedStatus = paymentStatus
+        ? normalizePaymentStatus(paymentStatus)
+        : "paid";
+      const normalizedCollectedMethod =
+        normalizedStatus === "paid" || normalizedStatus === "partial"
+          ? normalizeCollectedPaymentMethod(paymentMethodCollected) ??
+            normalizePaymentMethod(appointmentDoc.paymentMethod)
+          : null;
+      const parsedAmountPaid = Number(amountPaid);
+      const safeAmountPaid =
+        normalizedStatus === "paid" || normalizedStatus === "partial"
+          ? Number.isFinite(parsedAmountPaid)
+            ? Math.max(0, parsedAmountPaid)
+            : total
+          : 0;
+
+      appointmentDoc.paymentMethodCollected = normalizedCollectedMethod;
+      appointmentDoc.paymentStatus = normalizedStatus;
+      appointmentDoc.amountTotal = total;
+      appointmentDoc.amountPaid = safeAmountPaid;
+      appointmentDoc.amountPending =
+        normalizedStatus === "paid"
+          ? Math.max(0, total - safeAmountPaid)
+          : Math.max(0, total - safeAmountPaid);
+    }
+
+    await appointmentDoc.save();
+
+    const appointment = appointmentDoc.toObject();
 
     return res.json({ appointment });
   } catch (err) {
@@ -544,8 +748,129 @@ export async function listServices(req, res, next) {
     const services = await ServiceModel.find({
       owner: ownerId,
       isActive: true,
-    }).sort({ name: 1 });
-    return res.json({ services });
+    })
+      .sort({ name: 1 })
+      .lean();
+    return res.json({ services: services.map(sanitizeService) });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function createService(req, res, next) {
+  try {
+    const ownerId = req.user.id;
+    const name = String(req.body?.name ?? "").trim();
+    const durationMinutes = Number(req.body?.durationMinutes ?? 30);
+    const price = Number(req.body?.price ?? 0);
+
+    if (!name) {
+      return res.status(400).json({ error: "El nombre del servicio es obligatorio" });
+    }
+
+    if (!Number.isFinite(durationMinutes) || durationMinutes < 10 || durationMinutes > 480) {
+      return res.status(400).json({ error: "La duración del servicio no es válida" });
+    }
+
+    if (!Number.isFinite(price) || price < 0) {
+      return res.status(400).json({ error: "El precio del servicio no es válido" });
+    }
+
+    const existing = await ServiceModel.findOne({
+      owner: ownerId,
+      isActive: true,
+      name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"),
+    }).lean();
+
+    if (existing) {
+      return res.status(409).json({ error: "Ya existe un servicio con ese nombre" });
+    }
+
+    const service = await ServiceModel.create({
+      owner: ownerId,
+      name,
+      durationMinutes,
+      price,
+      isActive: true,
+    });
+
+    return res.status(201).json({ service: sanitizeService(service) });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function updateService(req, res, next) {
+  try {
+    const ownerId = req.user.id;
+    const { serviceId } = req.params;
+    const name = String(req.body?.name ?? "").trim();
+    const durationMinutes = Number(req.body?.durationMinutes ?? 30);
+    const price = Number(req.body?.price ?? 0);
+
+    if (!mongoose.Types.ObjectId.isValid(serviceId)) {
+      return res.status(400).json({ error: "Servicio inválido" });
+    }
+
+    if (!name) {
+      return res.status(400).json({ error: "El nombre del servicio es obligatorio" });
+    }
+
+    if (!Number.isFinite(durationMinutes) || durationMinutes < 10 || durationMinutes > 480) {
+      return res.status(400).json({ error: "La duración del servicio no es válida" });
+    }
+
+    if (!Number.isFinite(price) || price < 0) {
+      return res.status(400).json({ error: "El precio del servicio no es válido" });
+    }
+
+    const existing = await ServiceModel.findOne({
+      owner: ownerId,
+      isActive: true,
+      _id: { $ne: serviceId },
+      name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"),
+    }).lean();
+
+    if (existing) {
+      return res.status(409).json({ error: "Ya existe otro servicio con ese nombre" });
+    }
+
+    const service = await ServiceModel.findOneAndUpdate(
+      { _id: serviceId, owner: ownerId, isActive: true },
+      { name, durationMinutes, price },
+      { new: true },
+    ).lean();
+
+    if (!service) {
+      return res.status(404).json({ error: "Servicio no encontrado" });
+    }
+
+    return res.json({ service: sanitizeService(service) });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function deleteService(req, res, next) {
+  try {
+    const ownerId = req.user.id;
+    const { serviceId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(serviceId)) {
+      return res.status(400).json({ error: "Servicio inválido" });
+    }
+
+    const service = await ServiceModel.findOneAndUpdate(
+      { _id: serviceId, owner: ownerId, isActive: true },
+      { isActive: false },
+      { new: true },
+    ).lean();
+
+    if (!service) {
+      return res.status(404).json({ error: "Servicio no encontrado" });
+    }
+
+    return res.json({ service: sanitizeService(service) });
   } catch (err) {
     return next(err);
   }

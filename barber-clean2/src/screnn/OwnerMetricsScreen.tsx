@@ -247,7 +247,7 @@ function OwnerMetricsScreen({ navigation }: Props) {
                     { backgroundColor: hexToRgba('#1c1c1c1', 0.1) },
                   ]}
                 >
-                  <Banknote size={16} color="#FF1493" />
+                  <Banknote size={16} color={theme.primary} />
                 </View>
                 <View>
                   <Text style={styles.paymentLabel}>Efectivo</Text>
@@ -267,7 +267,7 @@ function OwnerMetricsScreen({ navigation }: Props) {
                     { backgroundColor: hexToRgba('#1c1c1c1', 0.1) },
                   ]}
                 >
-                  <CreditCard size={16} color="#FF1493" />
+                  <CreditCard size={16} color={theme.primary} />
                 </View>
                 <View>
                   <Text style={styles.paymentLabel}>Transferencia</Text>

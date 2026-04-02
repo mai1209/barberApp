@@ -53,7 +53,22 @@ function sanitizeAppointment(app) {
 
 function sanitizeShop(shop) {
   if (!shop) return null;
-  return { _id: shop._id.toString(), name: shop.fullName, slug: shop.shopSlug };
+  const paymentSettings = shop.paymentSettings || {};
+  return {
+    _id: shop._id.toString(),
+    name: shop.fullName,
+    slug: shop.shopSlug,
+    paymentSettings: {
+      cashEnabled: paymentSettings.cashEnabled !== false,
+      advancePaymentEnabled: Boolean(paymentSettings.advancePaymentEnabled),
+      advanceMode: paymentSettings.advanceMode || "deposit",
+      advanceType: paymentSettings.advanceType || "percent",
+      advanceValue: Number(paymentSettings.advanceValue || 0),
+      mercadoPagoReady: paymentSettings.mercadoPagoConnectionStatus === "connected",
+      mercadoPagoConnectionStatus:
+        paymentSettings.mercadoPagoConnectionStatus || "disconnected",
+    },
+  };
 }
 
 function sanitizeService(service) {
@@ -68,6 +83,25 @@ function sanitizeService(service) {
 
 function normalizePaymentMethod(value) {
   return value === "transfer" ? "transfer" : "cash";
+}
+
+function validatePublicPaymentSelection(shop, paymentMethod) {
+  const settings = shop?.paymentSettings || {};
+  const normalized = normalizePaymentMethod(paymentMethod);
+  const cashEnabled = settings.cashEnabled !== false;
+  const advanceEnabled =
+    Boolean(settings.advancePaymentEnabled) &&
+    settings.mercadoPagoConnectionStatus === "connected";
+
+  if (normalized === "cash" && !cashEnabled) {
+    throw new Error("Esta barbería no está tomando pagos en el local en este momento.");
+  }
+
+  if (normalized === "transfer" && !advanceEnabled) {
+    throw new Error("El pago adelantado no está habilitado para esta barbería.");
+  }
+
+  return normalized;
 }
 
 async function resolveServicePrice({ ownerId, serviceName, providedPrice }) {
@@ -233,7 +267,12 @@ export async function publicCreateAppointment(req, res, next) {
       return res.status(409).json({ error: "El horario ya está ocupado" });
     }
 
-    const normalizedPaymentMethod = normalizePaymentMethod(paymentMethod);
+    let normalizedPaymentMethod;
+    try {
+      normalizedPaymentMethod = validatePublicPaymentSelection(shop, paymentMethod);
+    } catch (validationError) {
+      return res.status(400).json({ error: validationError.message });
+    }
     const resolvedServicePrice = await resolveServicePrice({
       ownerId,
       serviceName: service,
@@ -249,8 +288,13 @@ export async function publicCreateAppointment(req, res, next) {
       startTime: appointmentDate,
       durationMinutes: Number(durationMinutes) || 30,
       servicePrice: resolvedServicePrice,
+      amountTotal: resolvedServicePrice,
+      amountPaid: 0,
+      amountPending: resolvedServicePrice,
       notes,
       paymentMethod: normalizedPaymentMethod,
+      paymentMethodCollected: null,
+      paymentStatus: "unpaid",
       status: "pending",
       // Si querés guardar el email en la DB, podés agregarlo al modelo y ponerlo acá
     });

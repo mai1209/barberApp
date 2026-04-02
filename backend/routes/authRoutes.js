@@ -5,6 +5,7 @@ import {
   loginUser,
   requestPasswordRecovery,
   registerUser,
+  updatePaymentSettings,
   updatePassword,
   updateThemeConfig,
 } from "../api/authController.js";
@@ -22,5 +23,6 @@ router.post("/password/recovery/confirm", confirmPasswordRecovery);
 router.get("/me", requireAuth, getCurrentUser);
 router.put("/password", requireAuth, updatePassword);
 router.put("/theme", requireAuth, updateThemeConfig);
+router.put("/payment-settings", requireAuth, updatePaymentSettings);
 router.post("/save-push-token", requireAuth, savePushToken);
 export default router;

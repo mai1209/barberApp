@@ -17,6 +17,34 @@ const themeConfigSchema = new mongoose.Schema(
   },
 );
 
+const paymentSettingsSchema = new mongoose.Schema(
+  {
+    cashEnabled: { type: Boolean, default: true },
+    advancePaymentEnabled: { type: Boolean, default: false },
+    advanceMode: {
+      type: String,
+      enum: ["deposit", "full"],
+      default: "deposit",
+    },
+    advanceType: {
+      type: String,
+      enum: ["percent", "fixed"],
+      default: "percent",
+    },
+    advanceValue: { type: Number, default: 30, min: 0 },
+    mercadoPagoConnectionStatus: {
+      type: String,
+      enum: ["disconnected", "pending", "connected"],
+      default: "disconnected",
+    },
+    mercadoPagoSellerId: { type: String, default: null },
+    mercadoPagoPublicKey: { type: String, default: null },
+  },
+  {
+    _id: false,
+  },
+);
+
 const userSchema = new mongoose.Schema(
   {
     fullName: {
@@ -74,6 +102,10 @@ const userSchema = new mongoose.Schema(
     },
     themeConfig: {
       type: themeConfigSchema,
+      default: () => ({}),
+    },
+    paymentSettings: {
+      type: paymentSettingsSchema,
       default: () => ({}),
     },
   },

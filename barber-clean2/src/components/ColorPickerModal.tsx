@@ -25,6 +25,8 @@ type HsvColor = {
 };
 
 type BoxLayout = {
+  x: number;
+  y: number;
   width: number;
   height: number;
 };
@@ -125,8 +127,20 @@ export default function ColorPickerModal({
   onConfirm,
 }: Props) {
   const [hsv, setHsv] = useState<HsvColor>(() => hexToHsv(value));
-  const [squareLayout, setSquareLayout] = useState<BoxLayout>({ width: 1, height: 1 });
-  const [hueLayout, setHueLayout] = useState<BoxLayout>({ width: 1, height: 1 });
+  const [squareLayout, setSquareLayout] = useState<BoxLayout>({
+    x: 0,
+    y: 0,
+    width: 1,
+    height: 1,
+  });
+  const [hueLayout, setHueLayout] = useState<BoxLayout>({
+    x: 0,
+    y: 0,
+    width: 1,
+    height: 1,
+  });
+  const squareRef = useRef<View | null>(null);
+  const hueRef = useRef<View | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -145,6 +159,23 @@ export default function ColorPickerModal({
     [hsv.h],
   );
 
+  const measureTarget = (target: View | null, setter: (layout: BoxLayout) => void) => {
+    if (!target) return;
+    target.measureInWindow((x, y, width, height) => {
+      setter({
+        x,
+        y,
+        width: width || 1,
+        height: height || 1,
+      });
+    });
+  };
+
+  const refreshLayouts = () => {
+    measureTarget(squareRef.current, setSquareLayout);
+    measureTarget(hueRef.current, setHueLayout);
+  };
+
   const updateSquareFromTouch = (x: number, y: number) => {
     setHsv(current => ({
       ...current,
@@ -160,15 +191,23 @@ export default function ColorPickerModal({
     }));
   };
 
+  const updateSquareFromPage = (pageX: number, pageY: number) => {
+    updateSquareFromTouch(pageX - squareLayout.x, pageY - squareLayout.y);
+  };
+
+  const updateHueFromPage = (pageX: number) => {
+    updateHueFromTouch(pageX - hueLayout.x);
+  };
+
   const squareResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: event => {
-        updateSquareFromTouch(event.nativeEvent.locationX, event.nativeEvent.locationY);
+        updateSquareFromPage(event.nativeEvent.pageX, event.nativeEvent.pageY);
       },
       onPanResponderMove: event => {
-        updateSquareFromTouch(event.nativeEvent.locationX, event.nativeEvent.locationY);
+        updateSquareFromPage(event.nativeEvent.pageX, event.nativeEvent.pageY);
       },
     }),
   ).current;
@@ -178,10 +217,10 @@ export default function ColorPickerModal({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: event => {
-        updateHueFromTouch(event.nativeEvent.locationX);
+        updateHueFromPage(event.nativeEvent.pageX);
       },
       onPanResponderMove: event => {
-        updateHueFromTouch(event.nativeEvent.locationX);
+        updateHueFromPage(event.nativeEvent.pageX);
       },
     }),
   ).current;
@@ -191,19 +230,21 @@ export default function ColorPickerModal({
   const hueLeft = clamp((hsv.h / 360) * hueLayout.width, 0, hueLayout.width);
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      onShow={refreshLayouts}
+    >
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <Text style={styles.title}>{title}</Text>
 
           <View
+            ref={squareRef}
             style={styles.squareWrap}
-            onLayout={event => {
-              setSquareLayout({
-                width: event.nativeEvent.layout.width,
-                height: event.nativeEvent.layout.height,
-              });
-            }}
+            onLayout={() => refreshLayouts()}
             {...squareResponder.panHandlers}
           >
             <Svg width="100%" height="100%">
@@ -235,13 +276,9 @@ export default function ColorPickerModal({
           </View>
 
           <View
+            ref={hueRef}
             style={styles.hueWrap}
-            onLayout={event => {
-              setHueLayout({
-                width: event.nativeEvent.layout.width,
-                height: event.nativeEvent.layout.height,
-              });
-            }}
+            onLayout={() => refreshLayouts()}
             {...hueResponder.panHandlers}
           >
             <Svg width="100%" height="100%">

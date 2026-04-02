@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Appointment,
   Barber,
@@ -31,30 +32,31 @@ import {
 } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
-import { Pencil, BarChart2, Plus } from 'lucide-react-native';
+import type { RootStackParamList } from '../navigation/StackNavigation';
+import {
+  Pencil,
+  BarChart2,
+  Plus,
+  Clock,
+  Scissors,
+  User,
+} from 'lucide-react-native';
 
 const hexToRgba = (hex: string, alpha: number) => {
   const sanitized = hex.replace('#', '');
-  const bigint = parseInt(sanitized.length === 3 ? sanitized.repeat(2) : sanitized, 16);
+  const bigint = parseInt(
+    sanitized.length === 3 ? sanitized.repeat(2) : sanitized,
+    16,
+  );
   const r = (bigint >> 16) & 255;
   const g = (bigint >> 8) & 255;
   const b = bigint & 255;
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
-const sanitizeWhatsappNumber = (value: string) =>
-  value.replace(/[^\d]/g, '');
+const sanitizeWhatsappNumber = (value: string) => value.replace(/[^\d]/g, '');
 
-type Props = {
-  navigation: any;
-  route: {
-    params: {
-      barberId: string;
-      barberName?: string;
-      barber?: Barber;
-    };
-  };
-};
+type Props = NativeStackScreenProps<RootStackParamList, 'Barber-Home'>;
 
 function formatDateParam(date: Date) {
   const year = date.getFullYear();
@@ -111,23 +113,44 @@ function capitalize(text: string) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function InfoLine({ label, value, styles }: { label: string; value: string; styles: ReturnType<typeof makeStyles> }) {
-  return (
-    <View style={styles.infoLineRow}>
-      <Text style={styles.infoLineLabel}>{label}</Text>
-      <Text style={styles.infoLineValue}>{value}</Text>
-    </View>
-  );
+function getPaymentSnapshot(appointment: Appointment) {
+  if (appointment.status === 'completed') {
+    if (appointment.paymentStatus === 'unpaid') {
+      return { label: 'Sin cobrar', tone: 'neutral' as const };
+    }
+    if (appointment.paymentMethodCollected === 'transfer') {
+      return {
+        label: 'Cobrado por adelantado / transferencia',
+        tone: 'transfer' as const,
+      };
+    }
+    return { label: 'Cobrado en efectivo', tone: 'cash' as const };
+  }
+
+  if (appointment.paymentMethod === 'transfer') {
+    return {
+      label: 'Reserva con adelanto / transferencia',
+      tone: 'transfer' as const,
+    };
+  }
+
+  return {
+    label: 'Reserva para cobrar en efectivo',
+    tone: 'cash' as const,
+  };
 }
 
 function BarberDashboard({ route, navigation }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const { barberId, barberName, barber: initialBarber } = route.params;
+  const { barberId, barberName, barber: initialBarber } = route.params ?? {};
+  const activeBarberId = barberId ?? initialBarber?._id ?? null;
 
   const [date, setDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [barberProfile, setBarberProfile] = useState<Barber | null>(initialBarber ?? null);
+  const [barberProfile, setBarberProfile] = useState<Barber | null>(
+    initialBarber ?? null,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -160,12 +183,12 @@ function BarberDashboard({ route, navigation }: Props) {
         date: itemDate,
         isSelected: isSameDay(itemDate, date),
         isToday: isSameDay(itemDate, new Date()),
-        dayName: new Intl.DateTimeFormat('es-AR', {
-          weekday: 'short',
-        }).format(itemDate),
-        dayNumber: new Intl.DateTimeFormat('es-AR', {
-          day: '2-digit',
-        }).format(itemDate),
+        dayName: new Intl.DateTimeFormat('es-AR', { weekday: 'short' }).format(
+          itemDate,
+        ),
+        dayNumber: new Intl.DateTimeFormat('es-AR', { day: '2-digit' }).format(
+          itemDate,
+        ),
       };
     });
   }, [date]);
@@ -173,18 +196,30 @@ function BarberDashboard({ route, navigation }: Props) {
   const dateParam = useMemo(() => formatDateParam(date), [date]);
 
   const loadAppointments = useCallback(async () => {
+    if (!activeBarberId) {
+      setAppointments([]);
+      setBarberProfile(initialBarber ?? null);
+      setError('No encontramos el perfil del barbero');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const [appointmentsRes, barbersRes] = await Promise.all([
-        fetchBarberAppointments(barberId, dateParam),
+        fetchBarberAppointments(activeBarberId, dateParam),
         fetchBarbers(),
       ]);
 
       setAppointments(
-        appointmentsRes.appointments.filter((item: Appointment) => item.status !== 'cancelled'),
+        appointmentsRes.appointments.filter(
+          (item: Appointment) => item.status !== 'cancelled',
+        ),
       );
       setBarberProfile(
-        barbersRes.barbers.find((item: Barber) => item._id === barberId) ?? initialBarber ?? null,
+        barbersRes.barbers.find((item: Barber) => item._id === activeBarberId) ??
+          initialBarber ??
+          null,
       );
       setError('');
     } catch (err: any) {
@@ -192,7 +227,7 @@ function BarberDashboard({ route, navigation }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [barberId, dateParam]);
+  }, [activeBarberId, dateParam, initialBarber]);
 
   useFocusEffect(
     useCallback(() => {
@@ -210,22 +245,26 @@ function BarberDashboard({ route, navigation }: Props) {
     loadAppointments();
   }, [date, loadAppointments]);
 
-  const handleShiftDate = (days: number) => {
+  const handleShiftDate = (days: number) =>
     setDate(prev => addDays(prev, days));
-  };
-
-  const handleSelectDate = (selected: Date) => {
-    setDate(selected);
-  };
-
-  const handleGoToToday = () => {
-    setDate(new Date());
-  };
+  const handleSelectDate = (selected: Date) => setDate(selected);
+  const handleGoToToday = () => setDate(new Date());
 
   const handleEditProfile = () => {
+    if (barberProfile) {
+      navigation.navigate('Register-Employed', {
+        barber: barberProfile,
+      });
+      return;
+    }
+
+    if (!activeBarberId) {
+      return;
+    }
+
     navigation.navigate('Register-Employed', {
-      barber: barberProfile ?? {
-        _id: barberId,
+      barber: {
+        _id: activeBarberId,
         fullName: barberName ?? 'Barbero',
         workDays: [],
       },
@@ -238,11 +277,8 @@ function BarberDashboard({ route, navigation }: Props) {
         onMoveShouldSetPanResponder: (_, gestureState) =>
           Math.abs(gestureState.dx) > 18 && Math.abs(gestureState.dy) < 10,
         onPanResponderRelease: (_, gestureState) => {
-          if (gestureState.dx < -40) {
-            handleShiftDate(1);
-          } else if (gestureState.dx > 40) {
-            handleShiftDate(-1);
-          }
+          if (gestureState.dx < -40) handleShiftDate(1);
+          else if (gestureState.dx > 40) handleShiftDate(-1);
         },
       }),
     [],
@@ -250,32 +286,102 @@ function BarberDashboard({ route, navigation }: Props) {
 
   const handleSwipeableOpen = (appointmentId: string) => {
     const previousId = openedSwipeableIdRef.current;
-    if (previousId && previousId !== appointmentId) {
+    if (previousId && previousId !== appointmentId)
       swipeableRefs.current[previousId]?.close();
-    }
     openedSwipeableIdRef.current = appointmentId;
   };
 
   const handleComplete = async (appointmentId: string) => {
     Alert.alert(
-      'Completar turno',
-      '¿Estás seguro que deseas completar el turno?',
+      'Finalizar turno',
+      '¿Deseas marcar este turno como completado?',
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: 'No', style: 'cancel' },
         {
-          text: 'Completar',
-          onPress: async () => {
-            try {
-              await updateAppointmentStatus(appointmentId, 'completed');
+          text: 'Sí, finalizar',
+          onPress: () => {
+            const appointment = appointments.find(item => item._id === appointmentId);
+            const totalAmount = Number(
+              appointment?.amountTotal ??
+                appointment?.servicePrice ??
+                0,
+            );
 
-              setAppointments(prev =>
-                prev.map(app =>
-                  app._id === appointmentId ? { ...app, status: 'completed' } : app,
-                ),
-              );
-            } catch (err: any) {
-              Alert.alert('Error', err?.message ?? 'No se pudo actualizar el turno');
-            }
+            Alert.alert(
+              '¿Cómo pagó este cliente?',
+              'Esto define las métricas reales del barbero.',
+              [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                  text: 'Efectivo',
+                  onPress: async () => {
+                    try {
+                      const response = await updateAppointmentStatus(
+                        appointmentId,
+                        'completed',
+                        {
+                          paymentMethodCollected: 'cash',
+                          paymentStatus: 'paid',
+                          amountPaid: totalAmount,
+                        },
+                      );
+                      setAppointments(prev =>
+                        prev.map(app =>
+                          app._id === appointmentId ? response.appointment : app,
+                        ),
+                      );
+                    } catch (err: any) {
+                      Alert.alert('Error', err?.message ?? 'No se pudo actualizar');
+                    }
+                  },
+                },
+                {
+                  text: 'Transferencia / adelantado',
+                  onPress: async () => {
+                    try {
+                      const response = await updateAppointmentStatus(
+                        appointmentId,
+                        'completed',
+                        {
+                          paymentMethodCollected: 'transfer',
+                          paymentStatus: 'paid',
+                          amountPaid: totalAmount,
+                        },
+                      );
+                      setAppointments(prev =>
+                        prev.map(app =>
+                          app._id === appointmentId ? response.appointment : app,
+                        ),
+                      );
+                    } catch (err: any) {
+                      Alert.alert('Error', err?.message ?? 'No se pudo actualizar');
+                    }
+                  },
+                },
+                {
+                  text: 'Aún no pagó',
+                  onPress: async () => {
+                    try {
+                      const response = await updateAppointmentStatus(
+                        appointmentId,
+                        'completed',
+                        {
+                          paymentStatus: 'unpaid',
+                          amountPaid: 0,
+                        },
+                      );
+                      setAppointments(prev =>
+                        prev.map(app =>
+                          app._id === appointmentId ? response.appointment : app,
+                        ),
+                      );
+                    } catch (err: any) {
+                      Alert.alert('Error', err?.message ?? 'No se pudo actualizar');
+                    }
+                  },
+                },
+              ],
+            );
           },
         },
       ],
@@ -284,154 +390,146 @@ function BarberDashboard({ route, navigation }: Props) {
 
   const handleRelease = (appointmentId: string) => {
     const appointment = appointments.find(item => item._id === appointmentId);
-    Alert.alert(
-      'Liberar Turno',
-      'Elegí si querés solo liberar el turno o cancelarlo avisando al cliente por WhatsApp.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Confirmar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteAppointment(appointmentId);
-              setAppointments(prev => prev.filter(app => app._id !== appointmentId));
-            } catch (err: any) {
-              Alert.alert('Error', err?.message ?? 'No se pudo liberar el turno');
-            }
-          },
+    Alert.alert('Gestionar Turno', 'Elegí una acción:', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Borrar (Solo App)',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteAppointment(appointmentId);
+            setAppointments(prev =>
+              prev.filter(app => app._id !== appointmentId),
+            );
+          } catch (err: any) {
+            Alert.alert('Error', 'No se pudo liberar');
+          }
         },
-        {
-          text: 'Cancelar turno',
-          onPress: async () => {
-            try {
-              if (!appointment?.notes) {
-                Alert.alert('Falta WhatsApp', 'Este turno no tiene número de cliente cargado.');
-                return;
-              }
-
-              const phone = sanitizeWhatsappNumber(appointment.notes);
-              if (!phone) {
-                Alert.alert('WhatsApp inválido', 'El número del cliente no tiene un formato válido.');
-                return;
-              }
-
-              await deleteAppointment(appointmentId);
-              setAppointments(prev => prev.filter(app => app._id !== appointmentId));
-
-              const message = buildCancellationMessage({
-                shopName: barberName || 'la barbería',
-                customerName: appointment.customerName,
-                service: appointment.service,
-                startTime: appointment.startTime,
-              });
-
-              await Linking.openURL(
-                `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
-              );
-            } catch (err: any) {
-              Alert.alert('Error', err?.message ?? 'No se pudo cancelar el turno');
+      },
+      {
+        text: 'Cancelar y Avisar WhatsApp',
+        onPress: async () => {
+          try {
+            if (!appointment?.notes) {
+              Alert.alert('Sin contacto', 'No hay WhatsApp registrado.');
+              return;
             }
-          },
+            const phone = sanitizeWhatsappNumber(appointment.notes);
+            await deleteAppointment(appointmentId);
+            setAppointments(prev =>
+              prev.filter(app => app._id !== appointmentId),
+            );
+            const message = buildCancellationMessage({
+              shopName: barberName || 'la barbería',
+              customerName: appointment.customerName,
+              service: appointment.service,
+              startTime: appointment.startTime,
+            });
+            await Linking.openURL(
+              `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+            );
+          } catch (err: any) {
+            Alert.alert('Error', 'No se pudo cancelar');
+          }
         },
-      ],
-    );
+      },
+    ]);
   };
 
   const renderAppointmentCard = (appointment: Appointment, index: number) => {
     const isCompleted = appointment.status === 'completed';
+    const paymentSnapshot = getPaymentSnapshot(appointment);
 
     const card = (
       <View
         style={[
           styles.appointmentCard,
           isCompleted && styles.appointmentCardCompleted,
-          { marginTop: index === 0 ? 0 : 14 },
+          { marginTop: index === 0 ? 0 : 12 },
         ]}
       >
-        <View
-          style={[
-            styles.cardGlowLine,
-            isCompleted && styles.cardGlowLineCompleted,
-          ]}
-        />
-
-        <View style={styles.cardHeaderRow}>
-          <View style={styles.cardTimeBox}>
-            <Text style={styles.cardTimeMain}>
+        <View style={styles.cardHeader}>
+          <View style={styles.timeTag}>
+            <Clock size={14} color={theme.primary} style={{ marginRight: 6 }} />
+            <Text style={styles.timeText}>
               {formatTimeOnly(appointment.startTime)}
             </Text>
-            <Text style={styles.cardTimeSub}>HORARIO</Text>
           </View>
+          <View
+            style={[
+              styles.statusBadge,
+              isCompleted ? styles.statusBadgeDone : styles.statusBadgePending,
+            ]}
+          >
+            <Text
+              style={[
+                styles.statusText,
+                isCompleted ? styles.statusTextDone : styles.statusTextPending,
+              ]}
+            >
+              {isCompleted ? 'COMPLETADO' : 'PENDIENTE'}
+            </Text>
+          </View>
+        </View>
 
-          <View style={styles.cardHeaderContent}>
-            <View style={styles.cardTitleRow}>
-              <View style={{ flex: 1, paddingRight: 10 }}>
-                <Text style={styles.cardServiceTitle}>
-                  {appointment.service}
-                </Text>
-                <Text style={styles.cardDurationText}>
-                  {appointment.durationMinutes
-                    ? `${appointment.durationMinutes} min`
-                    : 'Duración no definida'}
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.cardStatusPill,
-                  isCompleted
-                    ? styles.cardStatusPillCompleted
-                    : styles.cardStatusPillPending,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.cardStatusText,
-                    isCompleted
-                      ? styles.cardStatusTextCompleted
-                      : styles.cardStatusTextPending,
-                  ]}
-                >
-                  {isCompleted ? 'Completado' : 'Pendiente'}
-                </Text>
-              </View>
+        <View style={styles.cardBody}>
+          <Text style={styles.customerNameText}>
+            {appointment.customerName}
+          </Text>
+          <View style={styles.serviceRow}>
+            <Scissors size={14} color="#888" style={{ marginRight: 6 }} />
+            <Text style={styles.serviceNameText}>{appointment.service}</Text>
+            <Text style={styles.dotSeparator}>•</Text>
+            <Text style={styles.durationText}>
+              {appointment.durationMinutes || 60} min
+            </Text>
+          </View>
+          {appointment.notes ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginTop: 4,
+              }}
+            >
+              <User size={12} color="#666" style={{ marginRight: 4 }} />
+              <Text style={styles.phoneSubText}>{appointment.notes}</Text>
             </View>
-
-            <View style={styles.cardInfoPanel}>
-              <InfoLine label="Cliente" value={appointment.customerName} styles={styles} />
-              {appointment.notes ? (
-                <InfoLine label="Teléfono Cliente" value={appointment.notes} styles={styles} />
-              ) : null}
-            </View>
+          ) : null}
+          <View
+            style={[
+              styles.paymentInfoBadge,
+              paymentSnapshot.tone === 'cash'
+                ? styles.paymentInfoBadgeCash
+                : paymentSnapshot.tone === 'transfer'
+                  ? styles.paymentInfoBadgeTransfer
+                  : styles.paymentInfoBadgeNeutral,
+            ]}
+          >
+            <Text style={styles.paymentInfoText}>{paymentSnapshot.label}</Text>
           </View>
         </View>
 
         {!isCompleted && (
-          <View style={styles.cardButtonsRow}>
+          <View style={styles.cardActions}>
             <Pressable
-              style={[styles.cardActionBtn, styles.cardActionPrimary]}
+              style={[styles.btnAction, styles.btnMain]}
               onPress={() => handleComplete(appointment._id)}
             >
-              <Text style={styles.cardActionPrimaryText}>
-                Finalizar Atención
-              </Text>
+              <Text style={styles.btnMainText}>Cobrar y finalizar</Text>
             </Pressable>
-
             <Pressable
-              style={[styles.cardActionBtn, styles.cardActionSecondary]}
+              style={[styles.btnAction, styles.btnSec]}
               onPress={() => handleRelease(appointment._id)}
             >
-              <Text style={styles.cardActionSecondaryText}>Liberar</Text>
+              <Text style={styles.btnSecText}>Liberar</Text>
             </Pressable>
           </View>
         )}
       </View>
     );
 
-    if (isCompleted) {
-      return <View key={appointment._id}>{card}</View>;
-    }
+    if (isCompleted) return <View key={appointment._id}>{card}</View>;
 
     return (
       <Swipeable
@@ -442,21 +540,13 @@ function BarberDashboard({ route, navigation }: Props) {
         overshootRight={false}
         renderRightActions={() => (
           <Pressable
-            style={[styles.swipeAction, { marginTop: index === 0 ? 0 : 14 }]}
-            onPress={() => {
-              swipeableRefs.current[appointment._id]?.close();
-              handleRelease(appointment._id);
-            }}
+            style={[styles.swipeAction, { marginTop: index === 0 ? 0 : 12 }]}
+            onPress={() => handleRelease(appointment._id)}
           >
             <Text style={styles.swipeActionText}>Liberar</Text>
           </Pressable>
         )}
         onSwipeableOpen={() => handleSwipeableOpen(appointment._id)}
-        onSwipeableClose={() => {
-          if (openedSwipeableIdRef.current === appointment._id) {
-            openedSwipeableIdRef.current = null;
-          }
-        }}
       >
         {card}
       </Swipeable>
@@ -473,64 +563,62 @@ function BarberDashboard({ route, navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-            <Image style={styles.logo} source={theme.logo} />
-            <Text style={styles.headerSubtitle}>BARBER DASHBOARD</Text>
-            <Text style={styles.headerTitle}>
-                {barberProfile?.fullName || barberName || 'Mi Agenda'}
-            </Text>
+          <Image style={styles.logo} source={theme.logo} />
+          <Text style={styles.headerSubtitle}>BARBER DASHBOARD</Text>
+          <Text style={styles.headerTitle}>
+            {barberProfile?.fullName || barberName || 'Mi Agenda'}
+          </Text>
 
-            <View style={styles.headerActionsContainer}>
-                {/* Botón Principal: Nuevo Turno */}
+          <View style={styles.headerActionsContainer}>
+            <Pressable
+              onPress={() => navigation.navigate('Reservas')}
+              style={({ pressed }) => [
+                styles.mainActionBtn,
+                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
+              ]}
+            >
+              <Plus size={20} color="#fff" strokeWidth={2} />
+              <Text style={styles.mainActionBtnText}>NUEVO TURNO</Text>
+            </Pressable>
+
+            <View style={styles.secondaryActionsRow}>
+              <Pressable
+                onPress={handleEditProfile}
+                style={({ pressed }) => [
+                  styles.secondaryActionBtn,
+                  pressed && { backgroundColor: hexToRgba(theme.primary, 0.2) },
+                ]}
+              >
+                <Pencil size={14} color={theme.primary} />
+                <Text style={styles.secondaryActionText}>Editar Perfil</Text>
+              </Pressable>
+
                 <Pressable
-                    onPress={() => navigation.navigate('Reservas')}
-                    style={({ pressed }) => [
-                        styles.mainActionBtn,
-                        pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
-                    ]}
-                >
-                    <Plus size={20} color="#fff" strokeWidth={2} />
-                    <Text style={styles.mainActionBtnText}>NUEVO TURNO</Text>
-                </Pressable>
-
-                {/* Botones Secundarios: Editar y Métricas */}
-                <View style={styles.secondaryActionsRow}>
-                    <Pressable
-                        onPress={handleEditProfile}
-                        style={({ pressed }) => [
-                            styles.secondaryActionBtn,
-                            pressed && { backgroundColor: hexToRgba(theme.primary, 0.2) }
-                        ]}
-                    >
-                        <Pencil size={14} color={theme.primary} />
-                        <Text style={styles.secondaryActionText}>Editar Perfil</Text>
-                    </Pressable>
-
-                    <Pressable
-                        onPress={() =>
-                            navigation.navigate('Metrics', {
-                                barberId,
-                                barberName: barberProfile?.fullName || barberName || 'Mi Agenda',
-                            })
-                        }
-                        style={({ pressed }) => [
-                            styles.secondaryActionBtn,
-                            pressed && { backgroundColor: hexToRgba(theme.primary, 0.2) }
-                        ]}
-                    >
-                        <BarChart2 size={14} color={theme.primary} />
-                        <Text style={styles.secondaryActionText}>Métricas</Text>
-                    </Pressable>
-                </View>
+                  onPress={() =>
+                    navigation.navigate('Metrics', {
+                    barberId: activeBarberId ?? undefined,
+                    barberName:
+                      barberProfile?.fullName || barberName || 'Mi Agenda',
+                    })
+                  }
+                style={({ pressed }) => [
+                  styles.secondaryActionBtn,
+                  pressed && { backgroundColor: hexToRgba(theme.primary, 0.2) },
+                ]}
+              >
+                <BarChart2 size={14} color={theme.primary} />
+                <Text style={styles.secondaryActionText}>Métricas</Text>
+              </Pressable>
             </View>
+          </View>
         </View>
 
         <View style={styles.section}>
           <View style={styles.agendaTopRow}>
-            <Text style={styles.sectionTitle}>Agenda del día</Text>
-
+            <Text style={styles.sectionTitle}>Agenda de turnos</Text>
             {!isToday && (
               <Pressable style={styles.todayButton} onPress={handleGoToToday}>
-                <Text style={styles.todayButtonText}>Ir a hoy</Text>
+                <Text style={styles.todayButtonText}>Hoy</Text>
               </Pressable>
             )}
           </View>
@@ -543,17 +631,7 @@ function BarberDashboard({ route, navigation }: Props) {
               >
                 <Text style={styles.dateCircleBtnText}>‹</Text>
               </Pressable>
-
               <View style={styles.dateHeroTextWrap}>
-                <View style={styles.dateBadgeRow}>
-                  <View style={styles.dateHeroBadge}>
-                    <Text style={styles.dateHeroBadgeText}>
-                      {isToday ? 'HOY' : 'AGENDA'}
-                    </Text>
-                  </View>
-                  <Text style={styles.dateHeroSwipeHint}>Deslizá o tocá</Text>
-                </View>
-
                 <Text style={styles.dateHeroTitle}>
                   {capitalize(formattedHeaderDate.split(',')[0])}
                 </Text>
@@ -563,7 +641,6 @@ function BarberDashboard({ route, navigation }: Props) {
                   )}
                 </Text>
               </View>
-
               <Pressable
                 style={styles.dateCircleBtn}
                 onPress={() => handleShiftDate(1)}
@@ -571,7 +648,6 @@ function BarberDashboard({ route, navigation }: Props) {
                 <Text style={styles.dateCircleBtnText}>›</Text>
               </Pressable>
             </View>
-
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -594,7 +670,6 @@ function BarberDashboard({ route, navigation }: Props) {
                   >
                     {capitalize(item.dayName.replace('.', ''))}
                   </Text>
-
                   <Text
                     style={[
                       styles.weekDayNumber,
@@ -603,28 +678,23 @@ function BarberDashboard({ route, navigation }: Props) {
                   >
                     {item.dayNumber}
                   </Text>
-
-                  {item.isToday && !item.isSelected ? (
-                    <View style={styles.weekTodayDot} />
-                  ) : null}
                 </Pressable>
               ))}
             </ScrollView>
           </View>
 
-          <View style={{ marginTop: 16 }}>
+          <View style={{ marginTop: 20 }}>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-            {loading ? (
-              <ActivityIndicator color={theme.primary} style={{ marginTop: 40 }} />
+            {loading && !appointments.length ? (
+              <ActivityIndicator
+                color={theme.primary}
+                style={{ marginTop: 40 }}
+              />
             ) : appointments.length ? (
               appointments.map(renderAppointmentCard)
             ) : (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyTitle}>Sin turnos por ahora</Text>
-                <Text style={styles.emptyText}>
-                  No hay turnos programados para esta fecha.
-                </Text>
+                <Text style={styles.emptyTitle}>Sin turnos hoy</Text>
               </View>
             )}
           </View>
@@ -636,15 +706,8 @@ function BarberDashboard({ route, navigation }: Props) {
 
 const makeStyles = (theme: Theme) =>
   StyleSheet.create({
-    screen: {
-      flex: 1,
-      backgroundColor: theme.background,
-    },
-
-    scrollContent: {
-      paddingBottom: 100,
-    },
-
+    screen: { flex: 1, backgroundColor: theme.background },
+    scrollContent: { paddingBottom: 130 },
     header: {
       marginTop: Platform.OS === 'ios' ? 60 : 30,
       paddingHorizontal: 20,
@@ -652,15 +715,13 @@ const makeStyles = (theme: Theme) =>
       marginBottom: 25,
     },
     logo: { width: 45, height: 45, marginBottom: 12, resizeMode: 'contain' },
-
     headerSubtitle: {
       color: theme.primary,
       fontSize: 11,
       fontWeight: '800',
       letterSpacing: 3,
-      textTransform: 'uppercase'
+      textTransform: 'uppercase',
     },
-
     headerTitle: {
       color: '#fff',
       fontSize: 26,
@@ -668,458 +729,208 @@ const makeStyles = (theme: Theme) =>
       marginTop: 4,
       textAlign: 'center',
     },
-
-    // CONTENEDOR DE ACCIONES PRO
-    headerActionsContainer: {
-        width: '100%',
-        marginTop: 20,
-        gap: 10,
-    },
-
+    headerActionsContainer: { width: '100%', marginTop: 20, gap: 10 },
     mainActionBtn: {
-        backgroundColor: theme.primary,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 10,
-        borderRadius: 18,
-        gap: 8,
-        shadowColor: theme.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 6,
+      backgroundColor: theme.primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 10,
+      borderRadius: 18,
+      gap: 8,
     },
-
     mainActionBtnText: {
-        color: '#fff',
-        fontWeight: '600',
-        fontSize: 12,
-        letterSpacing: 1,
+      color: '#fff',
+      fontWeight: '800',
+      fontSize: 12,
+      letterSpacing: 1,
     },
-
-    secondaryActionsRow: {
-        flexDirection: 'row',
-        gap: 10,
-    },
-
+    secondaryActionsRow: { flexDirection: 'row', gap: 10 },
     secondaryActionBtn: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: hexToRgba(theme.primary, 0.08),
-        borderWidth: 1,
-        borderColor: hexToRgba(theme.primary, 0.2),
-        paddingVertical: 12,
-        borderRadius: 16,
-        gap: 8,
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: hexToRgba(theme.primary, 0.08),
+      borderWidth: 1,
+      borderColor: hexToRgba(theme.primary, 0.2),
+      paddingVertical: 12,
+      borderRadius: 16,
+      gap: 8,
     },
-
     secondaryActionText: {
-        color: theme.primary,
-        fontWeight: '700',
-        fontSize: 13,
+      color: theme.primary,
+      fontWeight: '700',
+      fontSize: 13,
     },
-
-    section: {
-      paddingHorizontal: 20,
-    },
-
+    section: { paddingHorizontal: 20 },
     agendaTopRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       marginBottom: 14,
     },
-
-    sectionTitle: {
-      color: '#fff',
-      fontSize: 18,
-      fontWeight: '700',
-    },
-
+    sectionTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
     todayButton: {
       backgroundColor: hexToRgba(theme.primary, 0.12),
-      borderWidth: 1,
-      borderColor: hexToRgba(theme.primary, 0.25),
       paddingHorizontal: 12,
-      paddingVertical: 8,
+      paddingVertical: 6,
       borderRadius: 999,
     },
+    todayButtonText: { color: theme.primary, fontSize: 12, fontWeight: '700' },
 
-    todayButtonText: {
-      color: theme.primary,
-      fontSize: 12,
-      fontWeight: '700',
-    },
-
+    // Date Selection (Mismo que Home)
     dateHeroCard: {
       backgroundColor: theme.card,
       borderRadius: 24,
       borderWidth: 1,
-      borderColor: hexToRgba(theme.primary, 0.18),
-      paddingTop: 15,
-      paddingBottom: 13,
-      overflow: 'hidden',
+      borderColor: '#2A2A2A',
+      paddingVertical: 15,
     },
-
     dateHeroHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: 14,
     },
-
     dateCircleBtn: {
-      width: 44,
-      height: 44,
-      borderRadius: 16,
+      width: 40,
+      height: 40,
+      borderRadius: 12,
       backgroundColor: theme.background,
-      borderWidth: 1,
-      borderColor: '#303030',
       alignItems: 'center',
       justifyContent: 'center',
     },
-
     dateCircleBtnText: {
       color: theme.primary,
-      fontSize: 26,
+      fontSize: 24,
       fontWeight: '700',
-      lineHeight: 28,
-      marginTop: -2,
     },
-
-    dateHeroTextWrap: {
-      flex: 1,
-      paddingHorizontal: 12,
-    },
-
-    dateBadgeRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 8,
-    },
-
-    dateHeroBadge: {
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      borderRadius: 999,
-      backgroundColor: hexToRgba(theme.primary, 0.12),
-      borderWidth: 1,
-      borderColor: hexToRgba(theme.primary, 0.22),
-    },
-
-    dateHeroBadgeText: {
-      color: theme.primary,
-      fontSize: 10,
-      fontWeight: '800',
-      letterSpacing: 1.2,
-    },
-
-    dateHeroSwipeHint: {
-      color: '#5F5F5F',
-      fontSize: 11,
-      fontWeight: '600',
-    },
-
-    dateHeroTitle: {
-      color: '#fff',
-      fontSize: 20,
-      fontWeight: '800',
-    },
-
-    dateHeroSubtitle: {
-      color: '#8E8E8E',
-      fontSize: 12,
-      fontWeight: '500',
-      marginTop: 3,
-    },
-
-    weekStripContent: {
-      paddingHorizontal: 14,
-      paddingTop: 15,
-    },
-
+    dateHeroTextWrap: { flex: 1, alignItems: 'center' },
+    dateHeroTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
+    dateHeroSubtitle: { color: '#8E8E8E', fontSize: 11, fontWeight: '500' },
+    weekStripContent: { paddingHorizontal: 14, paddingTop: 15 },
     weekDayChip: {
-      width: 64,
-      height: 64,
-      borderRadius: 18,
-      backgroundColor: theme.background,
-      borderWidth: 1,
-      borderColor: '#2D2D2D',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 9,
-      position: 'relative',
-    },
-
-    weekDayChipActive: {
-      backgroundColor: hexToRgba(theme.primary, 0.14),
-      borderColor: hexToRgba(theme.primary, 0.32),
-    },
-
-    weekDayName: {
-      color: '#7A7A7A',
-      fontSize: 11,
-      fontWeight: '700',
-      marginBottom: 5,
-    },
-
-    weekDayNameActive: {
-      color: '#E7D2A0',
-    },
-
-    weekDayNumber: {
-      color: '#F2F2F2',
-      fontSize: 18,
-      fontWeight: '800',
-    },
-
-    weekDayNumberActive: {
-      color: theme.primary,
-    },
-
-    weekTodayDot: {
-      position: 'absolute',
-      bottom: 9,
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: theme.primary,
-    },
-
-    appointmentCard: {
-      position: 'relative',
-      backgroundColor: theme.card,
-      borderRadius: 22,
-      borderWidth: 1,
-      borderColor: '#252525',
-      padding: 15,
-      overflow: 'hidden',
-    },
-
-    appointmentCardCompleted: {
-      opacity: 0.72,
-    },
-
-    cardGlowLine: {
-      position: 'absolute',
-      left: 0,
-      top: 16,
-      bottom: 16,
-      width: 4,
-      borderTopRightRadius: 10,
-      borderBottomRightRadius: 10,
-      backgroundColor: theme.primary,
-    },
-
-    cardGlowLineCompleted: {
-      backgroundColor: '#31C96C',
-    },
-
-    cardHeaderRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-    },
-
-    cardTimeBox: {
-      width: 78,
-      minHeight: 78,
-      borderRadius: 18,
-      backgroundColor: theme.background,
-      borderWidth: 1,
-      borderColor: '#2E2E2E',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 12,
-    },
-
-    cardTimeMain: {
-      color: theme.primary,
-      fontSize: 11,
-      fontWeight: '800',
-    },
-
-    cardTimeSub: {
-      color: '#676767',
-      fontSize: 9,
-      fontWeight: '800',
-      letterSpacing: 1,
-      marginTop: 4,
-    },
-
-    cardHeaderContent: {
-      flex: 1,
-    },
-
-    cardTitleRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      marginBottom: 12,
-    },
-
-    cardServiceTitle: {
-      color: '#fff',
-      fontSize: 15,
-      fontWeight: '800',
-    },
-
-    cardDurationText: {
-      color: '#7C7C7C',
-      fontSize: 12,
-      fontWeight: '500',
-      marginTop: 4,
-    },
-
-    cardStatusPill: {
-      borderRadius: 999,
-      paddingHorizontal: 9,
-      paddingVertical: 6,
-      borderWidth: 1,
-    },
-
-    cardStatusPillPending: {
-      backgroundColor: hexToRgba(theme.primary, 0.1),
-      borderColor: hexToRgba(theme.primary, 0.22),
-    },
-
-    cardStatusPillCompleted: {
-      backgroundColor: 'rgba(49, 201, 108, 0.10)',
-      borderColor: 'rgba(49, 201, 108, 0.22)',
-    },
-
-    cardStatusText: {
-      fontSize: 10,
-      fontWeight: '800',
-    },
-
-    cardStatusTextPending: {
-      color: '#E7C975',
-    },
-
-    cardStatusTextCompleted: {
-      color: '#66DA92',
-    },
-
-    cardInfoPanel: {
-      backgroundColor: theme.background,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: '#262626',
-      padding: 11,
-      gap: 9,
-    },
-
-    infoLineRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 14,
-    },
-
-    infoLineLabel: {
-      color: '#6B6B6B',
-      fontSize: 10,
-      fontWeight: '700',
-      textTransform: 'uppercase',
-      letterSpacing: 0,
-    },
-
-    infoLineValue: {
-      flex: 1,
-      textAlign: 'right',
-      color: '#ECECEC',
-      fontSize: 12,
-      fontWeight: '600',
-    },
-
-    cardButtonsRow: {
-      flexDirection: 'row',
-      gap: 10,
-      marginTop: 13,
-    },
-
-    cardActionBtn: {
+      width: 55,
+      height: 60,
       borderRadius: 15,
-      paddingVertical: 10,
+      backgroundColor: theme.background,
       alignItems: 'center',
       justifyContent: 'center',
-      borderWidth: 1,
+      marginRight: 8,
     },
-
-    cardActionPrimary: {
-      flex: 1.5,
-      backgroundColor: theme.primary,
+    weekDayChipActive: {
+      backgroundColor: hexToRgba(theme.primary, 0.15),
+      borderWidth: 1,
       borderColor: theme.primary,
     },
+    weekDayName: { color: '#7A7A7A', fontSize: 10, fontWeight: '700' },
+    weekDayNameActive: { color: theme.primary },
+    weekDayNumber: { color: '#F2F2F2', fontSize: 16, fontWeight: '800' },
+    weekDayNumberActive: { color: theme.primary },
 
-    cardActionSecondary: {
-      flex: 1,
-      backgroundColor: '#222',
+    // Appointment Card Redesign
+    appointmentCard: {
+      backgroundColor: theme.card,
+      borderRadius: 24,
+      padding: 18,
+      borderWidth: 1,
+      borderColor: '#2A2A2A',
+    },
+    appointmentCardCompleted: { opacity: 0.5 },
+    cardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 14,
+    },
+    timeTag: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#1A1A1A',
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 8,
+      borderWidth: 1,
       borderColor: '#333',
     },
-
-    cardActionPrimaryText: {
-      color: '#fff',
-      fontSize: 12,
+    timeText: { color: '#FFF', fontSize: 14, fontWeight: '800' },
+    statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+    statusBadgePending: { backgroundColor: hexToRgba(theme.primary, 0.1) },
+    statusBadgeDone: { backgroundColor: 'rgba(49, 201, 108, 0.1)' },
+    statusText: { fontSize: 10, fontWeight: '900' },
+    statusTextPending: { color: theme.primary },
+    statusTextDone: { color: '#66DA92' },
+    cardBody: { marginBottom: 16 },
+    customerNameText: {
+      color: '#FFF',
+      fontSize: 20,
       fontWeight: '800',
+      marginBottom: 6,
     },
-
-    cardActionSecondaryText: {
-      color: '#fff',
-      fontSize: 12,
-      fontWeight: '700',
-    },
-
-    swipeAction: {
-      width: 108,
-      borderRadius: 22,
-      backgroundColor: '#9D2121',
+    serviceRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+    serviceNameText: { color: '#DDD', fontSize: 14, fontWeight: '600' },
+    dotSeparator: { color: '#555', marginHorizontal: 8 },
+    durationText: { color: '#888', fontSize: 13 },
+    phoneSubText: { color: '#666', fontSize: 12, fontWeight: '500' },
+    paymentInfoBadge: {
+      marginTop: 10,
+      alignSelf: 'flex-start',
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
       borderWidth: 1,
-      borderColor: '#C23A3A',
+    },
+    paymentInfoBadgeCash: {
+      backgroundColor: 'rgba(56, 189, 118, 0.14)',
+      borderColor: 'rgba(56, 189, 118, 0.34)',
+    },
+    paymentInfoBadgeTransfer: {
+      backgroundColor: hexToRgba(theme.primary, 0.14),
+      borderColor: hexToRgba(theme.primary, 0.34),
+    },
+    paymentInfoBadgeNeutral: {
+      backgroundColor: 'rgba(148, 163, 184, 0.12)',
+      borderColor: 'rgba(148, 163, 184, 0.28)',
+    },
+    paymentInfoText: { color: '#EDEDED', fontSize: 11, fontWeight: '700' },
+    cardActions: {
+      flexDirection: 'row',
+      gap: 10,
+      borderTopWidth: 1,
+      borderTopColor: '#2A2A2A',
+      paddingTop: 16,
+    },
+    btnAction: {
+      flex: 1,
+      height: 42,
+      borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      marginLeft: 10,
     },
-
-    swipeActionText: {
-      color: '#fff',
-      fontSize: 13,
-      fontWeight: '800',
-    },
-
-    emptyContainer: {
-      backgroundColor: theme.card,
-      borderRadius: 22,
-      borderWidth: 1,
-      borderColor: '#252525',
-      paddingVertical: 36,
-      paddingHorizontal: 20,
+    btnMain: { backgroundColor: theme.primary },
+    btnMainText: { color: '#000', fontSize: 13, fontWeight: '800' },
+    btnSec: { backgroundColor: '#222', borderWidth: 1, borderColor: '#333' },
+    btnSecText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+    swipeAction: {
+      width: 90,
+      borderRadius: 24,
+      backgroundColor: '#9D2121',
       alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 12,
     },
-
-    emptyTitle: {
-      color: '#fff',
-      fontSize: 16,
-      fontWeight: '700',
+    swipeActionText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+    emptyContainer: {
+      padding: 40,
+      alignItems: 'center',
+      backgroundColor: '#111',
+      borderRadius: 20,
+      borderStyle: 'dashed',
+      borderWidth: 1,
+      borderColor: '#333',
     },
-
-    emptyText: {
-      color: '#6A6A6A',
-      fontSize: 13,
-      marginTop: 6,
-      textAlign: 'center',
-    },
-
-    errorText: {
-      color: '#ff8080',
-      textAlign: 'center',
-      marginBottom: 10,
-      fontSize: 13,
-      fontWeight: '600',
-    },
+    emptyTitle: { color: '#555', fontSize: 14, fontWeight: '600' },
+    errorText: { color: '#ff7b7b', textAlign: 'center', marginBottom: 10 },
   });
 
 export default BarberDashboard;

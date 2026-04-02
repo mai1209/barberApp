@@ -23,9 +23,12 @@ import {
   fetchServices,
   ServiceOption,
   PaymentMethod,
+  getCurrentUser,
+  PaymentSettings,
 } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
+import { getUserProfile } from '../services/authStorage';
 
 const hexToRgba = (hex: string, alpha: number) => {
   const sanitized = hex.replace('#', '');
@@ -91,6 +94,48 @@ const DAY_NAMES = [
 
 type SlotGroup = { label: string; slots: string[] };
 
+type PaymentOption = {
+  value: PaymentMethod;
+  label: string;
+  helper: string;
+};
+
+function getPaymentOptions(settings?: PaymentSettings | null): PaymentOption[] {
+  const normalized = settings ?? {};
+  const options: PaymentOption[] = [];
+
+  if (normalized.cashEnabled !== false) {
+    options.push({
+      value: 'cash',
+      label: 'Efectivo en el local',
+      helper: 'El cliente paga cuando llega al turno.',
+    });
+  }
+
+  if (
+    normalized.advancePaymentEnabled &&
+    normalized.mercadoPagoConnectionStatus === 'connected'
+  ) {
+    const advanceLabel =
+      normalized.advanceMode === 'full'
+        ? 'Pago adelantado'
+        : normalized.advanceType === 'fixed'
+          ? `Seña online $${Number(normalized.advanceValue || 0)}`
+          : `Seña online ${Number(normalized.advanceValue || 0)}%`;
+
+    options.push({
+      value: 'transfer',
+      label: advanceLabel,
+      helper:
+        normalized.advanceMode === 'full'
+          ? 'El cliente paga todo el turno por adelantado.'
+          : 'El cliente paga una seña online antes de confirmar la reserva.',
+    });
+  }
+
+  return options;
+}
+
 function ReservasForm({ navigation }: any) {
   const { theme } = useTheme();
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -102,7 +147,8 @@ function ReservasForm({ navigation }: any) {
   const [selectedBarber, setSelectedBarber] = useState<string | null>(null);
   const [services, setServices] = useState<ServiceOption[]>([]);
   const [selectedService, setSelectedService] = useState<ServiceOption | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [paymentOptions, setPaymentOptions] = useState<PaymentOption[]>([]);
   const [servicePickerVisible, setServicePickerVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -122,14 +168,24 @@ function ReservasForm({ navigation }: any) {
   useEffect(() => {
     async function load() {
       try {
-        const [resB, resS] = await Promise.all([
+        const storedUser = await getUserProfile<any>();
+        const [resB, resS, currentUserRes] = await Promise.all([
           fetchBarbers(),
           fetchServices(),
+          getCurrentUser().catch(() => null),
         ]);
         setBarbers(resB.barbers || []);
         setServices(resS.services || []);
         if (resB.barbers?.length > 0) setSelectedBarber(resB.barbers[0]._id);
         if (resS.services?.length > 0) setSelectedService(resS.services[0]);
+
+        const paymentSettings =
+          currentUserRes?.user?.paymentSettings ??
+          storedUser?.paymentSettings ??
+          null;
+        const nextOptions = getPaymentOptions(paymentSettings);
+        setPaymentOptions(nextOptions);
+        setPaymentMethod(nextOptions[0]?.value ?? null);
       } catch (e) {
         console.error(e);
       } finally {
@@ -259,9 +315,27 @@ function ReservasForm({ navigation }: any) {
     }
   }, [allSlots, selectedSlot, isSlotUnavailable]);
 
+  useEffect(() => {
+    if (!paymentOptions.length) {
+      if (paymentMethod !== null) setPaymentMethod(null);
+      return;
+    }
+    const currentOption = paymentOptions.find(option => option.value === paymentMethod);
+    if (!currentOption) {
+      setPaymentMethod(paymentOptions[0].value);
+    }
+  }, [paymentMethod, paymentOptions]);
+
   const handleSubmit = async () => {
     if (!customerName.trim() || !selectedSlot) {
       Alert.alert('Error', 'Por favor ingresa tu nombre y elige un horario.');
+      return;
+    }
+    if (!paymentMethod) {
+      Alert.alert(
+        'Cobro no disponible',
+        'Esta barbería no tiene un medio de pago habilitado para reservas desde la app.',
+      );
       return;
     }
     setSaving(true);
@@ -485,41 +559,48 @@ function ReservasForm({ navigation }: any) {
 
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>¿Cómo preferís pagar?</Text>
-              <View style={styles.paymentRow}>
-                <Pressable
-                  style={[
-                    styles.paymentChip,
-                    paymentMethod === 'cash' && styles.paymentChipActive,
-                  ]}
-                  onPress={() => setPaymentMethod('cash')}
-                >
-                  <Text
-                    style={[
-                      styles.paymentChipText,
-                      paymentMethod === 'cash' && styles.paymentChipTextActive,
-                    ]}
-                  >
-                    Efectivo
+              {paymentOptions.length > 0 ? (
+                <>
+                  <View style={styles.paymentRow}>
+                    {paymentOptions.map(option => (
+                      <Pressable
+                        key={option.value}
+                        style={[
+                          styles.paymentChip,
+                          paymentMethod === option.value && styles.paymentChipActive,
+                        ]}
+                        onPress={() => setPaymentMethod(option.value)}
+                      >
+                        <Text
+                          style={[
+                            styles.paymentChipText,
+                            paymentMethod === option.value &&
+                              styles.paymentChipTextActive,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <Text style={styles.paymentHelperText}>
+                    {
+                      paymentOptions.find(option => option.value === paymentMethod)
+                        ?.helper
+                    }
                   </Text>
-                </Pressable>
-
-                <Pressable
-                  style={[
-                    styles.paymentChip,
-                    paymentMethod === 'transfer' && styles.paymentChipActive,
-                  ]}
-                  onPress={() => setPaymentMethod('transfer')}
-                >
-                  <Text
-                    style={[
-                      styles.paymentChipText,
-                      paymentMethod === 'transfer' && styles.paymentChipTextActive,
-                    ]}
-                  >
-                    Transferencia
+                </>
+              ) : (
+                <View style={styles.paymentUnavailableBox}>
+                  <Text style={styles.paymentUnavailableTitle}>
+                    Reservas sin cobro habilitado
                   </Text>
-                </Pressable>
-              </View>
+                  <Text style={styles.paymentUnavailableText}>
+                    Este local todavía no configuró un medio de pago disponible
+                    para tomar reservas desde la app.
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* BARBEROS */}
@@ -640,9 +721,12 @@ function ReservasForm({ navigation }: any) {
             </View>
 
             <Pressable
-              style={styles.submitBtn}
+              style={[
+                styles.submitBtn,
+                (!paymentMethod || saving) && styles.submitBtnDisabled,
+              ]}
               onPress={handleSubmit}
-              disabled={saving}
+              disabled={saving || !paymentMethod}
             >
               {saving ? (
                 <ActivityIndicator color="#fff" />
@@ -739,6 +823,30 @@ const createStyles = (theme: Theme) =>
     paymentChipTextActive: {
       color: theme.primary,
     },
+    paymentHelperText: {
+      color: '#8B8B8B',
+      fontSize: 12,
+      lineHeight: 18,
+      marginTop: 2,
+    },
+    paymentUnavailableBox: {
+      backgroundColor: '#252525',
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: '#333',
+      padding: 14,
+      gap: 6,
+    },
+    paymentUnavailableTitle: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    paymentUnavailableText: {
+      color: '#8B8B8B',
+      fontSize: 12,
+      lineHeight: 18,
+    },
     barberCard: { alignItems: 'center', marginRight: 20, width: 85 },
     avatar: {
       width: 64,
@@ -828,17 +936,20 @@ const createStyles = (theme: Theme) =>
     },
     submitBtn: {
       backgroundColor: theme.primary,
-      padding: 20,
-      borderRadius: 20,
+      padding: 12,
+      borderRadius: 15,
       alignItems: 'center',
       marginTop: 10,
       shadowColor: theme.primary,
       shadowOpacity: 0.3,
       shadowRadius: 10,
     },
+    submitBtnDisabled: {
+      opacity: 0.5,
+    },
     submitBtnText: {
       color: '#fff',
-      fontWeight: '900',
+      fontWeight: '600',
       fontSize: 17,
       textTransform: 'uppercase',
     },

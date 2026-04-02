@@ -11,10 +11,12 @@ import {
 } from 'react-native';
 import {
   ChevronRight,
+  CreditCard,
   KeyRound,
   LogOut,
   Mail,
   Palette,
+  Scissors,
 } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { removeToken, removeUserProfile } from '../services/authStorage';
@@ -25,8 +27,10 @@ type MenuItemProps = {
   icon: React.ComponentType<any>;
   label: string;
   description: string;
+  theme: any;
   onPress: () => void;
   danger?: boolean;
+  styles: any; // Pasamos los estilos para que MenuItem los reconozca
 };
 
 function MenuItem({
@@ -34,12 +38,17 @@ function MenuItem({
   label,
   description,
   onPress,
+  theme,
   danger = false,
+  styles,
 }: MenuItemProps) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}>
+    <Pressable 
+      onPress={onPress} 
+      style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+    >
       <View style={[styles.iconWrap, danger && styles.iconWrapDanger]}>
-        <Icon size={18} color={danger ? '#ff1414ff' : '#FF1493'} />
+        <Icon size={18} color={danger ? '#ff1414' : theme?.primary || '#FFFFFF'} />
       </View>
       <View style={styles.itemBody}>
         <Text style={[styles.itemLabel, danger && styles.itemLabelDanger]}>{label}</Text>
@@ -51,14 +60,15 @@ function MenuItem({
 }
 
 export default function SettingsScreen({ navigation }: { navigation: any }) {
-  const { applyUserTheme } = useTheme();
+  // 1. Extraemos theme y applyUserTheme
+  const { theme, applyUserTheme } = useTheme();
   const styles = createStyles();
 
   const handleLogout = async () => {
-    Alert.alert('Cerrar sesion', 'Vas a salir de esta cuenta en este dispositivo.', [
+    Alert.alert('Cerrar sesión', 'Vas a salir de esta cuenta en este dispositivo.', [
       { text: 'Cancelar', style: 'cancel' },
       {
-        text: 'Cerrar sesion',
+        text: 'Cerrar sesión',
         style: 'destructive',
         onPress: async () => {
           await removeToken();
@@ -102,6 +112,29 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
           label="Personalizar aspecto"
           description="Logo, colores de botones, textos destacados, tarjetas y fondo."
           onPress={() => navigation.navigate('Appearance-Settings')}
+          theme={theme}
+          styles={styles}
+        />
+        <View style={styles.separator} />
+        <MenuItem
+          icon={Scissors}
+          label="Cargar servicios"
+          description="Cargá, editá o sacá los servicios que ofrece tu local."
+          onPress={() => navigation.navigate('Service-Settings')}
+          theme={theme}
+          styles={styles}
+        />
+      </View>
+
+      <Text style={styles.sectionLabel}>Cobros</Text>
+      <View style={styles.groupCard}>
+        <MenuItem
+          icon={CreditCard}
+          label="Configurar cobros"
+          description="Efectivo, seña online y estado de Mercado Pago."
+          onPress={() => navigation.navigate('Payment-Settings')}
+          theme={theme}
+          styles={styles}
         />
       </View>
 
@@ -112,6 +145,8 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
           label="Cambiar contraseña"
           description="Actualizá la clave de acceso de esta cuenta."
           onPress={() => navigation.navigate('Change-Password')}
+          theme={theme}
+          styles={styles}
         />
         <View style={styles.separator} />
         <MenuItem
@@ -119,6 +154,8 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
           label="Recuperar contraseña"
           description="Te mandamos un código al mail para poner una nueva."
           onPress={() => navigation.navigate('Recover-Password')}
+          theme={theme}
+          styles={styles}
         />
       </View>
 
@@ -129,6 +166,8 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
           label="Comunicate con soporte"
           description="Abrí un mail y te ayudamos con la configuración."
           onPress={handleSupportMail}
+          theme={theme}
+          styles={styles}
         />
       </View>
 
@@ -140,59 +179,20 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
           description="Salir de esta cuenta en este dispositivo."
           onPress={handleLogout}
           danger
+          theme={theme}
+          styles={styles}
         />
       </View>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-  },
-  menuItemPressed: {
-    opacity: 0.82,
-  },
-  iconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(78, 161, 255, 0.12)',
-    marginRight: 12,
-  },
-  iconWrapDanger: {
-    backgroundColor: 'rgba(255, 138, 138, 0.12)',
-  },
-  itemBody: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  itemLabel: {
-    color: '#F5F7FB',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  itemLabelDanger: {
-    color: '#FFD0D0',
-  },
-  itemDescription: {
-    color: '#95A0B5',
-    fontSize: 12,
-    marginTop: 4,
-    lineHeight: 17,
-  },
-});
-
+// Función centralizada de estilos para evitar duplicados
 function createStyles() {
   return StyleSheet.create({
     screen: {
       flex: 1,
-      backgroundColor: '#1c1c1c',
+      backgroundColor: '#121212',
     },
     scrollContent: {
       paddingTop: Platform.OS === 'ios' ? 72 : 28,
@@ -230,17 +230,51 @@ function createStyles() {
       borderColor: 'rgba(110, 117, 133, 0.24)',
       marginBottom: 20,
       overflow: 'hidden',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.18,
-      shadowRadius: 20,
-      elevation: 8,
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 16,
+      paddingHorizontal: 16,
+    },
+    menuItemPressed: {
+      opacity: 0.82,
+      backgroundColor: 'rgba(255,255,255,0.02)',
+    },
+    iconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#8b8b8b22',
+      marginRight: 12,
+    },
+    iconWrapDanger: {
+      backgroundColor: 'rgba(255, 138, 138, 0.12)',
+    },
+    itemBody: {
+      flex: 1,
+      paddingRight: 12,
+    },
+    itemLabel: {
+      color: '#F5F7FB',
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    itemLabelDanger: {
+      color: '#FFD0D0',
+    },
+    itemDescription: {
+      color: '#95A0B5',
+      fontSize: 12,
+      marginTop: 4,
+      lineHeight: 17,
     },
     separator: {
       height: 1,
       backgroundColor: 'rgba(255,255,255,0.05)',
       marginLeft: 64,
     },
-  
   });
 }

@@ -45,6 +45,49 @@ const formatPrice = (value) =>
     maximumFractionDigits: 0,
   }).format(Number(value || 0));
 
+const formatBookingDateLabel = (date) =>
+  new Intl.DateTimeFormat("es-AR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: SHOP_TZ,
+  }).format(date);
+
+const getPublicPaymentOptions = (shopInfo) => {
+  const settings = shopInfo?.paymentSettings || {};
+  const options = [];
+
+  if (settings.cashEnabled !== false) {
+    options.push({
+      value: "cash",
+      label: "Efectivo en el local",
+      helper: "Pagás cuando llegás a tu turno.",
+    });
+  }
+
+  if (settings.advancePaymentEnabled && settings.mercadoPagoReady) {
+    const value =
+      settings.advanceType === "fixed"
+        ? formatPrice(settings.advanceValue || 0)
+        : `${Number(settings.advanceValue || 0)}%`;
+    const modeLabel =
+      settings.advanceMode === "full"
+        ? "Pago adelantado"
+        : `Seña online ${value}`;
+
+    options.push({
+      value: "transfer",
+      label: modeLabel,
+      helper:
+        settings.advanceMode === "full"
+          ? "Pagás todo el turno por adelantado con Mercado Pago."
+          : `Pagás ${value} por adelantado con Mercado Pago.`,
+    });
+  }
+
+  return options;
+};
+
 const labelToMinutes = (label) => {
   const [hours, minutes] = label.split(":").map(Number);
   return hours * 60 + minutes;
@@ -120,6 +163,11 @@ function BookingForm({ shopSlug }) {
     [barbers, selectedBarber],
   );
 
+  const paymentOptions = useMemo(
+    () => getPublicPaymentOptions(shopInfo),
+    [shopInfo],
+  );
+
   const workingWindow = useMemo(() => {
     const range =
       selectedBarberData?.scheduleRange || selectedBarberData?.schedule;
@@ -181,19 +229,24 @@ function BookingForm({ shopSlug }) {
     [horarioGroups],
   );
 
-  const formattedDate = useMemo(() => {
-    return new Intl.DateTimeFormat("es-AR", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-    }).format(selectedDate);
-  }, [selectedDate]);
+  const formattedDate = useMemo(
+    () => formatBookingDateLabel(selectedDate),
+    [selectedDate],
+  );
 
   // 3. TODOS LOS USEEFFECT
   useEffect(() => {
     if (!selectedSlot) return;
     if (!allSlots.includes(selectedSlot)) setSelectedSlot(null);
   }, [allSlots, selectedSlot]);
+
+  useEffect(() => {
+    if (!paymentOptions.length) return;
+    const currentOption = paymentOptions.find((item) => item.value === paymentMethod);
+    if (!currentOption) {
+      setPaymentMethod(paymentOptions[0].value);
+    }
+  }, [paymentMethod, paymentOptions]);
 
   useEffect(() => {
     if (!slugReady) return;
@@ -508,25 +561,26 @@ const handleSubmit = async (e) => {
           />
         </div>
 
-        <div className={styles.fieldGroup}>
-          <label className={styles.label}>¿Cómo preferís pagar?</label>
-          <div className={styles.paymentMethodRow}>
-            <button
-              type="button"
-              className={`${styles.paymentMethodChip} ${paymentMethod === "cash" ? styles.paymentMethodChipActive : ""}`}
-              onClick={() => setPaymentMethod("cash")}
-            >
-              Efectivo
-            </button>
-            <button
-              type="button"
-              className={`${styles.paymentMethodChip} ${paymentMethod === "transfer" ? styles.paymentMethodChipActive : ""}`}
-              onClick={() => setPaymentMethod("transfer")}
-            >
-              Transferencia
-            </button>
+        {paymentOptions.length ? (
+          <div className={styles.fieldGroup}>
+            <label className={styles.label}>¿Cómo preferís pagar?</label>
+            <div className={styles.paymentMethodRow}>
+              {paymentOptions.map((option) => (
+                <button
+                  type="button"
+                  key={option.value}
+                  className={`${styles.paymentMethodChip} ${paymentMethod === option.value ? styles.paymentMethodChipActive : ""}`}
+                  onClick={() => setPaymentMethod(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <p className={styles.paymentHelperText}>
+              {paymentOptions.find((option) => option.value === paymentMethod)?.helper}
+            </p>
           </div>
-        </div>
+        ) : null}
 
         <div className={styles.fieldGroup}>
           <label className={styles.label}>Elegí tu Barbero</label>
@@ -585,7 +639,7 @@ const handleSubmit = async (e) => {
                 ‹
               </button>
               <span className={styles.dateText}>
-                {formattedDate.split(",")[0]}
+                {formattedDate}
               </span>
               <button
                 type="button"
@@ -607,7 +661,7 @@ const handleSubmit = async (e) => {
               <div className={styles.noScheduleMessage}>
                 <p>
                   🚫 Este barbero no atiende los días <br />
-                  <strong>{formattedDate.split(",")[0]}</strong>
+                  <strong>{formattedDate}</strong>
                 </p>
                 <p className={styles.subtitleError}>
                   Intente seleccionar otra fecha u otro barbero

@@ -151,6 +151,13 @@
   color: #ff1493;
 }
 
+.paymentHelperText {
+  margin: 10px 2px 0;
+  color: #8d8d8d;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 /* SELECTOR DE SERVICIO */
 .selector {
   background: #222;
@@ -239,6 +246,7 @@
   height: 48px;
   background: #2e2e2e;
   border-radius: 50%;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -253,6 +261,8 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 50%;
+  display: block;
 }
 
 .barberChipSelected .barberAvatar {

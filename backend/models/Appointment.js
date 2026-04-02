@@ -51,6 +51,31 @@ const appointmentSchema = new mongoose.Schema(
       enum: ["cash", "transfer"],
       default: "cash",
     },
+    paymentMethodCollected: {
+      type: String,
+      enum: ["cash", "transfer", null],
+      default: null,
+    },
+    paymentStatus: {
+      type: String,
+      enum: ["unpaid", "partial", "paid", "refunded"],
+      default: "unpaid",
+    },
+    amountTotal: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    amountPaid: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    amountPending: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     status: {
       type: String,
       enum: ["pending", "completed", "cancelled"],

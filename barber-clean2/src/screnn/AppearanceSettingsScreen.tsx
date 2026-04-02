@@ -732,7 +732,7 @@ function createStyles(theme: Theme) {
       marginBottom: 16,
     },
     previewEyebrow: {
-      color: theme.primary,
+      color: theme.secondary ,
       fontSize: 11,
       fontWeight: '800',
       letterSpacing: 1.3,
@@ -775,7 +775,7 @@ function createStyles(theme: Theme) {
       paddingVertical: 12,
     },
     previewButtonText: {
-      color: '#111',
+      color: '#fff',
       fontWeight: '900',
     },
     previewTag: {

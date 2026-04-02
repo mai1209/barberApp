@@ -8,6 +8,7 @@ import StackNavigator from './src/navigation/StackNavigation';
 import { getCurrentUser, savePushTokenApi } from './src/services/api';
 import {
   getToken,
+  getUserProfile,
   removeToken,
   removeUserProfile,
   saveUserProfile,
@@ -38,6 +39,7 @@ export default function App() {
     const bootstrapSession = async () => {
       try {
         const token = await getToken();
+        const storedUser = await getUserProfile();
 
         if (!token) {
           if (isMounted) {
@@ -53,12 +55,21 @@ export default function App() {
           if (isMounted) {
             setInitialRouteName('Home');
           }
-        } catch (_error) {
-          await removeToken();
-          await removeUserProfile();
+        } catch (error: any) {
+          const unauthorized = error?.status === 401 || error?.status === 403;
 
-          if (isMounted) {
-            setInitialRouteName('Login');
+          if (unauthorized) {
+            await removeToken();
+            await removeUserProfile();
+
+            if (isMounted) {
+              setInitialRouteName('Login');
+            }
+          } else if (isMounted) {
+            if (storedUser) {
+              await saveUserProfile(storedUser);
+            }
+            setInitialRouteName('Home');
           }
         }
       } finally {
@@ -76,9 +87,11 @@ export default function App() {
   }, []);
 
 useEffect(() => {
+  let unsubscribeRefresh: (() => void) | undefined;
+  let unsubscribeForeground: (() => void) | undefined;
+
   const initNotifications = async () => {
     try {
-      // Necesario en Android 13+ para evitar que requestPermission falle silenciosamente
       await messaging().registerDeviceForRemoteMessages();
 
       const authStatus = await messaging().requestPermission();
@@ -92,41 +105,37 @@ useEffect(() => {
         await AsyncStorage.setItem('@push_token', token);
         try {
           await savePushTokenApi(token);
-        } catch (err) {
+        } catch (err: any) {
           console.log('No se pudo enviar token al backend:', err?.message);
         }
       }
 
-      // Refrescos de token → los persistimos y enviamos al backend
-      const unsubscribeRefresh = messaging().onTokenRefresh(async newToken => {
+      unsubscribeRefresh = messaging().onTokenRefresh(async newToken => {
         await AsyncStorage.setItem('@push_token', newToken);
         try {
           await savePushTokenApi(newToken);
-        } catch (err) {
+        } catch (err: any) {
           console.log('No se pudo enviar token refrescado:', err?.message);
         }
       });
 
-      // --- ESCUCHAR NOTIFICACIONES CON LA APP ABIERTA (Foreground) ---
-      const unsubscribe = messaging().onMessage(async remoteMessage => {
-        // Esto muestra una alerta nativa cuando llega algo y el barbero está mirando la app
+      unsubscribeForeground = messaging().onMessage(async remoteMessage => {
         Alert.alert(
           remoteMessage.notification?.title || 'Notificación',
           remoteMessage.notification?.body || 'Tienes una nueva notificación'
         );
       });
-
-      return () => {
-        unsubscribe();
-        unsubscribeRefresh();
-      }; // Se desuscribe al desmontar el componente
-
     } catch (e) {
       console.log("Error en initNotifications:", e);
     }
   };
 
   initNotifications();
+
+  return () => {
+    unsubscribeForeground?.();
+    unsubscribeRefresh?.();
+  };
 	}, []);
 
   if (!sessionReady) {

@@ -8,9 +8,16 @@ type RequestOptions = {
   auth?: boolean;
 };
 
+type ApiError = Error & {
+  status?: number;
+  code?: string;
+  isTimeout?: boolean;
+  isNetworkError?: boolean;
+};
 
 const LAN_IP = "192.168.100.48"; 
 const ANDROID_EMULATOR_HOST = "10.0.2.2";
+const REQUEST_TIMEOUT_MS = 8000;
 
 const isAndroid = Platform.OS === "android";
 const isAndroidEmulator = Boolean(
@@ -60,10 +67,48 @@ async function getBaseUrl() {
   return await resolveDevBaseUrl();
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const baseUrl = await getBaseUrl();
-  const url = `${baseUrl.trim()}${path}`;
+function buildApiError(
+  message: string,
+  extra: Partial<ApiError> = {},
+): ApiError {
+  const error = new Error(message) as ApiError;
+  Object.assign(error, extra);
+  return error;
+}
 
+async function fetchWithTimeout(
+  url: string,
+  options: RequestOptions,
+  headers: Record<string, string>,
+) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  const abortFromCaller = () => controller.abort();
+  if (options.signal) {
+    if (options.signal.aborted) {
+      controller.abort();
+    } else {
+      options.signal.addEventListener("abort", abortFromCaller, { once: true });
+    }
+  }
+
+  try {
+    return await fetch(url, {
+      method: options.method ?? "GET",
+      headers,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+    if (options.signal) {
+      options.signal.removeEventListener("abort", abortFromCaller);
+    }
+  }
+}
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {
     Accept: "application/json",
     "Content-Type": "application/json",
@@ -76,23 +121,47 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     }
   }
 
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: options.method ?? "GET",
-      headers,
-      body: options.body ? JSON.stringify(options.body) : undefined,
-      signal: options.signal,
-    });
-  } catch (err: any) {
-    throw new Error(`RED FALLÓ: ${url} | Motivo: ${err.message}`);
+  let response: Response | null = null;
+  let lastError: ApiError | null = null;
+
+  for (let attempt = 0; attempt < (__DEV__ ? 2 : 1); attempt += 1) {
+    try {
+      if (__DEV__ && attempt > 0) {
+        resolvedDevBaseUrl = null;
+      }
+
+      const baseUrl = await getBaseUrl();
+      const url = `${baseUrl.trim()}${path}`;
+      response = await fetchWithTimeout(url, options, headers);
+      lastError = null;
+      break;
+    } catch (err: any) {
+      const isTimeout = err?.name === "AbortError";
+      const baseUrl = resolvedDevBaseUrl ?? DEV_CANDIDATES[0] ?? PROD_API_URL;
+      const url = `${baseUrl.trim()}${path}`;
+
+      lastError = buildApiError(
+        isTimeout
+          ? `La conexión tardó demasiado. Revisá el backend o la IP local (${url}).`
+          : `RED FALLÓ: ${url} | Motivo: ${err?.message ?? "sin detalle"}`,
+        {
+          code: isTimeout ? "TIMEOUT" : "NETWORK_ERROR",
+          isTimeout,
+          isNetworkError: true,
+        },
+      );
+    }
+  }
+
+  if (!response) {
+    throw lastError ?? buildApiError("No se pudo completar la solicitud.");
   }
 
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
     const message = payload?.error ?? `Error servidor: ${response.status}`;
-    throw new Error(message);
+    throw buildApiError(message, { status: response.status });
   }
 
   return payload as T;
@@ -118,8 +187,27 @@ export type ThemeConfig = {
   logoDataUrl?: string | null;
 };
 
+export type PaymentSettings = {
+  cashEnabled?: boolean;
+  advancePaymentEnabled?: boolean;
+  advanceMode?: "deposit" | "full";
+  advanceType?: "percent" | "fixed";
+  advanceValue?: number;
+  mercadoPagoConnectionStatus?: "disconnected" | "pending" | "connected";
+  mercadoPagoSellerId?: string | null;
+  mercadoPagoPublicKey?: string | null;
+};
+
 export function updateThemeConfig(payload: ThemeConfig) {
   return request<{ message: string; user: any }>("/api/auth/theme", {
+    method: "PUT",
+    body: payload,
+    auth: true,
+  });
+}
+
+export function updatePaymentSettings(payload: PaymentSettings) {
+  return request<{ message: string; user: any }>("/api/auth/payment-settings", {
     method: "PUT",
     body: payload,
     auth: true,
@@ -176,6 +264,7 @@ export type ServiceOption = {
   name: string;
   durationMinutes: number;
   price?: number;
+  isActive?: boolean;
 };
 
 export type PaymentMethod = "cash" | "transfer";
@@ -189,6 +278,11 @@ export type Appointment = {
   durationMinutes: number;
   servicePrice?: number;
   paymentMethod?: PaymentMethod;
+  paymentMethodCollected?: PaymentMethod | null;
+  paymentStatus?: "unpaid" | "partial" | "paid" | "refunded";
+  amountTotal?: number;
+  amountPaid?: number;
+  amountPending?: number;
   status: string;
   notes?: string;
   email: string;
@@ -245,12 +339,76 @@ export type CurrentMonthOverviewResponse = {
   totals: Omit<MonthOverviewBarber, "barberId" | "barberName">;
 };
 
+export type CustomerHistoryItem = {
+  _id: string;
+  startTime: string;
+  customerName: string;
+  service: string;
+  barberName: string;
+  phone?: string;
+  paymentMethod: PaymentMethod;
+  price: number;
+  status: string;
+};
+
+export type CustomerHistoryResponse = {
+  period: {
+    mode: "monthly" | "annual";
+    key: string;
+    label: string;
+    year: number;
+    month: number | null;
+    from: string;
+    to: string;
+  };
+  summary: {
+    servicesCount: number;
+    uniqueClients: number;
+    totalRevenue: number;
+  };
+  items: CustomerHistoryItem[];
+};
+
 export function fetchBarbers() {
   return request<{ barbers: Barber[] }>("/api/barbers", { auth: true });
 }
 
 export function fetchServices() {
   return request<{ services: ServiceOption[] }>("/api/appointments/services", { auth: true });
+}
+
+export function createService(payload: {
+  name: string;
+  durationMinutes: number;
+  price: number;
+}) {
+  return request<{ service: ServiceOption }>("/api/appointments/services", {
+    method: "POST",
+    body: payload,
+    auth: true,
+  });
+}
+
+export function updateService(
+  serviceId: string,
+  payload: {
+    name: string;
+    durationMinutes: number;
+    price: number;
+  },
+) {
+  return request<{ service: ServiceOption }>(`/api/appointments/services/${serviceId}`, {
+    method: "PUT",
+    body: payload,
+    auth: true,
+  });
+}
+
+export function deleteService(serviceId: string) {
+  return request<{ service: ServiceOption }>(`/api/appointments/services/${serviceId}`, {
+    method: "DELETE",
+    auth: true,
+  });
 }
 
 export function createBarber(payload: { 
@@ -319,8 +477,23 @@ export function createAppointment(payload: {
   return request<{ appointment: Appointment }>("/api/appointments", { method: "POST", body: payload, auth: true });
 }
 
-export function updateAppointmentStatus(appointmentId: string, status: "pending" | "completed" | "cancelled") {
-  return request<{ appointment: Appointment }>(`/api/appointments/${appointmentId}`, { method: "PATCH", body: { status }, auth: true });
+export function updateAppointmentStatus(
+  appointmentId: string,
+  status: "pending" | "completed" | "cancelled",
+  extras?: {
+    paymentMethodCollected?: PaymentMethod;
+    paymentStatus?: "unpaid" | "partial" | "paid" | "refunded";
+    amountPaid?: number;
+  },
+) {
+  return request<{ appointment: Appointment }>(`/api/appointments/${appointmentId}`, {
+    method: "PATCH",
+    body: {
+      status,
+      ...extras,
+    },
+    auth: true,
+  });
 }
 
 export function deleteAppointment(appointmentId: string) {
@@ -366,6 +539,29 @@ export function fetchOwnerMetricsOverview(params?: {
 
   return request<CurrentMonthOverviewResponse>(
     `/api/appointments/month-overview${query ? `?${query}` : ""}`,
+    { auth: true }
+  );
+}
+
+export function fetchCustomerHistory(params?: {
+  year?: number;
+  month?: number;
+  annual?: boolean;
+  search?: string;
+  paymentMethod?: "cash" | "transfer";
+  barberId?: string;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params?.year) searchParams.set("year", String(params.year));
+  if (params?.month) searchParams.set("month", String(params.month));
+  if (params?.annual) searchParams.set("annual", "true");
+  if (params?.search) searchParams.set("search", params.search);
+  if (params?.paymentMethod) searchParams.set("paymentMethod", params.paymentMethod);
+  if (params?.barberId) searchParams.set("barberId", params.barberId);
+  const query = searchParams.toString();
+
+  return request<CustomerHistoryResponse>(
+    `/api/appointments/history${query ? `?${query}` : ""}`,
     { auth: true }
   );
 }

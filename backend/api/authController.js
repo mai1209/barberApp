@@ -131,6 +131,77 @@ function sanitizeThemeConfigInput(input) {
   return { updates, hasAnyField };
 }
 
+function sanitizePaymentSettingsInput(input) {
+  if (!input || typeof input !== "object") {
+    return { updates: {}, hasAnyField: false };
+  }
+
+  const updates = {};
+  let hasAnyField = false;
+
+  if (Object.prototype.hasOwnProperty.call(input, "cashEnabled")) {
+    hasAnyField = true;
+    updates.cashEnabled = Boolean(input.cashEnabled);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "advancePaymentEnabled")) {
+    hasAnyField = true;
+    updates.advancePaymentEnabled = Boolean(input.advancePaymentEnabled);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "advanceMode")) {
+    hasAnyField = true;
+    const value = String(input.advanceMode ?? "").trim().toLowerCase();
+    if (value && !["deposit", "full"].includes(value)) {
+      throw new Error("El modo de cobro adelantado no es válido.");
+    }
+    updates.advanceMode = value || "deposit";
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "advanceType")) {
+    hasAnyField = true;
+    const value = String(input.advanceType ?? "").trim().toLowerCase();
+    if (value && !["percent", "fixed"].includes(value)) {
+      throw new Error("El tipo de adelanto no es válido.");
+    }
+    updates.advanceType = value || "percent";
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "advanceValue")) {
+    hasAnyField = true;
+    const parsed = Number(input.advanceValue);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      throw new Error("El valor del adelanto no es válido.");
+    }
+    updates.advanceValue = parsed;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "mercadoPagoConnectionStatus")) {
+    hasAnyField = true;
+    const value = String(input.mercadoPagoConnectionStatus ?? "")
+      .trim()
+      .toLowerCase();
+    if (value && !["disconnected", "pending", "connected"].includes(value)) {
+      throw new Error("El estado de Mercado Pago no es válido.");
+    }
+    updates.mercadoPagoConnectionStatus = value || "disconnected";
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "mercadoPagoSellerId")) {
+    hasAnyField = true;
+    const value = String(input.mercadoPagoSellerId ?? "").trim();
+    updates.mercadoPagoSellerId = value || null;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "mercadoPagoPublicKey")) {
+    hasAnyField = true;
+    const value = String(input.mercadoPagoPublicKey ?? "").trim();
+    updates.mercadoPagoPublicKey = value || null;
+  }
+
+  return { updates, hasAnyField };
+}
+
 async function buildAvailableSlug(baseValue) {
   const base = baseValue || "barberia";
   let candidate = base;
@@ -294,6 +365,42 @@ export async function updateThemeConfig(req, res, next) {
 
     return res.json({
       message: "Tema guardado correctamente",
+      user: userDoc.toJSON(),
+    });
+  } catch (err) {
+    if (err instanceof Error) {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
+}
+
+export async function updatePaymentSettings(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    const userDoc = await UserModel.findById(userId);
+    if (!userDoc || userDoc.isActive === false) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    const { updates, hasAnyField } = sanitizePaymentSettingsInput(req.body ?? {});
+    if (!hasAnyField) {
+      return res.status(400).json({ error: "No llegaron cambios de cobro para guardar." });
+    }
+
+    userDoc.paymentSettings = {
+      ...(userDoc.paymentSettings?.toObject?.() ?? userDoc.paymentSettings ?? {}),
+      ...updates,
+    };
+
+    await userDoc.save();
+
+    return res.json({
+      message: "Configuración de cobro guardada correctamente",
       user: userDoc.toJSON(),
     });
   } catch (err) {
