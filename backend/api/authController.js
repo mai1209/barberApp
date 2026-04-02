@@ -61,6 +61,36 @@ async function sendPasswordRecoveryEmail({ email, fullName, code }) {
   });
 }
 
+export async function sendTestMail(req, res, next) {
+  try {
+    const user = await UserModel.findById(req.user.id)
+      .select({ email: 1, fullName: 1 })
+      .lean();
+
+    if (!user?.email) {
+      return res.status(400).json({ error: "El usuario no tiene un email configurado." });
+    }
+
+    await sendAppMail({
+      to: user.email,
+      subject: "Prueba de correo de BarberApp",
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111;">
+          <h2 style="margin-bottom: 8px;">Correo de prueba</h2>
+          <p>Hola ${user.fullName || "barbero/a"},</p>
+          <p>Este correo confirma que la configuración SMTP de tu BarberApp está funcionando.</p>
+          <p>Si recibiste este mensaje, los mails automáticos del sistema deberían salir bien.</p>
+        </div>
+      `,
+      text: `Hola ${user.fullName || "barbero/a"}. Este correo confirma que la configuración SMTP de tu BarberApp está funcionando.`,
+    });
+
+    return res.json({ message: `Correo de prueba enviado a ${user.email}` });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 function sanitizeThemeConfigInput(input) {
   if (!input || typeof input !== "object") {
     return { updates: {}, hasAnyField: false };

@@ -5,6 +5,7 @@ import {
   loginUser,
   requestPasswordRecovery,
   registerUser,
+  sendTestMail,
   updatePaymentSettings,
   updatePassword,
   updateThemeConfig,
@@ -24,5 +25,6 @@ router.get("/me", requireAuth, getCurrentUser);
 router.put("/password", requireAuth, updatePassword);
 router.put("/theme", requireAuth, updateThemeConfig);
 router.put("/payment-settings", requireAuth, updatePaymentSettings);
+router.post("/test-mail", requireAuth, sendTestMail);
 router.post("/save-push-token", requireAuth, savePushToken);
 export default router;

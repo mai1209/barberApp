@@ -36,7 +36,21 @@ function getEffectivePaymentMethod(appointment) {
 }
 
 function getEffectivePaidAmount(appointment, fallbackPrice = 0) {
+  const hasExplicitStatus =
+    appointment.paymentStatus != null &&
+    String(appointment.paymentStatus).trim() !== "";
   const paymentStatus = normalizePaymentStatus(appointment.paymentStatus);
+
+  if (!hasExplicitStatus) {
+    const paid = Number(appointment.amountPaid);
+    if (Number.isFinite(paid) && paid > 0) return paid;
+
+    const total = Number(appointment.amountTotal);
+    if (Number.isFinite(total) && total > 0) return total;
+
+    return Number(fallbackPrice || appointment.servicePrice || 0);
+  }
+
   if (paymentStatus === "unpaid" || paymentStatus === "refunded") {
     return 0;
   }
@@ -425,6 +439,10 @@ export async function getAppointmentMetrics(req, res, next) {
           service: 1,
           servicePrice: 1,
           paymentMethod: 1,
+          paymentMethodCollected: 1,
+          paymentStatus: 1,
+          amountTotal: 1,
+          amountPaid: 1,
           startTime: 1,
         })
         .lean(),
@@ -513,6 +531,10 @@ export async function getCurrentMonthOverview(req, res, next) {
           service: 1,
           servicePrice: 1,
           paymentMethod: 1,
+          paymentMethodCollected: 1,
+          paymentStatus: 1,
+          amountTotal: 1,
+          amountPaid: 1,
         })
         .lean(),
       ServiceModel.find({ owner: ownerId })
