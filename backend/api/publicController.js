@@ -5,6 +5,7 @@ import { UserModel } from "../models/User.js";
 import admin from "../firebase.js";
 import { BarberModel } from "../models/Barber.js";
 import { sendAppMail } from "../services/mailer.js";
+import { createAppointmentMercadoPagoPreference } from "./paymentController.js";
 import { getTimeZoneDayRange, getTimeZoneWeekday } from "../utils/timezone.js";
 
 function buildDayRange(dateParam) {
@@ -284,6 +285,7 @@ export async function publicCreateAppointment(req, res, next) {
       owner: ownerId,
       barber: barberId,
       customerName: customerName.trim(),
+      customerEmail: email ? String(email).trim().toLowerCase() : null,
       service,
       startTime: appointmentDate,
       durationMinutes: Number(durationMinutes) || 30,
@@ -325,7 +327,22 @@ export async function publicCreateAppointment(req, res, next) {
       console.error("⚠️ Error enviando push:", pushErr.message);
     }
 
-    if (email) {
+    let mercadoPagoCheckout = null;
+    if (normalizedPaymentMethod === "transfer") {
+      try {
+        mercadoPagoCheckout = await createAppointmentMercadoPagoPreference({
+          appointmentId: appointment._id.toString(),
+          ownerId,
+        });
+      } catch (mpError) {
+        await AppointmentModel.findByIdAndDelete(appointment._id);
+        return res.status(mpError?.statusCode || 400).json({
+          error: mpError.message || "No pudimos iniciar el pago con Mercado Pago.",
+        });
+      }
+    }
+
+    if (email && normalizedPaymentMethod === "cash") {
       const shopName = shop.fullName || "Tu Barbería";
       const timeZone = "America/Argentina/Cordoba";
       const dateLabel = appointmentDate.toLocaleDateString("es-AR", {
@@ -399,7 +416,23 @@ export async function publicCreateAppointment(req, res, next) {
       }
     }
 
-    return res.status(201).json({ message: "¡Reserva exitosa!", appointment });
+    return res.status(201).json({
+      message:
+        normalizedPaymentMethod === "transfer"
+          ? "Reserva creada. Continuá con el pago para confirmar tu turno."
+          : "¡Reserva exitosa!",
+      appointment,
+      payment: mercadoPagoCheckout
+        ? {
+            provider: "mercado_pago",
+            requiresRedirect: true,
+            checkoutUrl: mercadoPagoCheckout.checkoutUrl,
+            sandboxCheckoutUrl: mercadoPagoCheckout.sandboxCheckoutUrl,
+            preferenceId: mercadoPagoCheckout.preferenceId,
+            amountToCharge: mercadoPagoCheckout.amountToCharge,
+          }
+        : null,
+    });
   } catch (err) {
     console.error("❌ Error en publicCreateAppointment:", err);
     return res.status(400).json({ error: err.message });

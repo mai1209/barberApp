@@ -45,6 +45,22 @@ const paymentSettingsSchema = new mongoose.Schema(
   },
 );
 
+const mercadoPagoAuthSchema = new mongoose.Schema(
+  {
+    accessToken: { type: String, default: null },
+    refreshToken: { type: String, default: null },
+    userId: { type: String, default: null },
+    publicKey: { type: String, default: null },
+    scope: { type: String, default: null },
+    expiresAt: { type: Date, default: null },
+    linkedAt: { type: Date, default: null },
+    lastRefreshAt: { type: Date, default: null },
+  },
+  {
+    _id: false,
+  },
+);
+
 const userSchema = new mongoose.Schema(
   {
     fullName: {
@@ -107,6 +123,11 @@ const userSchema = new mongoose.Schema(
     paymentSettings: {
       type: paymentSettingsSchema,
       default: () => ({}),
+    },
+    mercadoPagoAuth: {
+      type: mercadoPagoAuthSchema,
+      default: null,
+      select: false,
     },
   },
   {

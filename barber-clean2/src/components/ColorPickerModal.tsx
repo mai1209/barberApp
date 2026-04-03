@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
-  PanResponder,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 type Props = {
@@ -24,21 +25,22 @@ type HsvColor = {
   v: number;
 };
 
-type BoxLayout = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
-
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
 function normalizeHex(value: string) {
-  const raw = value.trim().toUpperCase();
+  const raw = String(value ?? '').trim().toUpperCase();
   if (/^#[0-9A-F]{6}$/.test(raw)) return raw;
   return '#FF1493';
+}
+
+function sanitizeHexInput(value: string) {
+  const raw = String(value ?? '')
+    .toUpperCase()
+    .replace(/[^0-9A-F#]/g, '')
+    .replace(/^([^#])/, '#$1');
+  return raw.startsWith('#') ? raw.slice(0, 7) : `#${raw.slice(0, 6)}`;
 }
 
 function hexToRgb(hex: string) {
@@ -118,6 +120,63 @@ function hexToHsv(hex: string): HsvColor {
   };
 }
 
+function SliderTrack({
+  label,
+  value,
+  colorStops,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  colorStops: string[];
+  onChange: (nextValue: number) => void;
+}) {
+  return (
+    <View style={styles.sliderSection}>
+      <View style={styles.sliderHeader}>
+        <Text style={styles.sliderLabel}>{label}</Text>
+        <Text style={styles.sliderValue}>{Math.round(value * 100)}%</Text>
+      </View>
+
+      <View style={styles.trackWrap}>
+        <Svg width="100%" height="100%">
+          <Defs>
+            <LinearGradient id={`${label}-gradient`} x1="0%" y1="0%" x2="100%" y2="0%">
+              {colorStops.map((color, index) => (
+                <Stop
+                  key={`${label}-${color}-${index}`}
+                  offset={`${(index / Math.max(colorStops.length - 1, 1)) * 100}%`}
+                  stopColor={color}
+                />
+              ))}
+            </LinearGradient>
+          </Defs>
+          <Rect
+            x="0"
+            y="0"
+            width="100%"
+            height="100%"
+            rx="12"
+            fill={`url(#${label}-gradient)`}
+          />
+        </Svg>
+      </View>
+
+      <Slider
+        style={styles.nativeSlider}
+        minimumValue={0}
+        maximumValue={1}
+        step={0.01}
+        minimumTrackTintColor="transparent"
+        maximumTrackTintColor="transparent"
+        thumbTintColor="#FFFFFF"
+        value={value}
+        onValueChange={onChange}
+      />
+    </View>
+  );
+}
+
 export default function ColorPickerModal({
   visible,
   title,
@@ -127,207 +186,128 @@ export default function ColorPickerModal({
   onConfirm,
 }: Props) {
   const [hsv, setHsv] = useState<HsvColor>(() => hexToHsv(value));
-  const [squareLayout, setSquareLayout] = useState<BoxLayout>({
-    x: 0,
-    y: 0,
-    width: 1,
-    height: 1,
-  });
-  const [hueLayout, setHueLayout] = useState<BoxLayout>({
-    x: 0,
-    y: 0,
-    width: 1,
-    height: 1,
-  });
-  const squareRef = useRef<View | null>(null);
-  const hueRef = useRef<View | null>(null);
+  const [hexInput, setHexInput] = useState(() => normalizeHex(value));
 
   useEffect(() => {
-    if (visible) {
-      setHsv(hexToHsv(value));
-    }
+    if (!visible) return;
+    const nextHsv = hexToHsv(value);
+    setHsv(nextHsv);
+    setHexInput(normalizeHex(value));
   }, [visible, value]);
 
   const currentColor = useMemo(() => hsvToHex(hsv), [hsv]);
-  const baseHueColor = useMemo(
-    () =>
-      hsvToHex({
-        h: hsv.h,
-        s: 1,
-        v: 1,
-      }),
-    [hsv.h],
-  );
+  const saturationStart = useMemo(() => hsvToHex({ h: hsv.h, s: 0, v: hsv.v }), [hsv]);
+  const saturationEnd = useMemo(() => hsvToHex({ h: hsv.h, s: 1, v: hsv.v }), [hsv]);
+  const brightnessEnd = useMemo(() => hsvToHex({ h: hsv.h, s: hsv.s, v: 1 }), [hsv]);
 
-  const measureTarget = (target: View | null, setter: (layout: BoxLayout) => void) => {
-    if (!target) return;
-    target.measureInWindow((x, y, width, height) => {
-      setter({
-        x,
-        y,
-        width: width || 1,
-        height: height || 1,
-      });
-    });
+  useEffect(() => {
+    setHexInput(currentColor);
+  }, [currentColor]);
+
+  const applyHexInput = () => {
+    const normalized = normalizeHex(hexInput);
+    setHsv(hexToHsv(normalized));
+    setHexInput(normalized);
   };
-
-  const refreshLayouts = () => {
-    measureTarget(squareRef.current, setSquareLayout);
-    measureTarget(hueRef.current, setHueLayout);
-  };
-
-  const updateSquareFromTouch = (x: number, y: number) => {
-    setHsv(current => ({
-      ...current,
-      s: clamp(x / squareLayout.width, 0, 1),
-      v: 1 - clamp(y / squareLayout.height, 0, 1),
-    }));
-  };
-
-  const updateHueFromTouch = (x: number) => {
-    setHsv(current => ({
-      ...current,
-      h: clamp(x / hueLayout.width, 0, 1) * 360,
-    }));
-  };
-
-  const updateSquareFromPage = (pageX: number, pageY: number) => {
-    updateSquareFromTouch(pageX - squareLayout.x, pageY - squareLayout.y);
-  };
-
-  const updateHueFromPage = (pageX: number) => {
-    updateHueFromTouch(pageX - hueLayout.x);
-  };
-
-  const squareResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: event => {
-        updateSquareFromPage(event.nativeEvent.pageX, event.nativeEvent.pageY);
-      },
-      onPanResponderMove: event => {
-        updateSquareFromPage(event.nativeEvent.pageX, event.nativeEvent.pageY);
-      },
-    }),
-  ).current;
-
-  const hueResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: event => {
-        updateHueFromPage(event.nativeEvent.pageX);
-      },
-      onPanResponderMove: event => {
-        updateHueFromPage(event.nativeEvent.pageX);
-      },
-    }),
-  ).current;
-
-  const markerLeft = clamp(hsv.s * squareLayout.width, 0, squareLayout.width);
-  const markerTop = clamp((1 - hsv.v) * squareLayout.height, 0, squareLayout.height);
-  const hueLeft = clamp((hsv.h / 360) * hueLayout.width, 0, hueLayout.width);
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      onShow={refreshLayouts}
-    >
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <Text style={styles.title}>{title}</Text>
 
-          <View
-            ref={squareRef}
-            style={styles.squareWrap}
-            onLayout={() => refreshLayouts()}
-            {...squareResponder.panHandlers}
-          >
-            <Svg width="100%" height="100%">
-              <Defs>
-                <LinearGradient id="whiteOverlay" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="1" />
-                  <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
-                </LinearGradient>
-                <LinearGradient id="blackOverlay" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <Stop offset="0%" stopColor="#000000" stopOpacity="0" />
-                  <Stop offset="100%" stopColor="#000000" stopOpacity="1" />
-                </LinearGradient>
-              </Defs>
-              <Rect x="0" y="0" width="100%" height="100%" rx="18" fill={baseHueColor} />
-              <Rect x="0" y="0" width="100%" height="100%" rx="18" fill="url(#whiteOverlay)" />
-              <Rect x="0" y="0" width="100%" height="100%" rx="18" fill="url(#blackOverlay)" />
-            </Svg>
-
-            <View
-              pointerEvents="none"
-              style={[
-                styles.pickerMarker,
-                {
-                  left: markerLeft - 11,
-                  top: markerTop - 11,
-                },
-              ]}
-            />
-          </View>
-
-          <View
-            ref={hueRef}
-            style={styles.hueWrap}
-            onLayout={() => refreshLayouts()}
-            {...hueResponder.panHandlers}
-          >
-            <Svg width="100%" height="100%">
-              <Defs>
-                <LinearGradient id="hueGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <Stop offset="0%" stopColor="#FF0000" />
-                  <Stop offset="17%" stopColor="#FFFF00" />
-                  <Stop offset="33%" stopColor="#00FF00" />
-                  <Stop offset="50%" stopColor="#00FFFF" />
-                  <Stop offset="67%" stopColor="#0000FF" />
-                  <Stop offset="83%" stopColor="#FF00FF" />
-                  <Stop offset="100%" stopColor="#FF0000" />
-                </LinearGradient>
-              </Defs>
-              <Rect x="0" y="0" width="100%" height="100%" rx="10" fill="url(#hueGradient)" />
-            </Svg>
-
-            <View
-              pointerEvents="none"
-              style={[
-                styles.hueMarker,
-                {
-                  left: hueLeft - 10,
-                },
-              ]}
-            />
-          </View>
-
-          <View style={styles.previewRow}>
+          <View style={styles.previewBlock}>
             <View style={[styles.previewSwatch, { backgroundColor: currentColor }]} />
-            <Text style={styles.hexText}>{currentColor}</Text>
+            <View style={styles.previewMeta}>
+              <Text style={styles.previewTitle}>Color actual</Text>
+              <Text style={styles.previewHex}>{currentColor}</Text>
+            </View>
+          </View>
+
+          <SliderTrack
+            label="Matiz"
+            value={hsv.h / 360}
+            colorStops={[
+              '#FF0000',
+              '#FFFF00',
+              '#00FF00',
+              '#00FFFF',
+              '#0000FF',
+              '#FF00FF',
+              '#FF0000',
+            ]}
+            onChange={ratio =>
+              setHsv(current => ({
+                ...current,
+                h: ratio * 360,
+              }))
+            }
+          />
+
+          <SliderTrack
+            label="Saturacion"
+            value={hsv.s}
+            colorStops={[saturationStart, saturationEnd]}
+            onChange={ratio =>
+              setHsv(current => ({
+                ...current,
+                s: ratio,
+              }))
+            }
+          />
+
+          <SliderTrack
+            label="Luminosidad"
+            value={hsv.v}
+            colorStops={['#000000', brightnessEnd]}
+            onChange={ratio =>
+              setHsv(current => ({
+                ...current,
+                v: ratio,
+              }))
+            }
+          />
+
+          <View style={styles.hexBlock}>
+            <Text style={styles.hexLabel}>Hex</Text>
+            <TextInput
+              value={hexInput}
+              onChangeText={setHexInput}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={7}
+              style={styles.hexInput}
+              placeholder="#FF1493"
+              placeholderTextColor="#6B7280"
+            />
+            <Pressable style={styles.applyHexBtn} onPress={applyHexInput}>
+              <Text style={styles.applyHexText}>Aplicar</Text>
+            </Pressable>
           </View>
 
           {swatches.length ? (
             <View style={styles.swatchesWrap}>
-              {swatches.map(swatch => (
-                <Pressable
-                  key={swatch}
-                  style={[
-                    styles.swatchChip,
-                    {
-                      backgroundColor: swatch,
-                      borderColor: currentColor === swatch ? '#FFFFFF' : 'rgba(255,255,255,0.12)',
-                      borderWidth: currentColor === swatch ? 2 : 1,
-                    },
-                  ]}
-                  onPress={() => setHsv(hexToHsv(swatch))}
-                />
-              ))}
+              {swatches.map(swatch => {
+                const normalized = normalizeHex(swatch);
+                const isSelected = normalized === currentColor;
+                return (
+                  <Pressable
+                    key={swatch}
+                    style={[
+                      styles.swatchChip,
+                      {
+                        backgroundColor: normalized,
+                        borderColor: isSelected ? '#FFFFFF' : 'rgba(255,255,255,0.14)',
+                        borderWidth: isSelected ? 2 : 1,
+                      },
+                    ]}
+                    onPress={() => {
+                      setHsv(hexToHsv(normalized));
+                      setHexInput(normalized);
+                    }}
+                  />
+                );
+              })}
             </View>
           ) : null}
 
@@ -371,56 +351,103 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: 14,
   },
-  squareWrap: {
-    height: 210,
-    borderRadius: 18,
-    overflow: 'hidden',
-  },
-  pickerMarker: {
-    position: 'absolute',
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  hueWrap: {
-    height: 18,
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginTop: 16,
-  },
-  hueMarker: {
-    position: 'absolute',
-    top: -3,
-    width: 20,
-    height: 24,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    backgroundColor: 'transparent',
-  },
-  previewRow: {
+  previewBlock: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 16,
+    backgroundColor: '#131313',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    padding: 14,
+    marginBottom: 10,
   },
   previewSwatch: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 54,
+    height: 54,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    marginRight: 12,
+    borderColor: 'rgba(255,255,255,0.14)',
   },
-  hexText: {
-    color: '#F3F3F3',
-    fontSize: 16,
+  previewMeta: {
+    marginLeft: 14,
+    flex: 1,
+  },
+  previewTitle: {
+    color: '#9CA3AF',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  previewHex: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  sliderSection: {
+    marginTop: 14,
+  },
+  sliderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sliderLabel: {
+    color: '#E5E7EB',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  sliderValue: {
+    color: '#9CA3AF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  trackWrap: {
+    height: 18,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  nativeSlider: {
+    marginTop: -18,
+    marginHorizontal: -14,
+    height: 38,
+  },
+  hexBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 18,
+  },
+  hexLabel: {
+    color: '#D1D5DB',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  hexInput: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    backgroundColor: '#131313',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 14,
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  applyHexBtn: {
+    minHeight: 44,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: '#2A2A2A',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  applyHexText: {
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '700',
   },
   swatchesWrap: {

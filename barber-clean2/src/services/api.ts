@@ -198,6 +198,15 @@ export type PaymentSettings = {
   mercadoPagoPublicKey?: string | null;
 };
 
+export type MercadoPagoConnectionInfo = {
+  connectionStatus: "disconnected" | "pending" | "connected";
+  sellerId?: string | null;
+  publicKey?: string | null;
+  linkedAt?: string | null;
+  expiresAt?: string | null;
+  hasRefreshToken?: boolean;
+};
+
 export function updateThemeConfig(payload: ThemeConfig) {
   return request<{ message: string; user: any }>("/api/auth/theme", {
     method: "PUT",
@@ -210,6 +219,28 @@ export function updatePaymentSettings(payload: PaymentSettings) {
   return request<{ message: string; user: any }>("/api/auth/payment-settings", {
     method: "PUT",
     body: payload,
+    auth: true,
+  });
+}
+
+export function getMercadoPagoStatus() {
+  return request<{ mercadoPago: MercadoPagoConnectionInfo }>(
+    "/api/auth/mercadopago/status",
+    {
+      auth: true,
+    },
+  );
+}
+
+export function getMercadoPagoConnectUrl() {
+  return request<{ authUrl: string }>("/api/auth/mercadopago/connect", {
+    auth: true,
+  });
+}
+
+export function disconnectMercadoPago() {
+  return request<{ message: string; user: any }>("/api/auth/mercadopago/connect", {
+    method: "DELETE",
     auth: true,
   });
 }

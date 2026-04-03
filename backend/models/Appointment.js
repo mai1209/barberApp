@@ -20,6 +20,12 @@ const appointmentSchema = new mongoose.Schema(
       trim: true,
       maxlength: 120,
     },
+    customerEmail: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: null,
+    },
     service: {
       type: String,
       required: true,
@@ -75,6 +81,22 @@ const appointmentSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       min: 0,
+    },
+    mercadoPagoPreferenceId: {
+      type: String,
+      default: null,
+    },
+    mercadoPagoPaymentId: {
+      type: String,
+      default: null,
+    },
+    mercadoPagoMerchantOrderId: {
+      type: String,
+      default: null,
+    },
+    mercadoPagoExternalReference: {
+      type: String,
+      default: null,
     },
     status: {
       type: String,

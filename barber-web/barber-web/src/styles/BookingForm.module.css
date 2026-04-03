@@ -158,6 +158,31 @@
   line-height: 1.45;
 }
 
+.paymentSummary {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 20, 147, 0.18);
+  background: rgba(255, 20, 147, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.paymentSummaryLabel {
+  color: #7f8696;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.paymentSummaryValue {
+  color: #ffd6ec;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
 /* SELECTOR DE SERVICIO */
 .selector {
   background: #222;
@@ -478,6 +503,14 @@
   background: #252525;
   color: #444;
   cursor: not-allowed;
+}
+
+.submitHint {
+  margin: 8px 4px 0;
+  color: #8d8d8d;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  text-align: center;
 }
 
 /* MODAL */

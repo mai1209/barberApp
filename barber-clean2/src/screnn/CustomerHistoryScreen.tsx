@@ -7,7 +7,6 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -15,6 +14,7 @@ import {
   Image,
 } from 'react-native';
 import RNFS from 'react-native-fs';
+import Share from 'react-native-share';
 import * as XLSX from 'xlsx';
 import {
   ArrowLeft,
@@ -22,6 +22,8 @@ import {
   Calendar,
   ChevronDown,
   CreditCard,
+  FileSpreadsheet,
+  FileText,
   Filter,
   Scissors,
   Search,
@@ -154,6 +156,28 @@ const sanitizePdfText = (value: string | number | null | undefined) =>
     .replace(/\u2026/g, '...')
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201C\u201D]/g, '"');
+
+const buildShareUrl = (filePath: string) =>
+  filePath.startsWith('file://') ? filePath : `file://${filePath}`;
+
+async function shareExportedFile({
+  filePath,
+  fileName,
+  type,
+}: {
+  filePath: string;
+  fileName: string;
+  type: string;
+}) {
+  await Share.open({
+    title: fileName,
+    filename: fileName,
+    url: buildShareUrl(filePath),
+    type,
+    failOnCancel: false,
+    subject: fileName,
+  });
+}
 
 function CustomerHistoryScreen({ navigation }: Props) {
   const { theme } = useTheme();
@@ -438,10 +462,10 @@ function CustomerHistoryScreen({ navigation }: Props) {
 
       await RNFS.writeFile(filePath, workbookBase64, 'base64');
 
-      await Share.share({
-        title: fileName,
-        url: `file://${filePath}`,
-        message: Platform.OS === 'android' ? `Historial exportado: ${fileName}` : undefined,
+      await shareExportedFile({
+        filePath,
+        fileName,
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
     } catch (err) {
       console.error(err);
@@ -839,11 +863,10 @@ function CustomerHistoryScreen({ navigation }: Props) {
 
       await RNFS.writeFile(filePath, pdfBase64, 'base64');
 
-      await Share.share({
-        title: fileName,
-        url: `file://${filePath}`,
-        message:
-          Platform.OS === 'android' ? `Historial exportado: ${fileName}` : undefined,
+      await shareExportedFile({
+        filePath,
+        fileName,
+        type: 'application/pdf',
       });
     } catch (err) {
       console.error(err);
@@ -1031,9 +1054,11 @@ function CustomerHistoryScreen({ navigation }: Props) {
                 style={[styles.exportButton, styles.exportButtonGhost]}
                 onPress={handleExportPdf}
               >
+                <FileText size={15} color="#FF6B6B" />
                 <Text style={styles.exportButtonText}>Exportar PDF</Text>
               </Pressable>
               <Pressable style={styles.exportButton} onPress={handleExportExcel}>
+                <FileSpreadsheet size={15} color="#34D399" />
                 <Text style={styles.exportButtonText}>Exportar Excel</Text>
               </Pressable>
             </View>
@@ -1592,6 +1617,8 @@ const makeStyles = (theme: Theme) =>
       paddingHorizontal: 14,
       paddingVertical: 10,
       borderRadius: 999,
+      flexDirection: 'row',
+      gap: 8,
       backgroundColor: '#101115',
       borderWidth: 1,
       borderColor: hexToRgba(theme.primary, 0.4),

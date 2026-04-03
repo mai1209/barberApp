@@ -153,6 +153,7 @@ function BookingForm({ shopSlug }) {
   const [email, setEmail] = useState(""); // <-- AGREGAR ESTO
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [paymentResultMessage, setPaymentResultMessage] = useState("");
 
   const currentDuration =
     selectedService?.durationMinutes ?? SLOT_INTERVAL_MINUTES;
@@ -166,6 +167,11 @@ function BookingForm({ shopSlug }) {
   const paymentOptions = useMemo(
     () => getPublicPaymentOptions(shopInfo),
     [shopInfo],
+  );
+
+  const selectedPaymentOption = useMemo(
+    () => paymentOptions.find((item) => item.value === paymentMethod) ?? null,
+    [paymentMethod, paymentOptions],
   );
 
   const workingWindow = useMemo(() => {
@@ -233,6 +239,26 @@ function BookingForm({ shopSlug }) {
     () => formatBookingDateLabel(selectedDate),
     [selectedDate],
   );
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentResult = params.get("payment_result");
+
+    if (!paymentResult) return;
+
+    if (paymentResult === "success") {
+      setPaymentResultMessage("Pago aprobado. Tu turno ya quedó reservado.");
+    } else if (paymentResult === "pending") {
+      setPaymentResultMessage("Tu pago quedó pendiente. Apenas se confirme, tu reserva se actualizará.");
+    } else if (paymentResult === "failure") {
+      setPaymentResultMessage("El pago no se completó. Si querés, podés intentar otra vez.");
+    }
+
+    params.delete("payment_result");
+    const nextQuery = params.toString();
+    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}`;
+    window.history.replaceState({}, "", nextUrl);
+  }, []);
 
   // 3. TODOS LOS USEEFFECT
   useEffect(() => {
@@ -397,7 +423,7 @@ const handleSubmit = async (e) => {
       const localDate = new Date(y, mo, d, hh, mm, 0, 0);
       const finalDateUTC = localDate.toISOString();
 
-      await createAppointment({
+      const response = await createAppointment({
         barberId: selectedBarber,
         customerName: customerName.trim(),
         service: serviceName,
@@ -408,6 +434,17 @@ const handleSubmit = async (e) => {
         email: email.trim(),
         paymentMethod,
       });
+
+      if (response?.payment?.requiresRedirect && response?.payment?.checkoutUrl) {
+        window.location.assign(response.payment.checkoutUrl);
+        return;
+      }
+
+      if (paymentMethod === "transfer") {
+        throw new Error(
+          "La reserva se creó, pero Mercado Pago no devolvió un link de pago. Revisá la configuración del checkout y volvé a intentar.",
+        );
+      }
 
       // --- MENSAJE PERSONALIZADO ---
       if (isDev) {
@@ -446,6 +483,23 @@ const handleSubmit = async (e) => {
   // 6. RENDER
   return (
     <section className={styles.wrapper}>
+      {paymentResultMessage ? (
+        <div
+          style={{
+            maxWidth: 860,
+            margin: "0 auto 18px",
+            background: "rgba(255, 20, 147, 0.12)",
+            border: "1px solid rgba(255, 20, 147, 0.28)",
+            color: "#FFD6EC",
+            padding: "14px 16px",
+            borderRadius: 18,
+            fontWeight: 600,
+          }}
+        >
+          {paymentResultMessage}
+        </div>
+      ) : null}
+
       {servicePickerOpen && (
         <div
           className={styles.modalBackdrop}
@@ -577,8 +631,14 @@ const handleSubmit = async (e) => {
               ))}
             </div>
             <p className={styles.paymentHelperText}>
-              {paymentOptions.find((option) => option.value === paymentMethod)?.helper}
+              {selectedPaymentOption?.helper}
             </p>
+            <div className={styles.paymentSummary}>
+              <span className={styles.paymentSummaryLabel}>Método seleccionado</span>
+              <strong className={styles.paymentSummaryValue}>
+                {selectedPaymentOption?.label || "Sin seleccionar"}
+              </strong>
+            </div>
           </div>
         ) : null}
 
@@ -707,6 +767,11 @@ const handleSubmit = async (e) => {
         >
           {saving ? "Procesando..." : "Confirmar Reserva"}
         </button>
+        {paymentMethod === "transfer" ? (
+          <p className={styles.submitHint}>
+            Al confirmar te vamos a redirigir a Mercado Pago para completar el pago.
+          </p>
+        ) : null}
       </form>
     </section>
   );

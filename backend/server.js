@@ -7,6 +7,7 @@ import { errorHandler, notFoundHandler } from "./middlewares/errorHandler.js";
 import barberRoutes from "./routes/barberRoutes.js";
 import appointmentRoutes from "./routes/appointmentRoutes.js";
 import publicRoutes from "./routes/publicRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
 
 const app = express();
 
@@ -58,6 +59,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/barbers', barberRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/public', publicRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // 4. Manejadores de errores
 app.use(notFoundHandler);

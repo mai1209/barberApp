@@ -1,12 +1,17 @@
 import { UserModel } from "../models/User.js";
 import { hashPassword, verifyPassword } from "../token/passwordManager.js";
-import { signAccessToken } from "../token/jwtManager.js";
+import { signAccessToken, verifyAccessToken } from "../token/jwtManager.js";
 import crypto from "crypto";
 import {
   getMailerDebugInfo,
   sendAppMail,
   verifyMailerConnection,
 } from "../services/mailer.js";
+import {
+  buildMercadoPagoOAuthUrl,
+  exchangeMercadoPagoCode,
+  getMercadoPagoConfig,
+} from "../services/mercadoPago.js";
 
 const PASSWORD_RESET_EXPIRY_MS = 15 * 60 * 1000;
 
@@ -106,6 +111,62 @@ export async function getMailDebug(req, res, next) {
   } catch (err) {
     return next(err);
   }
+}
+
+function buildMercadoPagoStateToken(userId) {
+  return signAccessToken(
+    {
+      sub: userId,
+      type: "mp_oauth",
+      nonce: crypto.randomUUID(),
+    },
+    { expiresIn: "15m" },
+  );
+}
+
+function buildMercadoPagoConnectionPayload(userDoc) {
+  const auth = userDoc?.mercadoPagoAuth ?? null;
+  return {
+    connectionStatus:
+      userDoc?.paymentSettings?.mercadoPagoConnectionStatus || "disconnected",
+    sellerId:
+      userDoc?.paymentSettings?.mercadoPagoSellerId ||
+      auth?.userId ||
+      null,
+    publicKey:
+      userDoc?.paymentSettings?.mercadoPagoPublicKey ||
+      auth?.publicKey ||
+      null,
+    linkedAt: auth?.linkedAt || null,
+    expiresAt: auth?.expiresAt || null,
+    hasRefreshToken: Boolean(auth?.refreshToken),
+  };
+}
+
+function buildMercadoPagoCallbackHtml({
+  success,
+  title,
+  message,
+}) {
+  const accent = success ? "#34C759" : "#FF5A5F";
+  return `<!doctype html>
+  <html lang="es">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>${title}</title>
+    </head>
+    <body style="margin:0;background:#0D0D11;color:#fff;font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;">
+      <div style="max-width:460px;width:100%;background:#17171C;border:1px solid rgba(255,255,255,0.08);border-radius:24px;padding:28px;text-align:center;">
+        <div style="width:64px;height:64px;border-radius:20px;margin:0 auto 18px;background:${accent};display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:800;">
+          ${success ? "✓" : "!"}
+        </div>
+        <h1 style="margin:0 0 12px;font-size:24px;">${title}</h1>
+        <p style="margin:0 0 18px;color:#B7BECC;line-height:1.5;">${message}</p>
+        <p style="margin:0;color:#7C8596;font-size:13px;">Podés volver a la app y refrescar la pantalla de Cobros.</p>
+      </div>
+    </body>
+  </html>`;
 }
 
 function sanitizeThemeConfigInput(input) {
@@ -380,6 +441,173 @@ export async function getCurrentUser(req, res, next) {
         ...userDoc.toJSON(),
         shopSlug: userDoc.shopSlug,
       },
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function getMercadoPagoConnectionStatus(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    const userDoc = await UserModel.findById(userId)
+      .select("+mercadoPagoAuth")
+      .lean();
+
+    if (!userDoc || userDoc.isActive === false) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    return res.json({
+      mercadoPago: buildMercadoPagoConnectionPayload(userDoc),
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function getMercadoPagoConnectUrl(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    getMercadoPagoConfig();
+    const state = buildMercadoPagoStateToken(userId);
+    const authUrl = buildMercadoPagoOAuthUrl({ state });
+
+    return res.json({ authUrl });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function handleMercadoPagoOAuthCallback(req, res, next) {
+  try {
+    const errorCode = String(req.query?.error ?? "").trim();
+    const errorDescription = String(req.query?.error_description ?? "").trim();
+    const code = String(req.query?.code ?? "").trim();
+    const state = String(req.query?.state ?? "").trim();
+
+    if (errorCode) {
+      return res
+        .status(400)
+        .send(
+          buildMercadoPagoCallbackHtml({
+            success: false,
+            title: "No se pudo conectar Mercado Pago",
+            message: errorDescription || errorCode,
+          }),
+        );
+    }
+
+    if (!code || !state) {
+      return res
+        .status(400)
+        .send(
+          buildMercadoPagoCallbackHtml({
+            success: false,
+            title: "Falta información para completar la conexión",
+            message: "Mercado Pago no devolvió el código de autorización esperado.",
+          }),
+        );
+    }
+
+    const payload = verifyAccessToken(state);
+    if (!payload?.sub || payload?.type !== "mp_oauth") {
+      return res
+        .status(400)
+        .send(
+          buildMercadoPagoCallbackHtml({
+            success: false,
+            title: "La conexión venció o no es válida",
+            message: "Volvé a iniciar la conexión desde la pantalla de Cobros.",
+          }),
+        );
+    }
+
+    const userDoc = await UserModel.findById(payload.sub).select("+mercadoPagoAuth");
+    if (!userDoc || userDoc.isActive === false) {
+      return res
+        .status(404)
+        .send(
+          buildMercadoPagoCallbackHtml({
+            success: false,
+            title: "No encontramos la barbería",
+            message: "La cuenta usada para conectar Mercado Pago ya no está disponible.",
+          }),
+        );
+    }
+
+    const tokenResponse = await exchangeMercadoPagoCode({ code });
+    const expiresAt = tokenResponse.expires_in
+      ? new Date(Date.now() + Number(tokenResponse.expires_in) * 1000)
+      : null;
+
+    userDoc.mercadoPagoAuth = {
+      accessToken: tokenResponse.access_token || null,
+      refreshToken: tokenResponse.refresh_token || null,
+      userId: tokenResponse.user_id ? String(tokenResponse.user_id) : null,
+      publicKey: tokenResponse.public_key || null,
+      scope: tokenResponse.scope || null,
+      expiresAt,
+      linkedAt: new Date(),
+      lastRefreshAt: new Date(),
+    };
+
+    userDoc.paymentSettings = {
+      ...(userDoc.paymentSettings?.toObject?.() ?? userDoc.paymentSettings ?? {}),
+      mercadoPagoConnectionStatus: "connected",
+      mercadoPagoSellerId: tokenResponse.user_id ? String(tokenResponse.user_id) : null,
+      mercadoPagoPublicKey: tokenResponse.public_key || null,
+    };
+
+    await userDoc.save();
+
+    return res
+      .status(200)
+      .send(
+        buildMercadoPagoCallbackHtml({
+          success: true,
+          title: "Mercado Pago conectado",
+          message: "La cuenta quedó vinculada a tu barbería. Ya podés volver a la app y ofrecer cobro adelantado real.",
+        }),
+      );
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function disconnectMercadoPago(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    const userDoc = await UserModel.findById(userId).select("+mercadoPagoAuth");
+    if (!userDoc || userDoc.isActive === false) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    userDoc.mercadoPagoAuth = null;
+    userDoc.paymentSettings = {
+      ...(userDoc.paymentSettings?.toObject?.() ?? userDoc.paymentSettings ?? {}),
+      mercadoPagoConnectionStatus: "disconnected",
+      mercadoPagoSellerId: null,
+      mercadoPagoPublicKey: null,
+    };
+
+    await userDoc.save();
+
+    return res.json({
+      message: "Mercado Pago desconectado.",
+      user: userDoc.toJSON(),
     });
   } catch (err) {
     return next(err);

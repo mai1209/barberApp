@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -13,7 +14,10 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import {
+  disconnectMercadoPago,
   getCurrentUser,
+  getMercadoPagoConnectUrl,
+  getMercadoPagoStatus,
   updatePaymentSettings,
   type PaymentSettings,
 } from '../services/api';
@@ -61,13 +65,24 @@ export default function PaymentSettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [connecting, setConnecting] = useState(false);
 
   const loadSettings = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
-      const response = await getCurrentUser();
-      setForm(normalizeFormFromUser(response.user));
+      const [response, mpStatusResponse] = await Promise.all([
+        getCurrentUser(),
+        getMercadoPagoStatus().catch(() => null),
+      ]);
+
+      const normalized = normalizeFormFromUser(response.user);
+      if (mpStatusResponse?.mercadoPago?.connectionStatus) {
+        normalized.mercadoPagoConnectionStatus =
+          mpStatusResponse.mercadoPago.connectionStatus;
+      }
+
+      setForm(normalized);
     } catch (err: any) {
       setError(err?.message ?? 'No pudimos cargar la configuración de cobros.');
     } finally {
@@ -90,6 +105,16 @@ export default function PaymentSettingsScreen() {
       : `El cliente paga ${form.advanceValue || '0'}% por adelantado.`;
   }, [form]);
 
+  const mercadoPagoStatusLabel = useMemo(() => {
+    if (form.mercadoPagoConnectionStatus === 'connected') {
+      return 'Cuenta conectada y lista para cobrar.';
+    }
+    if (form.mercadoPagoConnectionStatus === 'pending') {
+      return 'La conexión quedó pendiente. Terminá el proceso desde el navegador.';
+    }
+    return 'Todavía no vinculaste una cuenta de Mercado Pago.';
+  }, [form.mercadoPagoConnectionStatus]);
+
   const handleSave = async () => {
     try {
       setSaving(true);
@@ -106,7 +131,6 @@ export default function PaymentSettingsScreen() {
         advanceMode: form.advanceMode,
         advanceType: form.advanceType,
         advanceValue: parsedAdvanceValue,
-        mercadoPagoConnectionStatus: form.mercadoPagoConnectionStatus,
       };
 
       const response = await updatePaymentSettings(payload);
@@ -117,6 +141,36 @@ export default function PaymentSettingsScreen() {
       setError(err?.message ?? 'Error al guardar.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleConnectMercadoPago = async () => {
+    try {
+      setConnecting(true);
+      const response = await getMercadoPagoConnectUrl();
+      await Linking.openURL(response.authUrl);
+      setForm(current => ({ ...current, mercadoPagoConnectionStatus: 'pending' }));
+    } catch (err: any) {
+      Alert.alert(
+        'No pudimos abrir Mercado Pago',
+        err?.message ?? 'Revisá la configuración del backend y volvé a intentar.',
+      );
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const handleDisconnectMercadoPago = async () => {
+    try {
+      setConnecting(true);
+      const response = await disconnectMercadoPago();
+      await saveUserProfile(response.user);
+      setForm(normalizeFormFromUser(response.user));
+      Alert.alert('Listo', 'La cuenta de Mercado Pago quedó desconectada.');
+    } catch (err: any) {
+      Alert.alert('No pudimos desconectar la cuenta', err?.message ?? 'Probá de nuevo.');
+    } finally {
+      setConnecting(false);
     }
   };
 
@@ -142,7 +196,7 @@ export default function PaymentSettingsScreen() {
           label="Aceptar efectivo"
           description="Pago presencial en el local."
           value={form.cashEnabled}
-          onValueChange={v => setForm(c => ({ ...c, cashEnabled: v }))}
+          onValueChange={(v: boolean) => setForm(c => ({ ...c, cashEnabled: v }))}
           theme={theme}
         />
         <View style={styles.separator} />
@@ -150,7 +204,9 @@ export default function PaymentSettingsScreen() {
           label="Aceptar seña online"
           description="Cobro adelantado vía Mercado Pago."
           value={form.advancePaymentEnabled}
-          onValueChange={v => setForm(c => ({ ...c, advancePaymentEnabled: v }))}
+          onValueChange={(v: boolean) =>
+            setForm(c => ({ ...c, advancePaymentEnabled: v }))
+          }
           theme={theme}
         />
 
@@ -185,10 +241,31 @@ export default function PaymentSettingsScreen() {
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Mercado Pago</Text>
-        <View style={styles.segmentRow}>
-          <SegmentButton label="Off" active={form.mercadoPagoConnectionStatus === 'disconnected'} onPress={() => setForm(c => ({ ...c, mercadoPagoConnectionStatus: 'disconnected' }))} theme={theme} />
-          <SegmentButton label="Pendiente" active={form.mercadoPagoConnectionStatus === 'pending'} onPress={() => setForm(c => ({ ...c, mercadoPagoConnectionStatus: 'pending' }))} theme={theme} />
-          <SegmentButton label="Listo" active={form.mercadoPagoConnectionStatus === 'connected'} onPress={() => setForm(c => ({ ...c, mercadoPagoConnectionStatus: 'connected' }))} theme={theme} />
+        <Text style={styles.helpText}>{mercadoPagoStatusLabel}</Text>
+        <View style={styles.actionStack}>
+          <SegmentButton
+            label={connecting ? 'Abriendo...' : 'Conectar'}
+            active={false}
+            onPress={handleConnectMercadoPago}
+            theme={theme}
+            containerStyle={styles.actionButton}
+          />
+          <SegmentButton
+            label="Actualizar estado"
+            active={false}
+            onPress={loadSettings}
+            theme={theme}
+            containerStyle={styles.actionButton}
+          />
+          {form.mercadoPagoConnectionStatus === 'connected' ? (
+            <SegmentButton
+              label="Desconectar"
+              active={false}
+              onPress={handleDisconnectMercadoPago}
+              theme={theme}
+              containerStyle={styles.actionButton}
+            />
+          ) : null}
         </View>
       </View>
 
@@ -221,13 +298,14 @@ function RowSwitch({ label, description, value, onValueChange, theme }: any) {
   );
 }
 
-function SegmentButton({ label, active, onPress, theme }: any) {
+function SegmentButton({ label, active, onPress, theme, containerStyle }: any) {
   return (
     <Pressable
       onPress={onPress}
       style={[
         styles.segmentButton,
-        active && { backgroundColor: theme.primary + '22', borderColor: theme.primary }
+        active && { backgroundColor: theme.primary + '22', borderColor: theme.primary },
+        containerStyle,
       ]}
     >
       <Text style={[styles.segmentButtonText, active && { color: theme.primary }]}>{label}</Text>
@@ -252,7 +330,9 @@ const styles = StyleSheet.create({
   nestedBlock: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
   blockLabel: { color: '#D8DFEA', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', marginBottom: 10 },
   segmentRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  actionStack: { marginTop: 14, gap: 10 },
   segmentButton: { minHeight: 40, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: '#343948', backgroundColor: '#111317', alignItems: 'center', justifyContent: 'center' },
+  actionButton: { width: '100%', minHeight: 48 },
   segmentButtonText: { color: '#A9B1BF', fontSize: 13, fontWeight: '700' },
   input: { height: 48, borderRadius: 12, borderWidth: 1, backgroundColor: '#111317', paddingHorizontal: 14, color: '#FFFFFF', marginBottom: 12 },
   helpText: { color: '#95A0B5', fontSize: 12 },
