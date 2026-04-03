@@ -107,29 +107,8 @@ function getPaymentOptions(settings?: PaymentSettings | null): PaymentOption[] {
   if (normalized.cashEnabled !== false) {
     options.push({
       value: 'cash',
-      label: 'Efectivo en el local',
-      helper: 'El cliente paga cuando llega al turno.',
-    });
-  }
-
-  if (
-    normalized.advancePaymentEnabled &&
-    normalized.mercadoPagoConnectionStatus === 'connected'
-  ) {
-    const advanceLabel =
-      normalized.advanceMode === 'full'
-        ? 'Pago adelantado'
-        : normalized.advanceType === 'fixed'
-          ? `Seña online $${Number(normalized.advanceValue || 0)}`
-          : `Seña online ${Number(normalized.advanceValue || 0)}%`;
-
-    options.push({
-      value: 'transfer',
-      label: advanceLabel,
-      helper:
-        normalized.advanceMode === 'full'
-          ? 'El cliente paga todo el turno por adelantado.'
-          : 'El cliente paga una seña online antes de confirmar la reserva.',
+      label: 'Cobro en el local',
+      helper: 'Las reservas cargadas desde la app se cobran presencialmente en el local.',
     });
   }
 
@@ -589,6 +568,9 @@ function ReservasForm({ navigation }: any) {
                         ?.helper
                     }
                   </Text>
+                  <Text style={styles.paymentMiniNote}>
+                    En la app solo dejamos cobro presencial. El pago online queda para las reservas desde la web.
+                  </Text>
                 </>
               ) : (
                 <View style={styles.paymentUnavailableBox}>
@@ -828,6 +810,12 @@ const createStyles = (theme: Theme) =>
       fontSize: 12,
       lineHeight: 18,
       marginTop: 2,
+    },
+    paymentMiniNote: {
+      color: '#676F7D',
+      fontSize: 11,
+      lineHeight: 16,
+      marginTop: 6,
     },
     paymentUnavailableBox: {
       backgroundColor: '#252525',

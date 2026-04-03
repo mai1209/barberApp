@@ -18,6 +18,7 @@ type ApiError = Error & {
 const LAN_IP = "192.168.100.48"; 
 const ANDROID_EMULATOR_HOST = "10.0.2.2";
 const REQUEST_TIMEOUT_MS = 8000;
+const FORCE_PROD_IN_DEBUG = true;
 
 const isAndroid = Platform.OS === "android";
 const isAndroidEmulator = Boolean(
@@ -63,7 +64,7 @@ async function resolveDevBaseUrl(): Promise<string> {
 
 
 async function getBaseUrl() {
-  if (!__DEV__) return PROD_API_URL;
+  if (!__DEV__ || FORCE_PROD_IN_DEBUG) return PROD_API_URL;
   return await resolveDevBaseUrl();
 }
 
@@ -124,9 +125,11 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   let response: Response | null = null;
   let lastError: ApiError | null = null;
 
-  for (let attempt = 0; attempt < (__DEV__ ? 2 : 1); attempt += 1) {
+  const totalAttempts = __DEV__ && !FORCE_PROD_IN_DEBUG ? 2 : 1;
+
+  for (let attempt = 0; attempt < totalAttempts; attempt += 1) {
     try {
-      if (__DEV__ && attempt > 0) {
+      if (__DEV__ && !FORCE_PROD_IN_DEBUG && attempt > 0) {
         resolvedDevBaseUrl = null;
       }
 
@@ -137,7 +140,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       break;
     } catch (err: any) {
       const isTimeout = err?.name === "AbortError";
-      const baseUrl = resolvedDevBaseUrl ?? DEV_CANDIDATES[0] ?? PROD_API_URL;
+      const baseUrl =
+        FORCE_PROD_IN_DEBUG
+          ? PROD_API_URL
+          : resolvedDevBaseUrl ?? DEV_CANDIDATES[0] ?? PROD_API_URL;
       const url = `${baseUrl.trim()}${path}`;
 
       lastError = buildApiError(

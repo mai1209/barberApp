@@ -107,12 +107,18 @@ export default function PaymentSettingsScreen() {
 
   const mercadoPagoStatusLabel = useMemo(() => {
     if (form.mercadoPagoConnectionStatus === 'connected') {
-      return 'Cuenta conectada y lista para cobrar.';
+      return 'Cuenta conectada y lista para cobrar online.';
     }
     if (form.mercadoPagoConnectionStatus === 'pending') {
       return 'La conexión quedó pendiente. Terminá el proceso desde el navegador.';
     }
     return 'Todavía no vinculaste una cuenta de Mercado Pago.';
+  }, [form.mercadoPagoConnectionStatus]);
+
+  const mercadoPagoStatusTone = useMemo(() => {
+    if (form.mercadoPagoConnectionStatus === 'connected') return 'connected';
+    if (form.mercadoPagoConnectionStatus === 'pending') return 'pending';
+    return 'disconnected';
   }, [form.mercadoPagoConnectionStatus]);
 
   const handleSave = async () => {
@@ -241,7 +247,45 @@ export default function PaymentSettingsScreen() {
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Mercado Pago</Text>
-        <Text style={styles.helpText}>{mercadoPagoStatusLabel}</Text>
+        <View
+          style={[
+            styles.statusNotice,
+            mercadoPagoStatusTone === 'connected'
+              ? styles.statusNoticeConnected
+              : mercadoPagoStatusTone === 'pending'
+                ? styles.statusNoticePending
+                : styles.statusNoticeDisconnected,
+          ]}
+        >
+          <Text
+            style={[
+              styles.statusNoticeTitle,
+              mercadoPagoStatusTone === 'connected'
+                ? styles.statusNoticeTitleConnected
+                : mercadoPagoStatusTone === 'pending'
+                  ? styles.statusNoticeTitlePending
+                  : styles.statusNoticeTitleDisconnected,
+            ]}
+          >
+            {mercadoPagoStatusTone === 'connected'
+              ? 'Mercado Pago activo'
+              : mercadoPagoStatusTone === 'pending'
+                ? 'Conexión pendiente'
+                : 'Mercado Pago desconectado'}
+          </Text>
+          <Text
+            style={[
+              styles.statusNoticeText,
+              mercadoPagoStatusTone === 'connected'
+                ? styles.statusNoticeTextConnected
+                : mercadoPagoStatusTone === 'pending'
+                  ? styles.statusNoticeTextPending
+                  : styles.statusNoticeTextDisconnected,
+            ]}
+          >
+            {mercadoPagoStatusLabel}
+          </Text>
+        </View>
         <View style={styles.actionStack}>
           <SegmentButton
             label={connecting ? 'Abriendo...' : 'Conectar'}
@@ -331,6 +375,18 @@ const styles = StyleSheet.create({
   blockLabel: { color: '#D8DFEA', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', marginBottom: 10 },
   segmentRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   actionStack: { marginTop: 14, gap: 10 },
+  statusNotice: { borderRadius: 14, borderWidth: 1, padding: 14 },
+  statusNoticeConnected: { backgroundColor: 'rgba(49, 201, 108, 0.12)', borderColor: 'rgba(49, 201, 108, 0.35)' },
+  statusNoticePending: { backgroundColor: 'rgba(255, 184, 0, 0.10)', borderColor: 'rgba(255, 184, 0, 0.28)' },
+  statusNoticeDisconnected: { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' },
+  statusNoticeTitle: { fontSize: 15, fontWeight: '800', marginBottom: 4 },
+  statusNoticeTitleConnected: { color: '#66DA92' },
+  statusNoticeTitlePending: { color: '#F6C453' },
+  statusNoticeTitleDisconnected: { color: '#D8DFEA' },
+  statusNoticeText: { fontSize: 12, lineHeight: 18 },
+  statusNoticeTextConnected: { color: '#DFF8E8' },
+  statusNoticeTextPending: { color: '#F6E1A9' },
+  statusNoticeTextDisconnected: { color: '#95A0B5' },
   segmentButton: { minHeight: 40, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: '#343948', backgroundColor: '#111317', alignItems: 'center', justifyContent: 'center' },
   actionButton: { width: '100%', minHeight: 48 },
   segmentButtonText: { color: '#A9B1BF', fontSize: 13, fontWeight: '700' },

@@ -134,11 +134,14 @@
   border: 1px solid #2e2e2e;
   border-radius: 14px;
   padding: 14px 16px;
-  color: #8d8d8d;
-  font-size: 0.9rem;
-  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 8px;
+  min-height: 112px;
 }
 
 .paymentMethodChip:hover {
@@ -148,39 +151,27 @@
 .paymentMethodChipActive {
   background: rgba(255, 20, 147, 0.08);
   border-color: #ff1493;
-  color: #ff1493;
 }
 
-.paymentHelperText {
-  margin: 10px 2px 0;
+.paymentMethodChipTitle {
+  color: #f2f2f2;
+  font-size: 0.93rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.paymentMethodChipHelper {
   color: #8d8d8d;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   line-height: 1.45;
 }
 
-.paymentSummary {
-  margin-top: 12px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 20, 147, 0.18);
-  background: rgba(255, 20, 147, 0.06);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.paymentSummaryLabel {
-  color: #7f8696;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-}
-
-.paymentSummaryValue {
+.paymentMethodChipActive .paymentMethodChipTitle {
   color: #ffd6ec;
-  font-size: 0.92rem;
-  font-weight: 800;
+}
+
+.paymentMethodChipActive .paymentMethodChipHelper {
+  color: #f1c4df;
 }
 
 /* SELECTOR DE SERVICIO */

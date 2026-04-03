@@ -1,6 +1,8 @@
 import crypto from "crypto";
 import { AppointmentModel } from "../models/Appointment.js";
+import { BarberModel } from "../models/Barber.js";
 import { UserModel } from "../models/User.js";
+import { sendAppMail } from "../services/mailer.js";
 import {
   buildMercadoPagoBookingReturnUrls,
   buildMercadoPagoWebhookUrl,
@@ -38,6 +40,94 @@ function calculateAdvanceAmount({ amountTotal, settings }) {
 
 function buildWebhookManifest({ paymentId, xRequestId, ts }) {
   return `id:${paymentId};request-id:${xRequestId};ts:${ts};`;
+}
+
+function buildPaymentApprovedMailHtml({
+  customerName,
+  shopName,
+  barberName,
+  barberPhone,
+  service,
+  appointmentDate,
+}) {
+  const timeZone = "America/Argentina/Cordoba";
+  const dateLabel = appointmentDate.toLocaleDateString("es-AR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone,
+  });
+  const timeLabel = appointmentDate.toLocaleTimeString("es-AR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone,
+  });
+  const cancelPhone = String(barberPhone || "").replace(/\s+/g, "");
+
+  return `
+    <div style="background-color: #121212; color: #ffffff; padding: 30px; font-family: sans-serif; border-radius: 15px; max-width: 500px; margin: auto; border: 1px solid #B89016;">
+      <div style="text-align: center; margin-bottom: 25px;">
+        <h2 style="color: #B89016; margin: 0; font-size: 24px; letter-spacing: 1px;">¡PAGO APROBADO!</h2>
+        <p style="color: #888; font-size: 14px; margin-top: 10px;">Hola <strong>${customerName}</strong>, tu turno quedó confirmado en <b>${shopName}</b>:</p>
+      </div>
+
+      <p style="margin: 10px 0; color: #ccc; font-size: 15px;">
+        <span style="color: #B89016; margin-right: 5px;">◈</span> <strong>Barbero:</strong>
+        <span style="color: #FF1493; font-weight: bold;">${barberName}${barberPhone ? ` · ${barberPhone}` : ""}</span>
+      </p>
+      <p style="margin: 10px 0; color: #ccc; font-size: 15px;">
+        <span style="color: #B89016; margin-right: 5px;">◈</span> <strong>Servicio:</strong>
+        <span style="color: #FF1493; font-weight: bold;">${service}</span>
+      </p>
+      <p style="margin: 10px 0; color: #ccc; font-size: 15px;">
+        <span style="color: #B89016; margin-right: 5px;">◈</span> <strong>Fecha:</strong>
+        <span style="color: #FF1493; font-weight: bold;">${dateLabel}</span>
+      </p>
+      <p style="margin: 10px 0; color: #ccc; font-size: 15px;">
+        <span style="color: #B89016; margin-right: 5px;">◈</span> <strong>Hora:</strong>
+        <span style="color: #FF1493; font-weight: bold;">${timeLabel}</span>
+      </p>
+
+      <div style="text-align: center; margin-top: 16px;">
+        ${cancelPhone ? `
+        <a href="https://wa.me/${cancelPhone}?text=Hola!%20Soy%20${encodeURIComponent(customerName)},%20te%20escribo%20por%20mi%20turno%20del%20dia%20${encodeURIComponent(dateLabel)}%20a%20las%20${encodeURIComponent(timeLabel)}%20para%20cancelarlo"
+          style="background-color: #FF1493; color: white; padding: 12px 18px; text-decoration: none; border-radius: 8px; font-weight: 700; display: inline-block; font-size: 14px; border: 1px solid #ff4d4d; margin-bottom: 8px;">
+          CANCELAR TURNO
+        </a>
+        ` : ""}
+      </div>
+
+      <div style="text-align: center; margin-top: 12px;">
+        <p style="font-size: 9px; color: #444; letter-spacing: 3px; margin: 0; text-transform: uppercase;">
+          POWERED BY CODEX® SYSTEM
+        </p>
+      </div>
+    </div>
+  `;
+}
+
+async function sendMercadoPagoApprovedMail({ appointment, userDoc }) {
+  if (!appointment?.customerEmail) return;
+
+  const barber = await BarberModel.findById(appointment.barber)
+    .select({ fullName: 1, phone: 1 })
+    .lean();
+
+  const mailHtml = buildPaymentApprovedMailHtml({
+    customerName: appointment.customerName,
+    shopName: userDoc?.fullName || "Tu Barbería",
+    barberName: barber?.fullName || "Barbero",
+    barberPhone: barber?.phone || "",
+    service: appointment.service,
+    appointmentDate: new Date(appointment.startTime),
+  });
+
+  await sendAppMail({
+    to: appointment.customerEmail,
+    subject: `✅ Pago aprobado: ${appointment.service}`,
+    html: mailHtml,
+  });
 }
 
 function isMercadoPagoWebhookValid(req) {
@@ -240,6 +330,12 @@ export async function handleMercadoPagoWebhook(req, res, next) {
     const accessToken = await ensureMercadoPagoAccessToken(userDoc);
     const payment = await getMercadoPagoPayment({ accessToken, paymentId });
     const normalizedPaymentStatus = normalizePaymentStatus(payment.status);
+    const previousPaymentStatus = String(targetAppointment.paymentStatus || "").trim();
+    const shouldSendApprovedMail =
+      normalizedPaymentStatus === "approved" &&
+      targetAppointment.customerEmail &&
+      previousPaymentStatus !== "paid" &&
+      previousPaymentStatus !== "partial";
 
     targetAppointment.mercadoPagoPaymentId = String(payment.id || paymentId);
     targetAppointment.mercadoPagoMerchantOrderId = payment.order?.id
@@ -280,6 +376,20 @@ export async function handleMercadoPagoWebhook(req, res, next) {
     }
 
     await targetAppointment.save();
+
+    if (shouldSendApprovedMail) {
+      try {
+        await sendMercadoPagoApprovedMail({
+          appointment: targetAppointment,
+          userDoc,
+        });
+      } catch (mailErr) {
+        console.error(
+          "Error enviando email de confirmacion tras pago aprobado:",
+          mailErr?.message || mailErr,
+        );
+      }
+    }
 
     return res.status(200).json({ received: true, updated: true });
   } catch (err) {

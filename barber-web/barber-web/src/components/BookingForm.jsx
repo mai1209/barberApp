@@ -60,8 +60,8 @@ const getPublicPaymentOptions = (shopInfo) => {
   if (settings.cashEnabled !== false) {
     options.push({
       value: "cash",
-      label: "Efectivo en el local",
-      helper: "Pagás cuando llegás a tu turno.",
+      label: "Efectivo / transferencia en el local",
+      helper: "Reservás ahora y pagás presencialmente en la barbería cuando llegás a tu turno.",
     });
   }
 
@@ -70,18 +70,17 @@ const getPublicPaymentOptions = (shopInfo) => {
       settings.advanceType === "fixed"
         ? formatPrice(settings.advanceValue || 0)
         : `${Number(settings.advanceValue || 0)}%`;
-    const modeLabel =
-      settings.advanceMode === "full"
-        ? "Pago adelantado"
-        : `Seña online ${value}`;
 
     options.push({
       value: "transfer",
-      label: modeLabel,
+      label:
+        settings.advanceMode === "full"
+          ? "Transferencia adelantada"
+          : "Transferencia adelantada",
       helper:
         settings.advanceMode === "full"
-          ? "Pagás todo el turno por adelantado con Mercado Pago."
-          : `Pagás ${value} por adelantado con Mercado Pago.`,
+          ? "Pagás el turno completo online con Mercado Pago antes de confirmar la reserva."
+          : `Pagás ${value} online con Mercado Pago para reservar con seña.`,
     });
   }
 
@@ -167,11 +166,6 @@ function BookingForm({ shopSlug }) {
   const paymentOptions = useMemo(
     () => getPublicPaymentOptions(shopInfo),
     [shopInfo],
-  );
-
-  const selectedPaymentOption = useMemo(
-    () => paymentOptions.find((item) => item.value === paymentMethod) ?? null,
-    [paymentMethod, paymentOptions],
   );
 
   const workingWindow = useMemo(() => {
@@ -626,18 +620,10 @@ const handleSubmit = async (e) => {
                   className={`${styles.paymentMethodChip} ${paymentMethod === option.value ? styles.paymentMethodChipActive : ""}`}
                   onClick={() => setPaymentMethod(option.value)}
                 >
-                  {option.label}
+                  <span className={styles.paymentMethodChipTitle}>{option.label}</span>
+                  <span className={styles.paymentMethodChipHelper}>{option.helper}</span>
                 </button>
               ))}
-            </div>
-            <p className={styles.paymentHelperText}>
-              {selectedPaymentOption?.helper}
-            </p>
-            <div className={styles.paymentSummary}>
-              <span className={styles.paymentSummaryLabel}>Método seleccionado</span>
-              <strong className={styles.paymentSummaryValue}>
-                {selectedPaymentOption?.label || "Sin seleccionar"}
-              </strong>
             </div>
           </div>
         ) : null}
