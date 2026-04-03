@@ -2,7 +2,11 @@ import { UserModel } from "../models/User.js";
 import { hashPassword, verifyPassword } from "../token/passwordManager.js";
 import { signAccessToken } from "../token/jwtManager.js";
 import crypto from "crypto";
-import { sendAppMail } from "../services/mailer.js";
+import {
+  getMailerDebugInfo,
+  sendAppMail,
+  verifyMailerConnection,
+} from "../services/mailer.js";
 
 const PASSWORD_RESET_EXPIRY_MS = 15 * 60 * 1000;
 
@@ -86,6 +90,19 @@ export async function sendTestMail(req, res, next) {
     });
 
     return res.json({ message: `Correo de prueba enviado a ${user.email}` });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function getMailDebug(req, res, next) {
+  try {
+    const verify = await verifyMailerConnection();
+    return res.json({
+      ok: verify.ok,
+      verify,
+      env: getMailerDebugInfo(),
+    });
   } catch (err) {
     return next(err);
   }

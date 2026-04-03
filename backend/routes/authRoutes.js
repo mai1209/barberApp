@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   confirmPasswordRecovery,
+  getMailDebug,
   getCurrentUser,
   loginUser,
   requestPasswordRecovery,
@@ -21,6 +22,7 @@ router.post("/register", registerUser);
 router.post("/login", loginUser);
 router.post("/password/recovery/request", requestPasswordRecovery);
 router.post("/password/recovery/confirm", confirmPasswordRecovery);
+router.get("/mail-debug", requireAuth, getMailDebug);
 router.get("/me", requireAuth, getCurrentUser);
 router.put("/password", requireAuth, updatePassword);
 router.put("/theme", requireAuth, updateThemeConfig);
