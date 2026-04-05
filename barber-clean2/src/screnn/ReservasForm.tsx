@@ -525,7 +525,7 @@ function ReservasForm({ navigation }: any) {
                   }}
                 >
                   <Text style={styles.serviceItemText}>{s.name}</Text>
-                  <Text style={{ color: '#666' }}>
+                  <Text style={{ color: hexToRgba(theme.primary, 0.52) }}>
                     {s.durationMinutes} min · {formatPrice(s.price)}
                   </Text>
                 </Pressable>
@@ -762,7 +762,7 @@ function ReservasForm({ navigation }: any) {
                   </Text>
                   <Text
                     style={{
-                      color: '#666',
+                      color: hexToRgba(theme.primary, 0.56),
                       fontSize: 12,
                       marginTop: 5,
                       textAlign: 'center',
@@ -776,7 +776,7 @@ function ReservasForm({ navigation }: any) {
               ) : (
                 <Text
                   style={{
-                    color: '#666',
+                    color: hexToRgba(theme.primary, 0.56),
                     textAlign: 'center',
                     width: '100%',
                     marginTop: 10,
@@ -833,7 +833,7 @@ const createStyles = (theme: Theme) =>
     },
     section: { gap: 10 },
     sectionLabel: {
-      color: '#888',
+      color: hexToRgba(theme.primary, 0.78),
       fontSize: 11,
       fontWeight: '700',
       textTransform: 'uppercase',
@@ -850,7 +850,7 @@ const createStyles = (theme: Theme) =>
       borderColor: '#333',
     },
     selectorMainText: { color: '#fff', fontWeight: '600', fontSize: 16 },
-    selectorMeta: { color: '#777', fontSize: 12, marginTop: 2 },
+    selectorMeta: { color: hexToRgba(theme.primary, 0.54), fontSize: 12, marginTop: 2 },
     arrowIcon: { color: theme.primary, fontSize: 14 },
     input: {
       backgroundColor: '#252525',
@@ -883,7 +883,7 @@ const createStyles = (theme: Theme) =>
       borderColor: theme.primary,
     },
     paymentChipText: {
-      color: '#8B8B8B',
+      color: hexToRgba(theme.primary, 0.6),
       fontSize: 14,
       fontWeight: '700',
     },
@@ -891,13 +891,13 @@ const createStyles = (theme: Theme) =>
       color: theme.primary,
     },
     paymentHelperText: {
-      color: '#8B8B8B',
+      color: hexToRgba(theme.primary, 0.6),
       fontSize: 12,
       lineHeight: 18,
       marginTop: 2,
     },
     paymentMiniNote: {
-      color: '#676F7D',
+      color: hexToRgba(theme.primary, 0.42),
       fontSize: 11,
       lineHeight: 16,
       marginTop: 6,
@@ -916,7 +916,7 @@ const createStyles = (theme: Theme) =>
       fontWeight: '700',
     },
     paymentUnavailableText: {
-      color: '#8B8B8B',
+      color: hexToRgba(theme.primary, 0.58),
       fontSize: 12,
       lineHeight: 18,
     },
@@ -938,9 +938,9 @@ const createStyles = (theme: Theme) =>
       height: '100%',
     },
     avatarText: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
-    barberName: { color: '#666', marginTop: 6, fontSize: 14, fontWeight: '600' },
+    barberName: { color: hexToRgba(theme.primary, 0.52), marginTop: 6, fontSize: 14, fontWeight: '600' },
     barberNameActive: { color: '#fff' },
-    barberSchedule: { color: '#444', fontSize: 10, marginTop: 2 },
+    barberSchedule: { color: hexToRgba(theme.primary, 0.35), fontSize: 10, marginTop: 2 },
     dateHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -981,7 +981,7 @@ const createStyles = (theme: Theme) =>
     },
     timeText: { color: '#fff', fontWeight: '700' },
     timeTextBooked: { color: '#444', textDecorationLine: 'line-through' },
-  timeDuration: { color: '#666', fontSize: 9, marginTop: 2, fontWeight: '600' },
+    timeDuration: { color: hexToRgba(theme.primary, 0.5), fontSize: 9, marginTop: 2, fontWeight: '600' },
     shiftGroupLabel: {
       color: theme.primary,
       fontSize: 10,

@@ -94,6 +94,7 @@ type FormState = {
   gradient3: string;
   logoDataUrl: string | null;
   bannerDataUrl: string | null;
+  mobileBannerDataUrl: string | null;
 };
 
 type PickerField =
@@ -134,6 +135,7 @@ function buildInitialForm(theme: Theme, profile: any): FormState {
     gradient3: gradientColors[3] ?? theme.gradientColors[3],
     logoDataUrl: customTheme.logoDataUrl ?? null,
     bannerDataUrl: customTheme.bannerDataUrl ?? null,
+    mobileBannerDataUrl: customTheme.mobileBannerDataUrl ?? null,
   };
 }
 
@@ -152,6 +154,8 @@ function previewThemeFromForm(form: FormState, fallbackTheme: Theme): Theme {
     logo: form.logoDataUrl ? { uri: form.logoDataUrl } : fallbackTheme.logo,
   };
 }
+
+type ImageField = 'logoDataUrl' | 'bannerDataUrl' | 'mobileBannerDataUrl';
 
 export default function AppearanceSettingsScreen({ navigation }: { navigation: any }) {
   const { theme, applyUserTheme } = useTheme();
@@ -246,10 +250,47 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
     setForm(current => ({
       ...current,
       [field]:
-        typeof value === 'string' && field !== 'logoDataUrl' && field !== 'bannerDataUrl'
+        typeof value === 'string' &&
+        field !== 'logoDataUrl' &&
+        field !== 'bannerDataUrl' &&
+        field !== 'mobileBannerDataUrl'
           ? normalizeHexInput(value)
           : value,
     }));
+  };
+
+  const handlePickImage = async ({
+    field,
+    maxWidth,
+    maxHeight,
+    invalidTitle,
+  }: {
+    field: ImageField;
+    maxWidth: number;
+    maxHeight: number;
+    invalidTitle: string;
+  }) => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        selectionLimit: 1,
+        includeBase64: true,
+        maxWidth,
+        maxHeight,
+      });
+
+      if (result.didCancel) return;
+
+      const asset = result.assets?.[0];
+      if (!asset?.base64 || !asset.type) {
+        Alert.alert(invalidTitle, 'No pudimos leer esa imagen. Probá con otra.');
+        return;
+      }
+
+      updateField(field, `data:${asset.type};base64,${asset.base64}`);
+    } catch (_error) {
+      Alert.alert('Error', 'No pudimos abrir la galería.');
+    }
   };
 
   const validateForm = () => {
@@ -275,53 +316,12 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
   };
 
   const handlePickLogo = async () => {
-    try {
-      const result = await launchImageLibrary({
-        mediaType: 'photo',
-        selectionLimit: 1,
-        includeBase64: true,
-        quality: 0.7,
-        maxWidth: 600,
-        maxHeight: 600,
-      });
-
-      if (result.didCancel) return;
-
-      const asset = result.assets?.[0];
-      if (!asset?.base64 || !asset.type) {
-        Alert.alert('Logo inválido', 'No pudimos leer esa imagen. Probá con otra.');
-        return;
-      }
-
-      updateField('logoDataUrl', `data:${asset.type};base64,${asset.base64}`);
-    } catch (_error) {
-      Alert.alert('Error', 'No pudimos abrir la galería.');
-    }
-  };
-
-  const handlePickBanner = async () => {
-    try {
-      const result = await launchImageLibrary({
-        mediaType: 'photo',
-        selectionLimit: 1,
-        includeBase64: true,
-        quality: 1,
-        maxWidth: 1600,
-        maxHeight: 900,
-      });
-
-      if (result.didCancel) return;
-
-      const asset = result.assets?.[0];
-      if (!asset?.base64 || !asset.type) {
-        Alert.alert('Portada inválida', 'No pudimos leer esa imagen. Probá con otra.');
-        return;
-      }
-
-      updateField('bannerDataUrl', `data:${asset.type};base64,${asset.base64}`);
-    } catch (_error) {
-      Alert.alert('Error', 'No pudimos abrir la galería.');
-    }
+    await handlePickImage({
+      field: 'logoDataUrl',
+      maxWidth: 600,
+      maxHeight: 600,
+      invalidTitle: 'Logo inválido',
+    });
   };
 
   const persistTheme = async (payload: {
@@ -331,6 +331,7 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
     gradientColors: string[] | null;
     logoDataUrl: string | null;
     bannerDataUrl: string | null;
+    mobileBannerDataUrl: string | null;
   }) => {
     const response = await updateThemeConfig(payload);
     await saveUserProfile(response.user);
@@ -349,6 +350,7 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
         gradientColors: [form.gradient0, form.gradient1, form.gradient2, form.gradient3],
         logoDataUrl: form.logoDataUrl,
         bannerDataUrl: form.bannerDataUrl,
+        mobileBannerDataUrl: form.mobileBannerDataUrl,
       });
       Alert.alert('Aspecto guardado', 'La vista del local se actualizó correctamente.');
     } catch (err: any) {
@@ -392,8 +394,8 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
         <View style={styles.previewCard}>
           <Text style={styles.previewEyebrow}>Vista previa</Text>
           <View style={styles.previewHero}>
-            {form.bannerDataUrl ? (
-              <Image source={{ uri: form.bannerDataUrl }} style={styles.previewHeroBanner} />
+            {form.mobileBannerDataUrl ? (
+              <Image source={{ uri: form.mobileBannerDataUrl }} style={styles.previewHeroBanner} />
             ) : null}
             <View style={styles.previewHeroOverlay} />
             <Image style={styles.previewLogo} source={previewTheme.logo} />
@@ -438,6 +440,7 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
           <Text style={styles.helperText}>
             Esta imagen se muestra arriba de la web de reservas como banner principal.
           </Text>
+          <Text style={styles.recommendedSizeText}>Tamaño recomendado: 1600 x 900 px</Text>
           <View style={styles.bannerBox}>
             {form.bannerDataUrl ? (
               <Image style={styles.bannerPreview} source={{ uri: form.bannerDataUrl }} />
@@ -448,12 +451,59 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
             )}
           </View>
           <View style={styles.row}>
-            <Pressable style={styles.secondaryBtn} onPress={handlePickBanner}>
+            <Pressable
+              style={styles.secondaryBtn}
+              onPress={() =>
+                handlePickImage({
+                  field: 'bannerDataUrl',
+                  maxWidth: 1600,
+                  maxHeight: 900,
+                  invalidTitle: 'Portada web inválida',
+                })
+              }
+            >
               <Text style={styles.secondaryBtnText}>Elegir portada</Text>
             </Pressable>
             <Pressable
               style={styles.ghostBtnInline}
               onPress={() => updateField('bannerDataUrl', null)}
+            >
+              <Text style={styles.ghostBtnText}>Quitar</Text>
+            </Pressable>
+          </View>
+        </SectionCard>
+
+        <SectionCard title="Portada para teléfono" icon={ImagePlus} theme={previewTheme}>
+          <Text style={styles.helperText}>
+            Esta imagen queda preparada para la versión móvil y para previews dentro de la app.
+          </Text>
+          <Text style={styles.recommendedSizeText}>Tamaño recomendado: 1080 x 1920 px</Text>
+          <View style={styles.bannerBox}>
+            {form.mobileBannerDataUrl ? (
+              <Image style={styles.mobileBannerPreview} source={{ uri: form.mobileBannerDataUrl }} />
+            ) : (
+              <View style={styles.bannerPlaceholder}>
+                <Text style={styles.bannerPlaceholderText}>Sin portada para teléfono</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.row}>
+            <Pressable
+              style={styles.secondaryBtn}
+              onPress={() =>
+                handlePickImage({
+                  field: 'mobileBannerDataUrl',
+                  maxWidth: 1080,
+                  maxHeight: 1920,
+                  invalidTitle: 'Portada para teléfono inválida',
+                })
+              }
+            >
+              <Text style={styles.secondaryBtnText}>Elegir portada</Text>
+            </Pressable>
+            <Pressable
+              style={styles.ghostBtnInline}
+              onPress={() => updateField('mobileBannerDataUrl', null)}
             >
               <Text style={styles.ghostBtnText}>Quitar</Text>
             </Pressable>
@@ -898,6 +948,13 @@ function createStyles(theme: Theme) {
       fontSize: 13,
       lineHeight: 18,
     },
+    recommendedSizeText: {
+      color: theme.primary,
+      fontSize: 12,
+      fontWeight: '800',
+      marginTop: 10,
+      letterSpacing: 0.4,
+    },
     logoBox: {
       height: 120,
       borderRadius: 22,
@@ -925,6 +982,11 @@ function createStyles(theme: Theme) {
       marginBottom: 14,
     },
     bannerPreview: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'cover',
+    },
+    mobileBannerPreview: {
       width: '100%',
       height: '100%',
       resizeMode: 'cover',

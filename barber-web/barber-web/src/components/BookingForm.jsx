@@ -287,6 +287,13 @@ function BookingForm({ shopSlug, onNotFound }) {
     [selectedDate],
   );
 
+  const desktopBannerSrc =
+    shopInfo?.themeConfig?.bannerDataUrl || DEFAULT_BOOKING_BANNER;
+  const mobileBannerSrc =
+    shopInfo?.themeConfig?.mobileBannerDataUrl ||
+    shopInfo?.themeConfig?.bannerDataUrl ||
+    DEFAULT_BOOKING_BANNER;
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const paymentResult = params.get("payment_result");
@@ -651,14 +658,16 @@ function BookingForm({ shopSlug, onNotFound }) {
             </p>
           </div>
           <div className={styles.shopHeroMedia}>
-            <img
-              className={styles.shopHeroBanner}
-              src={shopInfo?.themeConfig?.bannerDataUrl || DEFAULT_BOOKING_BANNER}
-              alt=""
-              aria-hidden="true"
-            />
+            <picture>
+              <source media="(max-width: 768px)" srcSet={mobileBannerSrc} />
+              <img
+                className={styles.shopHeroBanner}
+                src={desktopBannerSrc}
+                alt=""
+                aria-hidden="true"
+              />
+            </picture>
             <div className={styles.shopHeroOverlay} />
-            <div className={styles.shopHeroGlow} />
           </div>
         </div>
 

@@ -18,6 +18,7 @@ import {
 } from "../services/mercadoPago.js";
 import {
   isSubscriptionLifecycleAuthorized,
+  notifySubscriptionPriceChange,
   processSubscriptionLifecycle,
 } from "../services/subscriptionLifecycleService.js";
 import {
@@ -277,6 +278,23 @@ function sanitizeThemeConfigInput(input) {
         throw new Error("La portada es demasiado grande. Elegí una imagen más liviana.");
       }
       updates.bannerDataUrl = bannerDataUrl;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "mobileBannerDataUrl")) {
+    hasAnyField = true;
+
+    if (input.mobileBannerDataUrl == null || String(input.mobileBannerDataUrl).trim() === "") {
+      updates.mobileBannerDataUrl = null;
+    } else {
+      const mobileBannerDataUrl = String(input.mobileBannerDataUrl);
+      if (!/^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(mobileBannerDataUrl)) {
+        throw new Error("La portada para teléfono debe ser una imagen válida en base64.");
+      }
+      if (mobileBannerDataUrl.length > 4_500_000) {
+        throw new Error("La portada para teléfono es demasiado grande. Elegí una imagen más liviana.");
+      }
+      updates.mobileBannerDataUrl = mobileBannerDataUrl;
     }
   }
 
@@ -1110,12 +1128,68 @@ export async function updatePlanPricingAdmin(req, res, next) {
     }
 
     const pricingDoc = await getOrCreatePlanPricing();
+    const previousPricing = serializePlanPricing(pricingDoc);
     Object.assign(pricingDoc, updates);
     await pricingDoc.save();
+    const nextPricing = serializePlanPricing(pricingDoc);
+
+    const changedPlans = ["basic", "pro"].filter((plan) => {
+      const previousAmount = Number(previousPricing?.[plan]?.ars || 0);
+      const nextAmount = Number(nextPricing?.[plan]?.ars || 0);
+      return previousAmount > 0 && nextAmount > 0 && previousAmount !== nextAmount;
+    });
+
+    let notifiedUsers = 0;
+    if (changedPlans.length) {
+      const usersToNotify = await UserModel.find({
+        "subscription.status": "active",
+        "subscription.plan": { $in: changedPlans },
+        $and: [
+          {
+            $or: [
+              { "subscription.customPriceArs": null },
+              { "subscription.customPriceArs": { $exists: false } },
+              { "subscription.customPriceArs": 0 },
+            ],
+          },
+          {
+            $or: [
+              { "subscription.customPriceUsdReference": null },
+              { "subscription.customPriceUsdReference": { $exists: false } },
+              { "subscription.customPriceUsdReference": 0 },
+            ],
+          },
+        ],
+      }).select({
+        email: 1,
+        fullName: 1,
+        pushToken: 1,
+        subscription: 1,
+      });
+
+      const results = await Promise.allSettled(
+        usersToNotify.map(async (userDoc) => {
+          const plan = String(userDoc.subscription?.plan || "").trim();
+          if (!changedPlans.includes(plan)) return false;
+
+          await notifySubscriptionPriceChange({
+            userDoc,
+            plan,
+            previousAmountArs: previousPricing[plan]?.ars,
+            nextAmountArs: nextPricing[plan]?.ars,
+            effectiveAt: userDoc.subscription?.nextBillingAt || userDoc.subscription?.expiresAt || null,
+          });
+          return true;
+        }),
+      );
+
+      notifiedUsers = results.filter((result) => result.status === "fulfilled" && result.value).length;
+    }
 
     return res.json({
       message: "Precios actualizados correctamente.",
       pricing: serializePlanPricing(pricingDoc),
+      notifiedUsers,
     });
   } catch (err) {
     if (err instanceof Error) {

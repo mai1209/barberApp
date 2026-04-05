@@ -195,6 +195,7 @@ export type ThemeConfig = {
   gradientColors?: string[] | null;
   logoDataUrl?: string | null;
   bannerDataUrl?: string | null;
+  mobileBannerDataUrl?: string | null;
 };
 
 export type PaymentSettings = {

@@ -520,7 +520,7 @@ function BarberDashboard({ route, navigation }: Props) {
             {appointment.customerName}
           </Text>
           <View style={styles.serviceRow}>
-            <Scissors size={14} color="#888" style={{ marginRight: 6 }} />
+            <Scissors size={14} color={hexToRgba(theme.primary, 0.62)} style={{ marginRight: 6 }} />
             <Text style={styles.serviceNameText}>{appointment.service}</Text>
             <Text style={styles.dotSeparator}>•</Text>
             <Text style={styles.durationText}>
@@ -535,7 +535,7 @@ function BarberDashboard({ route, navigation }: Props) {
                 marginTop: 4,
               }}
             >
-              <User size={12} color="#666" style={{ marginRight: 4 }} />
+              <User size={12} color={hexToRgba(theme.primary, 0.48)} style={{ marginRight: 4 }} />
               <Text style={styles.phoneSubText}>{appointment.notes}</Text>
             </View>
           ) : null}
@@ -664,7 +664,7 @@ function BarberDashboard({ route, navigation }: Props) {
             <Text style={styles.sectionTitle}>Agenda de turnos</Text>
             {!isToday && (
               <Pressable style={styles.todayButton} onPress={handleGoToToday}>
-                <Text style={styles.todayButtonText}>Hoy</Text>
+                <Text style={styles.todayButtonText}>Volver a hoy</Text>
               </Pressable>
             )}
           </View>
@@ -841,7 +841,7 @@ const makeStyles = (theme: Theme) =>
       backgroundColor: theme.card,
       borderRadius: 24,
       borderWidth: 1,
-      borderColor: '#2A2A2A',
+      borderColor: hexToRgba(theme.primary, 0.16),
       paddingVertical: 15,
     },
     dateHeroHeader: {
@@ -891,7 +891,7 @@ const makeStyles = (theme: Theme) =>
       borderRadius: 24,
       padding: 18,
       borderWidth: 1,
-      borderColor: '#2A2A2A',
+      borderColor: hexToRgba(theme.primary, 0.14),
     },
     appointmentCardCompleted: { opacity: 0.5 },
     cardHeader: {
@@ -903,12 +903,12 @@ const makeStyles = (theme: Theme) =>
     timeTag: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#1A1A1A',
+      backgroundColor: hexToRgba(theme.primary, 0.08),
       paddingHorizontal: 10,
       paddingVertical: 5,
       borderRadius: 8,
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: hexToRgba(theme.primary, 0.18),
     },
     timeText: { color: '#FFF', fontSize: 14, fontWeight: '800' },
     statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
@@ -926,9 +926,9 @@ const makeStyles = (theme: Theme) =>
     },
     serviceRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
     serviceNameText: { color: '#DDD', fontSize: 14, fontWeight: '600' },
-    dotSeparator: { color: '#555', marginHorizontal: 8 },
-    durationText: { color: '#888', fontSize: 13 },
-    phoneSubText: { color: '#666', fontSize: 12, fontWeight: '500' },
+    dotSeparator: { color: hexToRgba(theme.primary, 0.38), marginHorizontal: 8 },
+    durationText: { color: hexToRgba(theme.primary, 0.58), fontSize: 13 },
+    phoneSubText: { color: hexToRgba(theme.primary, 0.5), fontSize: 12, fontWeight: '500' },
     paymentInfoBadge: {
       marginTop: 10,
       alignSelf: 'flex-start',
@@ -954,7 +954,7 @@ const makeStyles = (theme: Theme) =>
       flexDirection: 'row',
       gap: 10,
       borderTopWidth: 1,
-      borderTopColor: '#2A2A2A',
+      borderTopColor: hexToRgba(theme.primary, 0.14),
       paddingTop: 16,
     },
     btnAction: {
@@ -965,8 +965,8 @@ const makeStyles = (theme: Theme) =>
       justifyContent: 'center',
     },
     btnMain: { backgroundColor: theme.primary },
-    btnMainText: { color: '#000', fontSize: 13, fontWeight: '800' },
-    btnSec: { backgroundColor: '#222', borderWidth: 1, borderColor: '#333' },
+    btnMainText: { color: theme.secondary, fontSize: 13, fontWeight: '800' },
+    btnSec: { backgroundColor: '#222', borderWidth: 1, borderColor: hexToRgba(theme.primary, 0.18) },
     btnSecText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
     swipeAction: {
       width: 90,
@@ -980,13 +980,13 @@ const makeStyles = (theme: Theme) =>
     emptyContainer: {
       padding: 40,
       alignItems: 'center',
-      backgroundColor: '#111',
+      backgroundColor: hexToRgba(theme.primary, 0.05),
       borderRadius: 20,
       borderStyle: 'dashed',
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: hexToRgba(theme.primary, 0.18),
     },
-    emptyTitle: { color: '#555', fontSize: 14, fontWeight: '600' },
+    emptyTitle: { color: hexToRgba(theme.primary, 0.52), fontSize: 14, fontWeight: '600' },
     errorText: { color: '#ff7b7b', textAlign: 'center', marginBottom: 10 },
   });
 

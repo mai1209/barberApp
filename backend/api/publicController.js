@@ -82,6 +82,7 @@ function sanitizeShop(shop) {
       secondary: themeConfig.secondary || null,
       logoDataUrl: themeConfig.logoDataUrl || null,
       bannerDataUrl: themeConfig.bannerDataUrl || null,
+      mobileBannerDataUrl: themeConfig.mobileBannerDataUrl || null,
     },
     paymentSettings: {
       cashEnabled: paymentSettings.cashEnabled !== false,

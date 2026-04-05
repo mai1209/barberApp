@@ -4,6 +4,20 @@ import { sendAppMail } from "./mailer.js";
 
 const GRACE_PERIOD_DAYS = 3;
 
+function formatCurrencyArs(value) {
+  const amount = Number(value || 0);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function getPlanLabel(plan) {
+  return plan === "pro" ? "Pro" : plan === "basic" ? "Básico" : "Personalizado";
+}
+
 function normalizeStatus(value) {
   return ["trial", "active", "past_due", "cancelled"].includes(String(value))
     ? String(value)
@@ -72,6 +86,53 @@ function buildPushPayload({ title, body }) {
   };
 }
 
+function buildSubscriptionEventMailHtml({
+  title,
+  intro,
+  accentColor,
+  lines = [],
+  note,
+  ctaLabel,
+  ctaUrl,
+}) {
+  const renderedLines = lines
+    .filter((line) => line?.label && line?.value)
+    .map(
+      (line) => `
+        <p style="margin:10px 0;color:#ddd;font-size:15px;">
+          <strong>${line.label}:</strong>
+          <span style="color:${accentColor};font-weight:700;"> ${line.value}</span>
+        </p>
+      `,
+    )
+    .join("");
+
+  return `
+    <div style="background:#121212;color:#ffffff;padding:30px;font-family:sans-serif;border-radius:15px;max-width:520px;margin:auto;border:1px solid ${accentColor};">
+      <div style="text-align:center;margin-bottom:22px;">
+        <h2 style="color:${accentColor};margin:0;font-size:24px;letter-spacing:1px;">${title}</h2>
+        <p style="color:#aaa;font-size:14px;margin-top:10px;">${intro}</p>
+      </div>
+      ${renderedLines}
+      ${note ? `
+      <p style="margin:14px 0 0;color:#bbb;font-size:14px;line-height:1.6;">
+        ${note}
+      </p>
+      ` : ""}
+      ${ctaUrl ? `
+      <div style="text-align:center;margin-top:18px;">
+        <a href="${ctaUrl}" style="display:inline-block;background:${accentColor};color:#111;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:800;">
+          ${ctaLabel}
+        </a>
+      </div>
+      ` : ""}
+      <div style="text-align:center;margin-top:18px;">
+        <p style="font-size:9px;color:#444;letter-spacing:3px;margin:0;text-transform:uppercase;">POWERED BY CODEX® SYSTEM</p>
+      </div>
+    </div>
+  `;
+}
+
 async function sendSubscriptionMail({
   userDoc,
   title,
@@ -106,6 +167,115 @@ async function sendSubscriptionPush({ userDoc, title, body }) {
     token: userDoc.pushToken,
     ...buildPushPayload({ title, body }),
   });
+
+  return true;
+}
+
+export async function notifySubscriptionActivated({
+  userDoc,
+  plan,
+  amountArs,
+  expiresAt,
+  renewalMode = "manual",
+}) {
+  if (!userDoc) return false;
+
+  const planLabel = getPlanLabel(plan);
+  const formattedAmount = formatCurrencyArs(amountArs);
+  const expiryLabel = formatDateLabel(expiresAt);
+
+  try {
+    if (userDoc.email) {
+      await sendAppMail({
+        to: userDoc.email,
+        subject: `Plan ${planLabel} activo`,
+        html: buildSubscriptionEventMailHtml({
+          title: `Plan ${planLabel} activo`,
+          intro:
+            renewalMode === "automatic"
+              ? "Ya habilitamos tu plan y la renovación automática quedó configurada."
+              : "Ya habilitamos tu plan después de confirmar el pago.",
+          accentColor: "#34C759",
+          lines: [
+            { label: "Plan", value: planLabel },
+            { label: "Monto", value: formattedAmount || "A confirmar" },
+            { label: "Vence", value: expiryLabel },
+          ],
+          note:
+            renewalMode === "automatic"
+              ? "Los próximos cobros se intentarán procesar automáticamente desde Mercado Pago."
+              : "Cuando se acerque el vencimiento te vamos a avisar para renovar desde la web.",
+          ctaLabel: "Ver sitio de planes",
+          ctaUrl: String(process.env.PUBLIC_BOOKING_BASE_URL || "https://barberappbycodex.com").replace(/\/+$/, "") + "/planes",
+        }),
+      });
+    }
+  } catch (error) {
+    console.error("Error enviando mail de plan activo:", error?.message || error);
+  }
+
+  try {
+    await sendSubscriptionPush({
+      userDoc,
+      title: `Plan ${planLabel} activo`,
+      body:
+        renewalMode === "automatic"
+          ? "Tu plan quedó activo y la renovación automática ya está habilitada."
+          : "Tu plan quedó activo después de confirmar el pago.",
+    });
+  } catch (error) {
+    console.error("Error enviando push de plan activo:", error?.message || error);
+  }
+
+  return true;
+}
+
+export async function notifySubscriptionPriceChange({
+  userDoc,
+  plan,
+  previousAmountArs,
+  nextAmountArs,
+  effectiveAt,
+}) {
+  if (!userDoc?.email || !(Number(nextAmountArs) > 0)) return false;
+
+  const planLabel = getPlanLabel(plan);
+  const previousLabel = formatCurrencyArs(previousAmountArs) || "Sin valor anterior";
+  const nextLabel = formatCurrencyArs(nextAmountArs) || "Sin valor nuevo";
+  const effectiveLabel = formatDateLabel(effectiveAt) === "Sin fecha"
+    ? "en tu próximo ciclo"
+    : formatDateLabel(effectiveAt);
+
+  try {
+    await sendAppMail({
+      to: userDoc.email,
+      subject: `Actualización de precio del plan ${planLabel}`,
+      html: buildSubscriptionEventMailHtml({
+        title: "Actualización de precio",
+        intro: `Te avisamos con anticipación que el precio de tu plan ${planLabel} cambia en el próximo ciclo.`,
+        accentColor: "#F5C451",
+        lines: [
+          { label: "Plan", value: planLabel },
+          { label: "Precio actual", value: previousLabel },
+          { label: "Nuevo precio", value: nextLabel },
+          { label: "Vigencia", value: effectiveLabel },
+        ],
+        note: "Si necesitás revisar tu plan o consultar una condición especial, podés responder este correo o escribirnos por soporte comercial.",
+      }),
+    });
+  } catch (error) {
+    console.error("Error enviando mail de cambio de precio:", error?.message || error);
+  }
+
+  try {
+    await sendSubscriptionPush({
+      userDoc,
+      title: "Cambio de precio del plan",
+      body: `${planLabel}: ${nextLabel} desde ${effectiveLabel === "en tu próximo ciclo" ? "tu próximo ciclo" : effectiveLabel}.`,
+    });
+  } catch (error) {
+    console.error("Error enviando push de cambio de precio:", error?.message || error);
+  }
 
   return true;
 }

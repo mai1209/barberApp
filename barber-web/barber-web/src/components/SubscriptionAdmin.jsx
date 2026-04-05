@@ -67,6 +67,8 @@ const MONTH_LABELS = [
   'Dic',
 ];
 
+const PUBLIC_PLANS_BASE_URL = 'https://barberappbycodex.com/planes';
+
 function formatDate(value) {
   if (!value) return 'Sin fecha';
   const date = new Date(value);
@@ -78,8 +80,26 @@ function formatDate(value) {
   }).format(date);
 }
 
+function formatDateInputValue(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function resolveRenewalModeLabel(value) {
   return value === 'automatic' ? 'Automática' : 'Manual';
+}
+
+function buildRenewalUrl({ email, plan, renewalMode }) {
+  const params = new URLSearchParams();
+  if (email) params.set('email', String(email));
+  if (plan === 'basic' || plan === 'pro') params.set('plan', plan);
+  if (renewalMode) params.set('mode', renewalMode);
+  return `${PUBLIC_PLANS_BASE_URL}?${params.toString()}`;
 }
 
 function resolveNextDueDate(subscription) {
@@ -144,6 +164,7 @@ function buildDrafts(users, pricingDraft) {
         status: user.subscription?.status || 'trial',
         billingCycle: user.subscription?.billingCycle || 'monthly',
         renewalMode: user.subscription?.renewalMode || 'manual',
+        expiresAt: formatDateInputValue(user.subscription?.expiresAt),
         customPriceArs: user.subscription?.customPriceArs ?? '',
         customPriceUsdReference: user.subscription?.customPriceUsdReference ?? '',
         internalNotes: user.subscription?.internalNotes ?? '',
@@ -388,6 +409,7 @@ export default function SubscriptionAdmin() {
           status: response.user.subscription?.status || 'trial',
           billingCycle: response.user.subscription?.billingCycle || 'monthly',
           renewalMode: response.user.subscription?.renewalMode || 'manual',
+          expiresAt: formatDateInputValue(response.user.subscription?.expiresAt),
           customPriceArs: response.user.subscription?.customPriceArs ?? '',
           customPriceUsdReference: response.user.subscription?.customPriceUsdReference ?? '',
           internalNotes: response.user.subscription?.internalNotes ?? '',
@@ -403,6 +425,23 @@ export default function SubscriptionAdmin() {
       setError(err.message || 'No pudimos guardar la suscripción.');
     } finally {
       setSavingUserId(null);
+    }
+  };
+
+  const handleCopyRenewalLink = async (user) => {
+    const draft = drafts[user._id] || {};
+    const renewalUrl = buildRenewalUrl({
+      email: user.email,
+      plan: draft.plan || user.subscription?.plan || 'basic',
+      renewalMode: draft.renewalMode || user.subscription?.renewalMode || 'manual',
+    });
+
+    try {
+      await navigator.clipboard.writeText(renewalUrl);
+      setSuccess('Link de renovación copiado.');
+      setError('');
+    } catch (_error) {
+      window.prompt('Copiá este link de renovación:', renewalUrl);
     }
   };
 
@@ -1025,6 +1064,20 @@ export default function SubscriptionAdmin() {
                         </label>
 
                         <label className={styles.selectField}>
+                          <span>Vence el</span>
+                          <input
+                            type="date"
+                            value={draft.expiresAt ?? ''}
+                            onChange={(e) =>
+                              handleDraftChange(user._id, 'expiresAt', e.target.value)
+                            }
+                          />
+                          <small className={styles.fieldHint}>
+                            Podés ajustarlo manualmente para pruebas o acuerdos especiales.
+                          </small>
+                        </label>
+
+                        <label className={styles.selectField}>
                           <span>Precio especial ARS</span>
                           <input
                             type="number"
@@ -1095,6 +1148,13 @@ export default function SubscriptionAdmin() {
                           </span>
                         </div>
                         <div className={styles.inlineActions}>
+                          <button
+                            type="button"
+                            className={styles.secondaryInlineButton}
+                            onClick={() => handleCopyRenewalLink(user)}
+                          >
+                            Copiar link de renovación
+                          </button>
                           <button
                             type="button"
                             className={styles.secondaryInlineButton}

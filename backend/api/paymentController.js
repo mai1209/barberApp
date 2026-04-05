@@ -13,6 +13,11 @@ import {
   getMercadoPagoSystemPayment,
   refreshMercadoPagoAccessToken,
 } from "../services/mercadoPago.js";
+import {
+  getOrCreatePlanPricing,
+  serializePlanPricing,
+} from "../services/planPricingService.js";
+import { notifySubscriptionActivated } from "../services/subscriptionLifecycleService.js";
 
 function normalizePaymentStatus(value) {
   if (value === "approved" || value === "authorized") return "approved";
@@ -254,6 +259,9 @@ async function syncAutomaticSubscriptionFromPreapproval(preapproval) {
   const nextBillingAt = preapproval?.auto_recurring?.next_payment_date
     ? new Date(preapproval.auto_recurring.next_payment_date)
     : null;
+  const previousPreapprovalStatus = resolvePreapprovalStatus(
+    userDoc.subscription?.mercadoPagoPreapprovalStatus,
+  );
 
   if (normalizedStatus === "authorized") {
     const startedAt = preapproval?.date_created ? new Date(preapproval.date_created) : new Date();
@@ -279,6 +287,30 @@ async function syncAutomaticSubscriptionFromPreapproval(preapproval) {
       cancelledAt: null,
     };
     await userDoc.save();
+
+    if (previousPreapprovalStatus !== "authorized") {
+      try {
+        const pricingDoc = await getOrCreatePlanPricing();
+        const pricing = serializePlanPricing(pricingDoc);
+        const amountArs =
+          Number(userDoc.subscription?.customPriceArs || 0) > 0
+            ? Number(userDoc.subscription.customPriceArs)
+            : Number(pricing[plan]?.ars || 0);
+        await notifySubscriptionActivated({
+          userDoc,
+          plan,
+          amountArs,
+          expiresAt: nextBillingAt,
+          renewalMode: "automatic",
+        });
+      } catch (error) {
+        console.error(
+          "Error notificando activación automática del plan:",
+          error?.message || error,
+        );
+      }
+    }
+
     return true;
   }
 
@@ -590,6 +622,9 @@ export async function handleSubscriptionMercadoPagoWebhook(req, res, next) {
         String(payment.metadata?.billing_cycle || userDoc.subscription?.billingCycle || "monthly").trim() ||
         "monthly";
       const paidAt = payment.date_approved ? new Date(payment.date_approved) : new Date();
+      const previousPaymentId = String(userDoc.subscription?.mercadoPagoPaymentId || "").trim();
+      const currentPaymentId = String(payment.id || paymentId).trim();
+      const paidAmount = Math.max(0, Number(payment.transaction_amount || 0));
 
       userDoc.subscription = {
         ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
@@ -604,7 +639,7 @@ export async function handleSubscriptionMercadoPagoWebhook(req, res, next) {
             ? userDoc.subscription?.nextBillingAt || null
             : calculateSubscriptionExpiry({ billingCycle, paidAt }),
         pendingPlan: null,
-        mercadoPagoPaymentId: String(payment.id || paymentId),
+        mercadoPagoPaymentId: currentPaymentId,
         mercadoPagoPreferenceId:
           payment.order?.id ? String(payment.order.id) : userDoc.subscription?.mercadoPagoPreferenceId || null,
         lastPaymentAt: paidAt,
@@ -617,6 +652,23 @@ export async function handleSubscriptionMercadoPagoWebhook(req, res, next) {
         cancelledAt: null,
       };
       await userDoc.save();
+
+      if (currentPaymentId && currentPaymentId !== previousPaymentId) {
+        try {
+          await notifySubscriptionActivated({
+            userDoc,
+            plan,
+            amountArs: paidAmount,
+            expiresAt: userDoc.subscription?.expiresAt,
+            renewalMode: userDoc.subscription?.renewalMode || "manual",
+          });
+        } catch (error) {
+          console.error(
+            "Error notificando activación manual del plan:",
+            error?.message || error,
+          );
+        }
+      }
     } else if (normalizedStatus === "rejected") {
       userDoc.subscription = {
         ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),

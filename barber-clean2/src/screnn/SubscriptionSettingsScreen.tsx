@@ -38,7 +38,6 @@ const PLAN_COPY: Record<
   NonNullable<SubscriptionState['plan']>,
   {
     label: string;
-    accent: string;
     summary: string;
     price: string;
     includes: string[];
@@ -46,7 +45,6 @@ const PLAN_COPY: Record<
 > = {
   basic: {
     label: 'Básico',
-    accent: '#FF1493',
     summary: 'Todo lo necesario para vender turnos online y ordenar la agenda.',
     price: 'ARS 25.000 / mes · ref. USD 25',
     includes: [
@@ -58,7 +56,6 @@ const PLAN_COPY: Record<
   },
   pro: {
     label: 'Pro',
-    accent: '#21C063',
     summary: 'Más control del negocio con métricas, historial y exportaciones.',
     price: 'ARS 35.000 / mes · ref. USD 35',
     includes: [
@@ -70,7 +67,6 @@ const PLAN_COPY: Record<
   },
   custom: {
     label: 'Personalizable',
-    accent: '#F5C451',
     summary: 'Marca propia, dominio propio y solución hecha a medida.',
     price: 'A medida',
     includes: [
@@ -105,6 +101,12 @@ function getStatusCopy(status?: SubscriptionState['status']) {
     default:
       return { label: 'Cuenta de prueba', color: '#5A8CFF' };
   }
+}
+
+function getPlanAccent(plan: SubscriptionState['plan'], theme: Theme) {
+  if (plan === 'pro') return '#21C063';
+  if (plan === 'custom') return '#F5C451';
+  return theme.primary;
 }
 
 function getCycleCopy(cycle?: SubscriptionState['billingCycle']) {
@@ -163,6 +165,7 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
 
   const planKey = subscription?.plan ?? 'basic';
   const planInfo = PLAN_COPY[planKey];
+  const planAccent = getPlanAccent(planKey, theme);
   const basePriceArs =
     planKey === 'basic' ? priceOverrides.basic.ars : planKey === 'pro' ? priceOverrides.pro.ars : 0;
   const baseUsdReference =
@@ -201,6 +204,8 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
     subscription?.status === 'cancelled';
   const hasAutomaticRenewal =
     subscription?.renewalMode === 'automatic' && Boolean(subscription?.mercadoPagoPreapprovalId);
+  const nextRelevantBillingDate =
+    subscription?.nextBillingAt || subscription?.expiresAt || null;
 
   const getRenewalHint = () => {
     if (!expiresAtDate || Number.isNaN(expiresAtDate.getTime())) {
@@ -320,7 +325,7 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
             </View>
 
             <Text style={styles.planSummary}>{planInfo.summary}</Text>
-            <Text style={[styles.planPrice, { color: planInfo.accent }]}>Precio: {effectivePlanPrice}</Text>
+            <Text style={[styles.planPrice, { color: planAccent }]}>Precio: {effectivePlanPrice}</Text>
             {discountArs > 0 ? (
               <View style={styles.discountCard}>
                 <Text style={styles.discountTitle}>Descuento aplicado</Text>
@@ -350,7 +355,7 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
             <Text style={styles.sectionTitle}>Qué incluye hoy tu plan</Text>
             {planInfo.includes.map(item => (
               <View key={item} style={styles.includeRow}>
-                <View style={[styles.includeDot, { backgroundColor: planInfo.accent }]} />
+                <View style={[styles.includeDot, { backgroundColor: planAccent }]} />
                 <Text style={styles.includeText}>{item}</Text>
               </View>
             ))}
@@ -388,9 +393,31 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
             <View style={styles.renewalHintCard}>
               <Text style={styles.renewalHintTitle}>
                 {subscription?.status === 'past_due' || subscription?.status === 'cancelled'
-                  ? 'Renovación pendiente'
+                  ? 'Estado de renovación'
                   : 'Próximo vencimiento'}
               </Text>
+              <View style={styles.renewalMetaList}>
+                <View style={styles.renewalMetaRow}>
+                  <Text style={styles.renewalMetaLabel}>Estado</Text>
+                  <Text style={[styles.renewalMetaValue, { color: statusInfo.color }]}>
+                    {statusInfo.label}
+                  </Text>
+                </View>
+                <View style={styles.renewalMetaRow}>
+                  <Text style={styles.renewalMetaLabel}>
+                    {hasAutomaticRenewal ? 'Próximo cobro' : 'Vence'}
+                  </Text>
+                  <Text style={styles.renewalMetaValue}>
+                    {formatDateLabel(nextRelevantBillingDate)}
+                  </Text>
+                </View>
+                <View style={styles.renewalMetaRow}>
+                  <Text style={styles.renewalMetaLabel}>Modo</Text>
+                  <Text style={styles.renewalMetaValue}>
+                    {hasAutomaticRenewal ? 'Renovación automática' : 'Renovación manual'}
+                  </Text>
+                </View>
+              </View>
               <Text style={styles.renewalHintText}>{getRenewalHint()}</Text>
             </View>
             {isRestrictedAccount ? (
@@ -400,7 +427,7 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
             ) : null}
             {!isRestrictedAccount ? (
               <Pressable style={styles.primaryButton} onPress={openPlansWebsite}>
-                <Text style={styles.primaryButtonText}>Entrar al panel web</Text>
+                <Text style={styles.primaryButtonText}>Entrar al panel de planes</Text>
               </Pressable>
             ) : null}
             <Pressable style={styles.secondaryButton} onPress={openSupportMail}>
@@ -466,15 +493,15 @@ const createStyles = (theme: Theme) =>
       fontWeight: '600',
     },
     lockedCard: {
-      backgroundColor: '#1C1012',
+      backgroundColor: `${theme.primary}14`,
       borderRadius: 24,
       borderWidth: 1,
-      borderColor: '#5A1E2A',
+      borderColor: `${theme.primary}55`,
       padding: 18,
       gap: 8,
     },
     lockedEyebrow: {
-      color: '#FF7B8B',
+      color: theme.primary,
       fontSize: 11,
       fontWeight: '900',
       letterSpacing: 1.4,
@@ -487,12 +514,12 @@ const createStyles = (theme: Theme) =>
       fontWeight: '900',
     },
     lockedText: {
-      color: '#E7C8CF',
+      color: '#E7DDE2',
       fontSize: 14,
       lineHeight: 20,
     },
     lockedHint: {
-      color: '#FFC6D1',
+      color: '#FFF',
       fontSize: 13,
       lineHeight: 19,
       fontWeight: '700',
@@ -554,7 +581,7 @@ const createStyles = (theme: Theme) =>
       gap: 4,
     },
     discountTitle: {
-      color: '#21C063',
+      color: theme.primary,
       fontSize: 12,
       fontWeight: '900',
       textTransform: 'uppercase',
@@ -661,7 +688,7 @@ const createStyles = (theme: Theme) =>
       gap: 6,
     },
     renewalHintTitle: {
-      color: '#F5C451',
+      color: theme.primary,
       fontSize: 12,
       fontWeight: '900',
       textTransform: 'uppercase',
@@ -671,6 +698,29 @@ const createStyles = (theme: Theme) =>
       color: '#DFDFE6',
       fontSize: 14,
       lineHeight: 20,
+    },
+    renewalMetaList: {
+      gap: 8,
+    },
+    renewalMetaRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: 10,
+    },
+    renewalMetaLabel: {
+      color: '#8E8E98',
+      fontSize: 12,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+    },
+    renewalMetaValue: {
+      color: '#FFFFFF',
+      fontSize: 13,
+      fontWeight: '800',
+      textAlign: 'right',
+      flexShrink: 1,
     },
     primaryButton: {
       backgroundColor: theme.primary,

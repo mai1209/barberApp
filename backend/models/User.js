@@ -12,6 +12,7 @@ const themeConfigSchema = new mongoose.Schema(
     },
     logoDataUrl: { type: String, default: null },
     bannerDataUrl: { type: String, default: null },
+    mobileBannerDataUrl: { type: String, default: null },
   },
   {
     _id: false,

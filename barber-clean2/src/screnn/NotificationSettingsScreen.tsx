@@ -282,7 +282,7 @@ function createStyles(theme: Theme) {
   return StyleSheet.create({
     screen: {
       flex: 1,
-      backgroundColor: '#121212',
+      backgroundColor: theme.background,
     },
     centered: {
       justifyContent: 'center',
@@ -304,16 +304,16 @@ function createStyles(theme: Theme) {
       fontWeight: '800',
     },
     subtitle: {
-      color: '#98A2B3',
+      color: hexToRgba(theme.primary, 0.56),
       fontSize: 14,
       lineHeight: 20,
     },
     card: {
-      backgroundColor: '#1C1C1C',
+      backgroundColor: theme.card,
       borderRadius: 22,
       padding: 18,
       borderWidth: 1,
-      borderColor: 'rgba(110, 117, 133, 0.20)',
+      borderColor: hexToRgba(theme.primary, 0.16),
       gap: 14,
     },
     sectionLabel: {
@@ -322,7 +322,7 @@ function createStyles(theme: Theme) {
       fontWeight: '800',
     },
     sectionHint: {
-      color: '#8B93A5',
+      color: hexToRgba(theme.primary, 0.54),
       fontSize: 13,
       lineHeight: 20,
     },
@@ -345,7 +345,7 @@ function createStyles(theme: Theme) {
       borderColor: theme.primary,
     },
     toggleChipText: {
-      color: '#A1A1AA',
+      color: hexToRgba(theme.primary, 0.58),
       fontSize: 14,
       fontWeight: '700',
     },
@@ -370,7 +370,7 @@ function createStyles(theme: Theme) {
       borderColor: theme.primary,
     },
     optionChipText: {
-      color: '#B6B6B6',
+      color: hexToRgba(theme.primary, 0.62),
       fontSize: 13,
       fontWeight: '700',
     },
@@ -389,7 +389,7 @@ function createStyles(theme: Theme) {
       opacity: 0.7,
     },
     saveButtonText: {
-      color: '#fff',
+      color: theme.secondary,
       fontSize: 15,
       fontWeight: '800',
     },

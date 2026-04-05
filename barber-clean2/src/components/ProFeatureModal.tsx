@@ -163,7 +163,7 @@ function createStyles(theme: Theme) {
     previewWrap: {
       borderRadius: 24,
       overflow: 'hidden',
-      backgroundColor: '#171A20',
+      backgroundColor: theme.card,
       borderWidth: 1,
       borderColor: 'rgba(255,255,255,0.06)',
       padding: 16,
@@ -214,9 +214,9 @@ function createStyles(theme: Theme) {
       borderRadius: 22,
       padding: 16,
       marginBottom: 14,
-      backgroundColor: 'rgba(255,255,255,0.04)',
+      backgroundColor: hexToRgba(theme.primary, 0.12),
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.05)',
+      borderColor: hexToRgba(theme.primary, 0.18),
     },
     previewHeroBadge: {
       width: 74,
