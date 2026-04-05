@@ -19,6 +19,7 @@ export type ThemeConfig = {
   card?: string | null;
   gradientColors?: string[] | null;
   logoDataUrl?: string | null;
+  bannerDataUrl?: string | null;
 };
 
 type ThemeProfile = {

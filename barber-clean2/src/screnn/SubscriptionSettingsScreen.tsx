@@ -10,7 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { getCurrentUser, getPlanPricing } from '../services/api';
+import { getCurrentUser, getPlanPricing, updateSubscriptionSettings } from '../services/api';
 import { saveUserProfile } from '../services/authStorage';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
@@ -29,6 +29,9 @@ type SubscriptionState = {
   customPriceUsdReference?: number | null;
   startedAt?: string | null;
   expiresAt?: string | null;
+  mercadoPagoPreapprovalId?: string | null;
+  mercadoPagoPreapprovalStatus?: string | null;
+  nextBillingAt?: string | null;
 };
 
 const PLAN_COPY: Record<
@@ -122,6 +125,7 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
   const [subscription, setSubscription] = useState<SubscriptionState | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [updatingRenewalMode, setUpdatingRenewalMode] = useState(false);
   const [priceOverrides, setPriceOverrides] = useState({
     basic: { ars: 25000, usdReference: 25 },
     pro: { ars: 35000, usdReference: 35 },
@@ -195,6 +199,8 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
     subscription?.status === 'trial' ||
     subscription?.status === 'past_due' ||
     subscription?.status === 'cancelled';
+  const hasAutomaticRenewal =
+    subscription?.renewalMode === 'automatic' && Boolean(subscription?.mercadoPagoPreapprovalId);
 
   const getRenewalHint = () => {
     if (!expiresAtDate || Number.isNaN(expiresAtDate.getTime())) {
@@ -243,6 +249,23 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
       await Linking.openURL(PLANS_WEBSITE_URL);
     } catch (_error) {
       Alert.alert('No pudimos abrir el sitio de planes', PLANS_WEBSITE_URL);
+    }
+  };
+
+  const handleSwitchToManualRenewal = async () => {
+    try {
+      setUpdatingRenewalMode(true);
+      const response = await updateSubscriptionSettings({ renewalMode: 'manual' });
+      setSubscription(response.user?.subscription ?? null);
+      await saveUserProfile(response.user);
+      Alert.alert(
+        'Renovación automática desactivada',
+        'La cuenta volvió a renovación manual. Cuando venza, vas a poder renovar desde la web.',
+      );
+    } catch (error: any) {
+      Alert.alert('No pudimos cambiar el modo', error?.message ?? 'Probá de nuevo.');
+    } finally {
+      setUpdatingRenewalMode(false);
     }
   };
 
@@ -335,6 +358,33 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
 
           <View style={styles.actionsCard}>
             <Text style={styles.sectionTitle}>Acciones rápidas</Text>
+            {hasAutomaticRenewal ? (
+              <View style={styles.autoRenewCard}>
+                <Text style={styles.autoRenewTitle}>Renovación automática activa</Text>
+                <Text style={styles.autoRenewText}>
+                  Mercado Pago va a intentar renovar este plan todos los meses automáticamente.
+                </Text>
+                <Text style={styles.autoRenewMeta}>
+                  Próximo intento: {formatDateLabel(subscription?.nextBillingAt || subscription?.expiresAt)}
+                </Text>
+                <Pressable
+                  style={[styles.secondaryButton, updatingRenewalMode && styles.primaryButtonDisabled]}
+                  onPress={handleSwitchToManualRenewal}
+                  disabled={updatingRenewalMode}
+                >
+                  <Text style={styles.secondaryButtonText}>
+                    {updatingRenewalMode ? 'Cambiando modo...' : 'Pasar a renovación manual'}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.autoRenewCard}>
+                <Text style={styles.autoRenewTitle}>Renovación manual</Text>
+                <Text style={styles.autoRenewText}>
+                  Cuando llegue el vencimiento, te vamos a avisar por mail y vas a poder renovar desde la web con el link directo.
+                </Text>
+              </View>
+            )}
             <View style={styles.renewalHintCard}>
               <Text style={styles.renewalHintTitle}>
                 {subscription?.status === 'past_due' || subscription?.status === 'cancelled'
@@ -349,16 +399,8 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
               </Pressable>
             ) : null}
             {!isRestrictedAccount ? (
-              <Pressable
-                style={styles.primaryButton}
-                onPress={() =>
-                  navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'Home' }],
-                  })
-                }
-              >
-                <Text style={styles.primaryButtonText}>Entrar al panel</Text>
+              <Pressable style={styles.primaryButton} onPress={openPlansWebsite}>
+                <Text style={styles.primaryButtonText}>Entrar al panel web</Text>
               </Pressable>
             ) : null}
             <Pressable style={styles.secondaryButton} onPress={openSupportMail}>
@@ -583,6 +625,31 @@ const createStyles = (theme: Theme) =>
       borderColor: '#2A2A34',
       padding: 18,
       gap: 12,
+    },
+    autoRenewCard: {
+      backgroundColor: '#101016',
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: '#2A2A34',
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      gap: 6,
+    },
+    autoRenewTitle: {
+      color: '#fff',
+      fontSize: 15,
+      fontWeight: '900',
+    },
+    autoRenewText: {
+      color: '#D7D7DE',
+      fontSize: 13,
+      lineHeight: 19,
+    },
+    autoRenewMeta: {
+      color: '#8E8E98',
+      fontSize: 12,
+      lineHeight: 18,
+      marginBottom: 2,
     },
     renewalHintCard: {
       backgroundColor: '#101016',

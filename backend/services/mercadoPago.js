@@ -114,6 +114,18 @@ export async function createMercadoPagoPreference({ accessToken, payload }) {
   });
 }
 
+export async function createMercadoPagoPreapproval({ accessToken, payload }) {
+  return mercadoPagoFetch("/preapproval", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function getMercadoPagoPayment({ accessToken, paymentId }) {
   return mercadoPagoFetch(`/v1/payments/${paymentId}`, {
     method: "GET",
@@ -121,6 +133,28 @@ export async function getMercadoPagoPayment({ accessToken, paymentId }) {
       Authorization: `Bearer ${accessToken}`,
       Accept: "application/json",
     },
+  });
+}
+
+export async function getMercadoPagoPreapproval({ accessToken, preapprovalId }) {
+  return mercadoPagoFetch(`/preapproval/${preapprovalId}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+  });
+}
+
+export async function updateMercadoPagoPreapproval({ accessToken, preapprovalId, payload }) {
+  return mercadoPagoFetch(`/preapproval/${preapprovalId}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(payload),
   });
 }
 
@@ -144,6 +178,21 @@ export async function createMercadoPagoSystemPreference({ payload }) {
 export async function getMercadoPagoSystemPayment({ paymentId }) {
   const accessToken = getMercadoPagoSubscriptionsAccessToken();
   return getMercadoPagoPayment({ accessToken, paymentId });
+}
+
+export async function createMercadoPagoSystemPreapproval({ payload }) {
+  const accessToken = getMercadoPagoSubscriptionsAccessToken();
+  return createMercadoPagoPreapproval({ accessToken, payload });
+}
+
+export async function getMercadoPagoSystemPreapproval({ preapprovalId }) {
+  const accessToken = getMercadoPagoSubscriptionsAccessToken();
+  return getMercadoPagoPreapproval({ accessToken, preapprovalId });
+}
+
+export async function updateMercadoPagoSystemPreapproval({ preapprovalId, payload }) {
+  const accessToken = getMercadoPagoSubscriptionsAccessToken();
+  return updateMercadoPagoPreapproval({ accessToken, preapprovalId, payload });
 }
 
 export function buildMercadoPagoBookingReturnUrls(shopSlug) {

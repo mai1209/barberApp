@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   publicBarberAppointments,
+  publicCreateRecurringSubscriptionCheckout,
   publicCreateSubscriptionCheckout,
   publicCreateAppointment,
   publicListBarbers,
@@ -13,6 +14,7 @@ const router = Router();
 
 router.get("/plans", publicGetPlanPricing);
 router.post("/subscriptions/checkout", publicCreateSubscriptionCheckout);
+router.post("/subscriptions/recurring/start", publicCreateRecurringSubscriptionCheckout);
 router.get("/shops/:shopSlug", publicGetShop);
 router.get("/shops/:shopSlug/barbers", publicListBarbers);
 router.get("/shops/:shopSlug/barbers/:barberId/appointments", publicBarberAppointments);

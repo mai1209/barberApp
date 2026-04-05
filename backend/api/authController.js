@@ -14,6 +14,7 @@ import {
   createMercadoPagoSystemPreference,
   exchangeMercadoPagoCode,
   getMercadoPagoConfig,
+  updateMercadoPagoSystemPreapproval,
 } from "../services/mercadoPago.js";
 import {
   isSubscriptionLifecycleAuthorized,
@@ -262,6 +263,23 @@ function sanitizeThemeConfigInput(input) {
     }
   }
 
+  if (Object.prototype.hasOwnProperty.call(input, "bannerDataUrl")) {
+    hasAnyField = true;
+
+    if (input.bannerDataUrl == null || String(input.bannerDataUrl).trim() === "") {
+      updates.bannerDataUrl = null;
+    } else {
+      const bannerDataUrl = String(input.bannerDataUrl);
+      if (!/^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(bannerDataUrl)) {
+        throw new Error("La portada debe ser una imagen válida en base64.");
+      }
+      if (bannerDataUrl.length > 4_500_000) {
+        throw new Error("La portada es demasiado grande. Elegí una imagen más liviana.");
+      }
+      updates.bannerDataUrl = bannerDataUrl;
+    }
+  }
+
   return { updates, hasAnyField };
 }
 
@@ -410,6 +428,15 @@ function sanitizeSubscriptionInput(input) {
       }
       updates.customPriceUsdReference = parsed;
     }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "internalNotes")) {
+    hasAnyField = true;
+    const notes = String(input.internalNotes ?? "").trim();
+    if (notes.length > 400) {
+      throw new Error("Las notas internas no pueden superar los 400 caracteres.");
+    }
+    updates.internalNotes = notes;
   }
 
   if (Object.prototype.hasOwnProperty.call(input, "startedAt")) {
@@ -1026,6 +1053,25 @@ export async function updateOwnSubscriptionSettings(req, res, next) {
     const { updates, hasAnyField } = sanitizeSubscriptionInput(req.body ?? {});
     if (!hasAnyField) {
       return res.status(400).json({ error: "No llegaron cambios de suscripción para guardar." });
+    }
+
+    if (
+      updates.renewalMode === "manual" &&
+      userDoc.subscription?.renewalMode === "automatic" &&
+      userDoc.subscription?.mercadoPagoPreapprovalId
+    ) {
+      try {
+        await updateMercadoPagoSystemPreapproval({
+          preapprovalId: userDoc.subscription.mercadoPagoPreapprovalId,
+          payload: { status: "cancelled" },
+        });
+      } catch (err) {
+        console.error("No se pudo cancelar la renovación automática en Mercado Pago:", err?.message || err);
+      }
+
+      updates.mercadoPagoPreapprovalStatus = "cancelled";
+      updates.mercadoPagoPreapprovalId = null;
+      updates.nextBillingAt = null;
     }
 
     userDoc.subscription = {

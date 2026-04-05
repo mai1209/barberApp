@@ -30,9 +30,12 @@ import {
   updateAppointmentStatus,
   deleteAppointment,
 } from '../services/api';
+import { getUserProfile, subscribeToUserProfile } from '../services/authStorage';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
 import type { RootStackParamList } from '../navigation/StackNavigation';
+import { hasProPlanAccess } from '../services/planAccess';
+import ProFeatureModal from '../components/ProFeatureModal';
 import {
   Pencil,
   BarChart2,
@@ -41,6 +44,8 @@ import {
   Scissors,
   User,
 } from 'lucide-react-native';
+
+const PRO_PLAN_URL = 'https://barberappbycodex.com/planes?plan=pro';
 
 const hexToRgba = (hex: string, alpha: number) => {
   const sanitized = hex.replace('#', '');
@@ -153,6 +158,8 @@ function BarberDashboard({ route, navigation }: Props) {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [hasProAccess, setHasProAccess] = useState(false);
+  const [showProModal, setShowProModal] = useState(false);
 
   const dateRef = useRef(date);
   const didInitDateEffect = useRef(false);
@@ -162,6 +169,42 @@ function BarberDashboard({ route, navigation }: Props) {
   useEffect(() => {
     dateRef.current = date;
   }, [date]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const storedUser = await getUserProfile();
+      if (mounted) {
+        setHasProAccess(hasProPlanAccess(storedUser));
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    return subscribeToUserProfile(user => {
+      setHasProAccess(hasProPlanAccess(user));
+    });
+  }, []);
+
+  const handleProFeaturePress = useCallback(() => {
+    setShowProModal(true);
+  }, []);
+
+  const handleCloseProModal = useCallback(() => {
+    setShowProModal(false);
+  }, []);
+
+  const handleOpenSubscriptionSettings = useCallback(async () => {
+    setShowProModal(false);
+    try {
+      await Linking.openURL(PRO_PLAN_URL);
+    } catch (_error) {
+      Alert.alert('No pudimos abrir el sitio de planes', PRO_PLAN_URL);
+    }
+  }, []);
 
   const isToday = useMemo(() => isSameDay(date, new Date()), [date]);
 
@@ -595,14 +638,17 @@ function BarberDashboard({ route, navigation }: Props) {
 
                 <Pressable
                   onPress={() =>
-                    navigation.navigate('Metrics', {
-                    barberId: activeBarberId ?? undefined,
-                    barberName:
-                      barberProfile?.fullName || barberName || 'Mi Agenda',
-                    })
+                    hasProAccess
+                      ? navigation.navigate('Metrics', {
+                          barberId: activeBarberId ?? undefined,
+                          barberName:
+                            barberProfile?.fullName || barberName || 'Mi Agenda',
+                        })
+                      : handleProFeaturePress()
                   }
                 style={({ pressed }) => [
                   styles.secondaryActionBtn,
+                  !hasProAccess && styles.secondaryActionBtnLocked,
                   pressed && { backgroundColor: hexToRgba(theme.primary, 0.2) },
                 ]}
               >
@@ -700,6 +746,13 @@ function BarberDashboard({ route, navigation }: Props) {
           </View>
         </View>
       </ScrollView>
+      <ProFeatureModal
+        visible={showProModal}
+        variant="barber-metrics"
+        theme={theme}
+        onClose={handleCloseProModal}
+        onOpenPlan={handleOpenSubscriptionSettings}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -757,6 +810,10 @@ const makeStyles = (theme: Theme) =>
       paddingVertical: 12,
       borderRadius: 16,
       gap: 8,
+    },
+    secondaryActionBtnLocked: {
+      borderColor: hexToRgba(theme.primary, 0.28),
+      opacity: 0.82,
     },
     secondaryActionText: {
       color: theme.primary,

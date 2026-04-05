@@ -26,6 +26,11 @@ const BILLING_OPTIONS = [
   { value: 'custom', label: 'Manual / especial' },
 ];
 
+const RENEWAL_OPTIONS = [
+  { value: 'manual', label: 'Manual' },
+  { value: 'automatic', label: 'Automática' },
+];
+
 const PLAN_PRICE_META = [
   {
     key: 'basic',
@@ -73,6 +78,33 @@ function formatDate(value) {
   }).format(date);
 }
 
+function resolveRenewalModeLabel(value) {
+  return value === 'automatic' ? 'Automática' : 'Manual';
+}
+
+function resolveNextDueDate(subscription) {
+  return subscription?.nextBillingAt || subscription?.expiresAt || null;
+}
+
+function isDueWithinDays(subscription, days) {
+  const dueDateValue = resolveNextDueDate(subscription);
+  if (!dueDateValue) return false;
+  const dueDate = new Date(dueDateValue);
+  if (Number.isNaN(dueDate.getTime())) return false;
+  const now = new Date();
+  const diffMs = dueDate.getTime() - now.getTime();
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  return diffDays >= 0 && diffDays <= days;
+}
+
+function isOverdue(subscription) {
+  const dueDateValue = resolveNextDueDate(subscription);
+  if (!dueDateValue) return false;
+  const dueDate = new Date(dueDateValue);
+  if (Number.isNaN(dueDate.getTime())) return false;
+  return dueDate.getTime() < Date.now();
+}
+
 function getBasePlanValues(plan, pricingDraft) {
   if (plan === 'basic') {
     return {
@@ -111,8 +143,10 @@ function buildDrafts(users, pricingDraft) {
         plan: user.subscription?.plan || 'basic',
         status: user.subscription?.status || 'trial',
         billingCycle: user.subscription?.billingCycle || 'monthly',
+        renewalMode: user.subscription?.renewalMode || 'manual',
         customPriceArs: user.subscription?.customPriceArs ?? '',
         customPriceUsdReference: user.subscription?.customPriceUsdReference ?? '',
+        internalNotes: user.subscription?.internalNotes ?? '',
         discountPercent: calculateDiscountPercent({
           plan: user.subscription?.plan || 'basic',
           subscription: user.subscription,
@@ -143,6 +177,8 @@ export default function SubscriptionAdmin() {
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('all');
   const [selectedDiscountFilter, setSelectedDiscountFilter] = useState('all');
+  const [selectedRenewalFilter, setSelectedRenewalFilter] = useState('all');
+  const [selectedDueFilter, setSelectedDueFilter] = useState('all');
 
   const hasUsers = users.length > 0;
 
@@ -209,9 +245,9 @@ export default function SubscriptionAdmin() {
   const handleDraftChange = (userId, field, value) => {
     setDrafts((current) => ({
       ...current,
-      [userId]: {
-        ...current[userId],
-        [field]: value,
+        [userId]: {
+          ...current[userId],
+          [field]: value,
       },
     }));
   };
@@ -351,8 +387,10 @@ export default function SubscriptionAdmin() {
           plan: response.user.subscription?.plan || 'basic',
           status: response.user.subscription?.status || 'trial',
           billingCycle: response.user.subscription?.billingCycle || 'monthly',
+          renewalMode: response.user.subscription?.renewalMode || 'manual',
           customPriceArs: response.user.subscription?.customPriceArs ?? '',
           customPriceUsdReference: response.user.subscription?.customPriceUsdReference ?? '',
+          internalNotes: response.user.subscription?.internalNotes ?? '',
           discountPercent: calculateDiscountPercent({
             plan: response.user.subscription?.plan || 'basic',
             subscription: response.user.subscription,
@@ -441,10 +479,36 @@ export default function SubscriptionAdmin() {
           : selectedDiscountFilter === 'discounted'
             ? hasDiscount
             : !hasDiscount;
+      const renewalMode = String(user.subscription?.renewalMode || 'manual');
+      const renewalMatches =
+        selectedRenewalFilter === 'all' ? true : renewalMode === selectedRenewalFilter;
+      const dueMatches =
+        selectedDueFilter === 'all'
+          ? true
+          : selectedDueFilter === '7'
+            ? isDueWithinDays(user.subscription, 7)
+            : selectedDueFilter === '30'
+              ? isDueWithinDays(user.subscription, 30)
+              : isOverdue(user.subscription);
 
-      return yearMatches && monthMatches && statusMatches && discountMatches;
+      return (
+        yearMatches &&
+        monthMatches &&
+        statusMatches &&
+        discountMatches &&
+        renewalMatches &&
+        dueMatches
+      );
     });
-  }, [selectedDiscountFilter, selectedMonth, selectedStatusFilter, selectedYear, users]);
+  }, [
+    selectedDiscountFilter,
+    selectedDueFilter,
+    selectedMonth,
+    selectedRenewalFilter,
+    selectedStatusFilter,
+    selectedYear,
+    users,
+  ]);
 
   const summary = useMemo(() => {
     const activeUsers = visibleUsers.filter((user) => user.subscription?.status === 'active');
@@ -465,6 +529,7 @@ export default function SubscriptionAdmin() {
       activePro,
       activeCustom,
       estimatedMrr,
+      dueSoon7: visibleUsers.filter((user) => isDueWithinDays(user.subscription, 7)).length,
     };
   }, [getPlanAmount, visibleUsers]);
 
@@ -672,6 +737,10 @@ export default function SubscriptionAdmin() {
                   ARS {summary.estimatedMrr.toLocaleString('es-AR')}
                 </strong>
               </article>
+              <article className={styles.summaryCard}>
+                <span className={styles.summaryLabel}>Vencen en 7 días</span>
+                <strong className={styles.summaryValue}>{summary.dueSoon7}</strong>
+              </article>
             </div>
           </section>
 
@@ -793,6 +862,61 @@ export default function SubscriptionAdmin() {
               <div className={styles.statusToolbar}>
                 <button
                   type="button"
+                  className={`${styles.statusChip} ${selectedRenewalFilter === 'all' ? styles.statusChipActive : ''}`}
+                  onClick={() => setSelectedRenewalFilter('all')}
+                >
+                  Todos los modos
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.statusChip} ${selectedRenewalFilter === 'manual' ? styles.statusChipActive : ''}`}
+                  onClick={() => setSelectedRenewalFilter('manual')}
+                >
+                  Manual
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.statusChip} ${selectedRenewalFilter === 'automatic' ? styles.statusChipActive : ''}`}
+                  onClick={() => setSelectedRenewalFilter('automatic')}
+                >
+                  Automática
+                </button>
+              </div>
+
+              <div className={styles.statusToolbar}>
+                <button
+                  type="button"
+                  className={`${styles.statusChip} ${selectedDueFilter === 'all' ? styles.statusChipActive : ''}`}
+                  onClick={() => setSelectedDueFilter('all')}
+                >
+                  Todos los vencimientos
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.statusChip} ${selectedDueFilter === '7' ? styles.statusChipActive : ''}`}
+                  onClick={() => setSelectedDueFilter('7')}
+                >
+                  Vence en 7 días
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.statusChip} ${selectedDueFilter === '30' ? styles.statusChipActive : ''}`}
+                  onClick={() => setSelectedDueFilter('30')}
+                >
+                  Vence en 30 días
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.statusChip} ${selectedDueFilter === 'overdue' ? styles.statusChipActive : ''}`}
+                  onClick={() => setSelectedDueFilter('overdue')}
+                >
+                  Vencido
+                </button>
+              </div>
+
+              <div className={styles.statusToolbar}>
+                <button
+                  type="button"
                   className={`${styles.statusChip} ${selectedDiscountFilter === 'all' ? styles.statusChipActive : ''}`}
                   onClick={() => setSelectedDiscountFilter('all')}
                 >
@@ -834,7 +958,8 @@ export default function SubscriptionAdmin() {
                         </div>
                         <div className={styles.cardDates}>
                           <span>Alta: {formatDate(user.createdAt)}</span>
-                          <span>Vence: {formatDate(user.subscription?.expiresAt)}</span>
+                          <span>Vence: {formatDate(resolveNextDueDate(user.subscription))}</span>
+                          <span>Último pago: {formatDate(user.subscription?.lastPaymentAt)}</span>
                         </div>
                       </div>
 
@@ -876,6 +1001,22 @@ export default function SubscriptionAdmin() {
                             }
                           >
                             {BILLING_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className={styles.selectField}>
+                          <span>Renovación</span>
+                          <select
+                            value={draft.renewalMode || 'manual'}
+                            onChange={(e) =>
+                              handleDraftChange(user._id, 'renewalMode', e.target.value)
+                            }
+                          >
+                            {RENEWAL_OPTIONS.map((option) => (
                               <option key={option.value} value={option.value}>
                                 {option.label}
                               </option>
@@ -927,13 +1068,32 @@ export default function SubscriptionAdmin() {
                             Solo referencia. El cobro real sigue el valor principal configurado.
                           </small>
                         </label>
+
+                        <label className={`${styles.selectField} ${styles.notesField}`}>
+                          <span>Notas internas</span>
+                          <textarea
+                            value={draft.internalNotes ?? ''}
+                            onChange={(e) =>
+                              handleDraftChange(user._id, 'internalNotes', e.target.value)
+                            }
+                            placeholder="Ej. cliente con precio acordado o seguimiento comercial"
+                            className={styles.textarea}
+                            rows={4}
+                          />
+                        </label>
                       </div>
 
                       <div className={styles.cardActions}>
-                        <span className={`${styles.currentState} ${hasDiscount ? styles.currentStateDiscount : ''}`}>
-                          Actual: {user.subscription?.plan || 'basic'} · {user.subscription?.status || 'trial'} ·{' '}
-                          ARS {getPlanAmount(user.subscription?.plan, user.subscription).toLocaleString('es-AR')}
-                        </span>
+                        <div className={styles.currentStateWrap}>
+                          <span className={`${styles.currentState} ${hasDiscount ? styles.currentStateDiscount : ''}`}>
+                            Actual: {user.subscription?.plan || 'basic'} · {user.subscription?.status || 'trial'} ·{' '}
+                            ARS {getPlanAmount(user.subscription?.plan, user.subscription).toLocaleString('es-AR')}
+                          </span>
+                          <span className={styles.currentMeta}>
+                            Renovación: {resolveRenewalModeLabel(user.subscription?.renewalMode)} · Próximo cobro:{' '}
+                            {formatDate(resolveNextDueDate(user.subscription))}
+                          </span>
+                        </div>
                         <div className={styles.inlineActions}>
                           <button
                             type="button"

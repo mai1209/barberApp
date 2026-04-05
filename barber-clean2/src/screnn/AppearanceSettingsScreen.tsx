@@ -93,6 +93,7 @@ type FormState = {
   gradient2: string;
   gradient3: string;
   logoDataUrl: string | null;
+  bannerDataUrl: string | null;
 };
 
 type PickerField =
@@ -132,6 +133,7 @@ function buildInitialForm(theme: Theme, profile: any): FormState {
     gradient2: gradientColors[2] ?? theme.gradientColors[2],
     gradient3: gradientColors[3] ?? theme.gradientColors[3],
     logoDataUrl: customTheme.logoDataUrl ?? null,
+    bannerDataUrl: customTheme.bannerDataUrl ?? null,
   };
 }
 
@@ -244,7 +246,7 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
     setForm(current => ({
       ...current,
       [field]:
-        typeof value === 'string' && field !== 'logoDataUrl'
+        typeof value === 'string' && field !== 'logoDataUrl' && field !== 'bannerDataUrl'
           ? normalizeHexInput(value)
           : value,
     }));
@@ -297,12 +299,38 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
     }
   };
 
+  const handlePickBanner = async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        selectionLimit: 1,
+        includeBase64: true,
+        quality: 1,
+        maxWidth: 1600,
+        maxHeight: 900,
+      });
+
+      if (result.didCancel) return;
+
+      const asset = result.assets?.[0];
+      if (!asset?.base64 || !asset.type) {
+        Alert.alert('Portada inválida', 'No pudimos leer esa imagen. Probá con otra.');
+        return;
+      }
+
+      updateField('bannerDataUrl', `data:${asset.type};base64,${asset.base64}`);
+    } catch (_error) {
+      Alert.alert('Error', 'No pudimos abrir la galería.');
+    }
+  };
+
   const persistTheme = async (payload: {
     primary: string | null;
     secondary: string | null;
     card: string | null;
     gradientColors: string[] | null;
     logoDataUrl: string | null;
+    bannerDataUrl: string | null;
   }) => {
     const response = await updateThemeConfig(payload);
     await saveUserProfile(response.user);
@@ -320,6 +348,7 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
         card: form.card,
         gradientColors: [form.gradient0, form.gradient1, form.gradient2, form.gradient3],
         logoDataUrl: form.logoDataUrl,
+        bannerDataUrl: form.bannerDataUrl,
       });
       Alert.alert('Aspecto guardado', 'La vista del local se actualizó correctamente.');
     } catch (err: any) {
@@ -363,6 +392,10 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
         <View style={styles.previewCard}>
           <Text style={styles.previewEyebrow}>Vista previa</Text>
           <View style={styles.previewHero}>
+            {form.bannerDataUrl ? (
+              <Image source={{ uri: form.bannerDataUrl }} style={styles.previewHeroBanner} />
+            ) : null}
+            <View style={styles.previewHeroOverlay} />
             <Image style={styles.previewLogo} source={previewTheme.logo} />
             <View style={styles.previewTextWrap}>
               <Text style={styles.previewTitle}>Tu barbería</Text>
@@ -396,6 +429,32 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
               <Text style={styles.secondaryBtnText}>Elegir imagen</Text>
             </Pressable>
             <Pressable style={styles.ghostBtnInline} onPress={() => updateField('logoDataUrl', null)}>
+              <Text style={styles.ghostBtnText}>Quitar</Text>
+            </Pressable>
+          </View>
+        </SectionCard>
+
+        <SectionCard title="Portada web del local" icon={ImagePlus} theme={previewTheme}>
+          <Text style={styles.helperText}>
+            Esta imagen se muestra arriba de la web de reservas como banner principal.
+          </Text>
+          <View style={styles.bannerBox}>
+            {form.bannerDataUrl ? (
+              <Image style={styles.bannerPreview} source={{ uri: form.bannerDataUrl }} />
+            ) : (
+              <View style={styles.bannerPlaceholder}>
+                <Text style={styles.bannerPlaceholderText}>Sin portada cargada</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.row}>
+            <Pressable style={styles.secondaryBtn} onPress={handlePickBanner}>
+              <Text style={styles.secondaryBtnText}>Elegir portada</Text>
+            </Pressable>
+            <Pressable
+              style={styles.ghostBtnInline}
+              onPress={() => updateField('bannerDataUrl', null)}
+            >
               <Text style={styles.ghostBtnText}>Quitar</Text>
             </Pressable>
           </View>
@@ -740,8 +799,23 @@ function createStyles(theme: Theme) {
       marginBottom: 14,
     },
     previewHero: {
+      position: 'relative',
       flexDirection: 'row',
       alignItems: 'center',
+      overflow: 'hidden',
+      minHeight: 108,
+      borderRadius: 24,
+      padding: 16,
+      backgroundColor: '#121212',
+    },
+    previewHeroBanner: {
+      ...StyleSheet.absoluteFillObject,
+      width: '100%',
+      height: '100%',
+    },
+    previewHeroOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(10,10,14,0.46)',
     },
     previewLogo: {
       width: 68,
@@ -749,9 +823,11 @@ function createStyles(theme: Theme) {
       borderRadius: 20,
       marginRight: 14,
       backgroundColor: 'rgba(255,255,255,0.05)',
+      zIndex: 1,
     },
     previewTextWrap: {
       flex: 1,
+      zIndex: 1,
     },
     previewTitle: {
       color: '#FFF',
@@ -837,6 +913,34 @@ function createStyles(theme: Theme) {
       width: 86,
       height: 86,
       resizeMode: 'contain',
+    },
+    bannerBox: {
+      height: 150,
+      borderRadius: 22,
+      backgroundColor: '#161616',
+      borderWidth: 1,
+      borderColor: '#2C2C2C',
+      overflow: 'hidden',
+      marginTop: 14,
+      marginBottom: 14,
+    },
+    bannerPreview: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'cover',
+    },
+    bannerPlaceholder: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#111111',
+      paddingHorizontal: 18,
+    },
+    bannerPlaceholderText: {
+      color: '#8F8F8F',
+      fontSize: 13,
+      fontWeight: '700',
+      textAlign: 'center',
     },
     row: {
       flexDirection: 'row',

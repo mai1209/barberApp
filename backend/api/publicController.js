@@ -11,6 +11,7 @@ import { resolveBarberScheduleForWeekday } from "../utils/barberSchedule.js";
 import {
   buildMercadoPagoSubscriptionReturnUrls,
   buildMercadoPagoSubscriptionWebhookUrl,
+  createMercadoPagoSystemPreapproval,
   createMercadoPagoSystemPreference,
 } from "../services/mercadoPago.js";
 import {
@@ -80,6 +81,7 @@ function sanitizeShop(shop) {
       primary: themeConfig.primary || null,
       secondary: themeConfig.secondary || null,
       logoDataUrl: themeConfig.logoDataUrl || null,
+      bannerDataUrl: themeConfig.bannerDataUrl || null,
     },
     paymentSettings: {
       cashEnabled: paymentSettings.cashEnabled !== false,
@@ -251,6 +253,80 @@ export async function publicCreateSubscriptionCheckout(req, res, next) {
       currencyId: "ARS",
       discountApplied: discountedAmount > 0 && discountedAmount < baseAmount,
       baseAmount,
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function publicCreateRecurringSubscriptionCheckout(req, res, next) {
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const plan = normalizePublicPlan(req.body?.plan);
+
+    if (!email || !plan) {
+      return res.status(400).json({
+        error: "Necesitamos el email de la cuenta y un plan válido para activar la renovación automática.",
+      });
+    }
+
+    const userDoc = await UserModel.findOne({ email, isActive: true });
+    if (!userDoc) {
+      return res.status(404).json({
+        error: "No encontramos una cuenta activa con ese email.",
+      });
+    }
+
+    const pricingDoc = await getOrCreatePlanPricing();
+    const pricing = serializePlanPricing(pricingDoc);
+    const baseAmount = Number(pricing[plan]?.ars || 0);
+    const discountedAmount = Number(userDoc.subscription?.customPriceArs ?? 0);
+    const amount = discountedAmount > 0 ? discountedAmount : baseAmount;
+
+    if (!(amount > 0)) {
+      return res.status(400).json({
+        error: "El plan no tiene un precio configurado.",
+      });
+    }
+
+    const externalReference = `subscription:${userDoc._id.toString()}:${plan}:${Date.now()}`;
+    const preapproval = await createMercadoPagoSystemPreapproval({
+      payload: {
+        reason: `Suscripción BarberApp ${plan === "basic" ? "Básico" : "Pro"}`,
+        external_reference: externalReference,
+        payer_email: userDoc.email,
+        back_url: buildMercadoPagoSubscriptionReturnUrls().success,
+        status: "pending",
+        auto_recurring: {
+          frequency: 1,
+          frequency_type: "months",
+          transaction_amount: amount,
+          currency_id: "ARS",
+          start_date: new Date().toISOString(),
+        },
+        notification_url: `${buildMercadoPagoSubscriptionWebhookUrl()}?userId=${userDoc._id.toString()}`,
+      },
+    });
+
+    userDoc.subscription = {
+      ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
+      pendingPlan: plan,
+      billingCycle: "monthly",
+      renewalMode: "automatic",
+      mercadoPagoPreapprovalId: preapproval.id || null,
+      mercadoPagoPreapprovalStatus: preapproval.status || "pending",
+    };
+    await userDoc.save();
+
+    return res.json({
+      checkoutUrl: preapproval.init_point || null,
+      sandboxCheckoutUrl: preapproval.sandbox_init_point || null,
+      preapprovalId: preapproval.id || null,
+      amount,
+      currencyId: "ARS",
+      discountApplied: discountedAmount > 0 && discountedAmount < baseAmount,
+      baseAmount,
+      renewalMode: "automatic",
     });
   } catch (err) {
     return next(err);

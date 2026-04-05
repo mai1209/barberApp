@@ -194,6 +194,7 @@ export type ThemeConfig = {
   card?: string | null;
   gradientColors?: string[] | null;
   logoDataUrl?: string | null;
+  bannerDataUrl?: string | null;
 };
 
 export type PaymentSettings = {
@@ -224,6 +225,9 @@ export type NotificationSettings = {
 
 export type SubscriptionSettings = {
   renewalMode?: 'manual' | 'automatic';
+  mercadoPagoPreapprovalId?: string | null;
+  mercadoPagoPreapprovalStatus?: string | null;
+  nextBillingAt?: string | null;
 };
 
 export type PlanPricingResponse = {

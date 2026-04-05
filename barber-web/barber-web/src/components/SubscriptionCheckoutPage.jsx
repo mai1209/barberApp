@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { createPublicSubscriptionCheckout, fetchPlanPricing } from '../services/api';
+import {
+  createPublicRecurringSubscription,
+  createPublicSubscriptionCheckout,
+  fetchPlanPricing,
+} from '../services/api';
 import styles from '../styles/SubscriptionCheckoutPage.module.css';
 
 const PLAN_META = {
@@ -23,9 +27,22 @@ function getInitialPlan() {
   return plan === 'pro' ? 'pro' : 'basic';
 }
 
+function getInitialEmail() {
+  const url = new URL(window.location.href);
+  return String(url.searchParams.get('email') || '').trim();
+}
+
+function getInitialPaymentMode() {
+  const url = new URL(window.location.href);
+  return String(url.searchParams.get('mode') || '').trim().toLowerCase() === 'automatic'
+    ? 'automatic'
+    : 'manual';
+}
+
 export default function SubscriptionCheckoutPage() {
   const [selectedPlan, setSelectedPlan] = useState(getInitialPlan);
-  const [email, setEmail] = useState('');
+  const [paymentMode, setPaymentMode] = useState(getInitialPaymentMode);
+  const [email, setEmail] = useState(getInitialEmail);
   const [pricing, setPricing] = useState({
     basic: { ars: 25000, usdReference: 25 },
     pro: { ars: 35000, usdReference: 35 },
@@ -57,6 +74,15 @@ export default function SubscriptionCheckoutPage() {
     };
   }, []);
 
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('plan', selectedPlan);
+    if (email.trim()) url.searchParams.set('email', email.trim());
+    else url.searchParams.delete('email');
+    url.searchParams.set('mode', paymentMode);
+    window.history.replaceState({}, '', url.toString());
+  }, [selectedPlan, email, paymentMode]);
+
   const planCards = useMemo(
     () => [
       {
@@ -82,12 +108,24 @@ export default function SubscriptionCheckoutPage() {
     setMessage('');
 
     try {
-      const response = await createPublicSubscriptionCheckout({
-        email,
-        plan: selectedPlan,
-      });
+      const response =
+        paymentMode === 'automatic'
+          ? await createPublicRecurringSubscription({
+              email,
+              plan: selectedPlan,
+            })
+          : await createPublicSubscriptionCheckout({
+              email,
+              plan: selectedPlan,
+            });
 
-      if (response.discountApplied) {
+      if (paymentMode === 'automatic') {
+        setMessage(
+          `Vas a autorizar la renovación automática mensual del plan. El valor actual es ARS ${Number(
+            response.amount || 0,
+          ).toLocaleString('es-AR')}.`,
+        );
+      } else if (response.discountApplied) {
         setMessage(
           `A esta cuenta se le aplicó un precio diferencial. Vas a pagar ARS ${Number(
             response.amount || 0,
@@ -140,6 +178,29 @@ export default function SubscriptionCheckoutPage() {
 
       <section className={styles.formCard}>
         <form onSubmit={handleSubmit} className={styles.form}>
+          <div className={styles.modeSwitch}>
+            <button
+              type="button"
+              className={`${styles.modeButton} ${paymentMode === 'manual' ? styles.modeButtonActive : ''}`}
+              onClick={() => setPaymentMode('manual')}
+            >
+              Pago mensual manual
+            </button>
+            <button
+              type="button"
+              className={`${styles.modeButton} ${paymentMode === 'automatic' ? styles.modeButtonActive : ''}`}
+              onClick={() => setPaymentMode('automatic')}
+            >
+              Renovación automática
+            </button>
+          </div>
+
+          <p className={styles.modeHelper}>
+            {paymentMode === 'automatic'
+              ? 'Autorizás una vez el cobro mensual y después Mercado Pago intenta renovar solo cada mes.'
+              : 'Pagás cada mes manualmente desde la web cuando toque renovar.'}
+          </p>
+
           <label className={styles.field}>
             <span>Email de la cuenta</span>
             <input
@@ -152,7 +213,13 @@ export default function SubscriptionCheckoutPage() {
           </label>
 
           <button type="submit" className={styles.submitButton} disabled={loading}>
-            {loading ? 'Generando pago...' : 'Completar pago'}
+            {loading
+              ? paymentMode === 'automatic'
+                ? 'Generando autorización...'
+                : 'Generando pago...'
+              : paymentMode === 'automatic'
+                ? 'Activar renovación automática'
+                : 'Completar pago'}
           </button>
         </form>
 

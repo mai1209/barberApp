@@ -24,6 +24,7 @@ const minutesToLabel = (totalMinutes) => {
 
 const SLOT_INTERVAL_MINUTES = 30;
 const SHOP_TZ = "America/Argentina/Cordoba";
+const DEFAULT_BOOKING_BANNER = "/barberoSen%CC%83al.png";
 
 function formatTimeInShopTZ(value) {
   const parts = new Intl.DateTimeFormat("es-AR", {
@@ -177,7 +178,7 @@ const formatBarberScheduleSummary = (barber, date) => {
   return resolved.scheduleRange || "Sin horario configurado";
 };
 
-function BookingForm({ shopSlug }) {
+function BookingForm({ shopSlug, onNotFound }) {
   // 1. TODOS LOS USESTATE PRIMERO
   const [slugReady] = useState(() => {
     if (shopSlug) {
@@ -205,6 +206,7 @@ function BookingForm({ shopSlug }) {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedBarberSchedule, setSelectedBarberSchedule] = useState(null);
   const [paymentResultMessage, setPaymentResultMessage] = useState("");
+  const [shopUnavailable, setShopUnavailable] = useState(false);
 
   const currentDuration =
     selectedService?.durationMinutes ?? SLOT_INTERVAL_MINUTES;
@@ -326,34 +328,44 @@ function BookingForm({ shopSlug }) {
   }, [paymentMethod, paymentOptions]);
 
   useEffect(() => {
-    if (!slugReady) return;
+    if (!slugReady || shopUnavailable) return;
     (async () => {
       try {
         const res = await fetchShopInfo();
         setShopInfo(res?.shop ?? null);
       } catch (err) {
         console.error(err);
+        if (err?.status === 404) {
+          setShopUnavailable(true);
+          onNotFound?.();
+        }
       } finally {
         setShopLoading(false);
       }
     })();
-  }, [slugReady]);
+  }, [onNotFound, shopUnavailable, slugReady]);
 
   useEffect(() => {
-    if (!slugReady) return;
+    if (!slugReady || shopUnavailable) return;
     (async () => {
       try {
         const res = await fetchServices();
         const list = res?.services ?? [];
         setServices(list);
         setSelectedService(list[0] ?? null);
+      } catch (err) {
+        console.error("Error servicios:", err?.message, err?.status);
+        if (err?.status === 404) {
+          setShopUnavailable(true);
+          onNotFound?.();
+        }
       } finally {
       }
     })();
-  }, [slugReady]);
+  }, [onNotFound, shopUnavailable, slugReady]);
 
   useEffect(() => {
-    if (!slugReady) return;
+    if (!slugReady || shopUnavailable) return;
     (async () => {
       try {
         const res = await fetchBarbers();
@@ -362,14 +374,18 @@ function BookingForm({ shopSlug }) {
         if (list.length > 0) setSelectedBarber(list[0]._id);
       } catch (err) {
         console.error("Error barberos:", err.message, err.status);
+        if (err?.status === 404) {
+          setShopUnavailable(true);
+          onNotFound?.();
+        }
       } finally {
         setLoadingBarbers(false);
       }
     })();
-  }, [slugReady]);
+  }, [onNotFound, shopUnavailable, slugReady]);
 
   const loadSlots = useCallback(async () => {
-    if (!selectedBarber || !slugReady) return;
+    if (!selectedBarber || !slugReady || shopUnavailable) return;
     try {
       setLoadingSlots(true);
       const res = await fetchBarberAppointments(
@@ -402,10 +418,14 @@ function BookingForm({ shopSlug }) {
       setOccupiedSlots(busy);
     } catch (err) {
       console.error("Error ocupación:", err);
+      if (err?.status === 404) {
+        setShopUnavailable(true);
+        onNotFound?.();
+      }
     } finally {
       setLoadingSlots(false);
     }
-  }, [selectedBarber, selectedDate, slugReady]);
+  }, [onNotFound, selectedBarber, selectedDate, shopUnavailable, slugReady]);
 
   useEffect(() => {
     if (!selectedBarber) {
@@ -614,18 +634,11 @@ function BookingForm({ shopSlug }) {
       )}
 
       <header className={styles.header}>
-        <div className={styles.shopHero}>
-          <div className={styles.shopHeroLogoWrap}>
-            <img
-              className={styles.shopHeroLogo}
-              src={shopInfo?.themeConfig?.logoDataUrl || "/logo.png"}
-              alt={
-                shopLoading
-                  ? "Logo barbería"
-                  : `Logo ${shopInfo?.name || "barbería"}`
-              }
-            />
-          </div>
+        <h1 className={styles.title}>Nueva Cita</h1>
+      </header>
+
+      <form className={styles.card} onSubmit={handleSubmit}>
+        <div className={styles.cardHero}>
           <div className={styles.shopHeroText}>
             <p className={styles.shopHeroEyebrow}>Reservá tu turno en</p>
             <h2 className={styles.shopHeroName}>
@@ -633,17 +646,22 @@ function BookingForm({ shopSlug }) {
                 ? "Cargando barbería..."
                 : shopInfo?.name || "Barbería"}
             </h2>
+            <p className={styles.shopHeroSubtitle}>
+              Elegí servicio, horario y forma de pago para confirmar tu visita.
+            </p>
+          </div>
+          <div className={styles.shopHeroMedia}>
+            <img
+              className={styles.shopHeroBanner}
+              src={shopInfo?.themeConfig?.bannerDataUrl || DEFAULT_BOOKING_BANNER}
+              alt=""
+              aria-hidden="true"
+            />
+            <div className={styles.shopHeroOverlay} />
+            <div className={styles.shopHeroGlow} />
           </div>
         </div>
-        <p className={styles.textCodex}>
-          <img className={styles.logo} src="/logo.png" alt="logo" /> BarberApp
-          by CODEX®
-        </p>
-        <h1 className={styles.title}>Nueva Cita</h1>
-    
-      </header>
 
-      <form className={styles.card} onSubmit={handleSubmit}>
         <div className={styles.fieldGroup}>
           <label className={styles.label}>Servicio deseado</label>
           <button

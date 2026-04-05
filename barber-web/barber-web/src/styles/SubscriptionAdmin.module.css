@@ -217,7 +217,8 @@
 
 .input,
 .selectField select,
-.selectField input {
+.selectField input,
+.textarea {
   height: 48px;
   border-radius: 16px;
   border: 1px solid rgba(255,255,255,0.1);
@@ -225,6 +226,14 @@
   color: #fff;
   padding: 0 14px;
   font-size: 0.96rem;
+}
+
+.textarea {
+  height: auto;
+  min-height: 92px;
+  resize: vertical;
+  padding: 12px 14px;
+  font-family: inherit;
 }
 
 .loadButton,
@@ -473,6 +482,10 @@
   margin-bottom: 16px;
 }
 
+.notesField {
+  grid-column: span 3;
+}
+
 .cardActions {
   display: flex;
   align-items: center;
@@ -489,6 +502,17 @@
 .currentState {
   color: #c3c3ce;
   font-size: 0.92rem;
+}
+
+.currentStateWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.currentMeta {
+  color: #9292a4;
+  font-size: 0.84rem;
 }
 
 .currentStateDiscount {

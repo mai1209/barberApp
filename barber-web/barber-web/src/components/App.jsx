@@ -5,6 +5,7 @@ import { setShopSlug as registerShopSlug } from '../services/api';
 import LandingPage from './LandingPage';
 import SubscriptionAdmin from './SubscriptionAdmin';
 import SubscriptionCheckoutPage from './SubscriptionCheckoutPage';
+import NotFoundPage from './NotFoundPage';
 //import landingStyles from '../styles/LandingPage.module.css';
 
 
@@ -37,6 +38,7 @@ function resolveInitialSlug() {
 function resolveInternalPage() {
   const url = new URL(window.location.href);
   const pathname = url.pathname.replace(/^\/+|\/+$/g, '');
+  const segments = pathname ? pathname.split('/') : [];
 
   if (pathname === 'admin' || pathname === 'admin/subscriptions') {
     return 'subscription-admin';
@@ -46,6 +48,14 @@ function resolveInternalPage() {
     return 'subscription-checkout';
   }
 
+  if (segments[0] === 'admin' || segments[0] === 'planes' || segments[0] === 'suscripcion') {
+    return 'not-found';
+  }
+
+  if (segments.length > 1) {
+    return 'not-found';
+  }
+
   return null;
 }
 
@@ -53,6 +63,7 @@ function resolveInternalPage() {
 function App() {
   const [internalPage] = useState(() => resolveInternalPage());
   const [shopSlug] = useState(() => resolveInitialSlug());
+  const [missingShop, setMissingShop] = useState(false);
 
   if (internalPage === 'subscription-admin') {
     return <SubscriptionAdmin />;
@@ -60,6 +71,10 @@ function App() {
 
   if (internalPage === 'subscription-checkout') {
     return <SubscriptionCheckoutPage />;
+  }
+
+  if (internalPage === 'not-found' || missingShop) {
+    return <NotFoundPage />;
   }
 
   if (shopSlug) registerShopSlug(shopSlug);
@@ -71,7 +86,7 @@ function App() {
   return (
     <main className={styles.app}>
       <div className={styles.glow} aria-hidden="true" />
-      <BookingForm shopSlug={shopSlug} />
+      <BookingForm shopSlug={shopSlug} onNotFound={() => setMissingShop(true)} />
     </main>
   );
 }

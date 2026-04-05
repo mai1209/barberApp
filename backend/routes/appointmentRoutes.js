@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth } from "../middlewares/authMiddlewares.js";
+import { requireAuth, requireProSubscription } from "../middlewares/authMiddlewares.js";
 import {
   createAppointment,
   listAppointments,
@@ -26,9 +26,9 @@ router.get("/services", listServices);
 router.post("/services", createService);
 router.put("/services/:serviceId", updateService);
 router.delete("/services/:serviceId", deleteService);
-router.get("/metrics", getAppointmentMetrics);
-router.get("/month-overview", getCurrentMonthOverview);
-router.get("/history", getCustomerHistory);
+router.get("/metrics", requireProSubscription, getAppointmentMetrics);
+router.get("/month-overview", requireProSubscription, getCurrentMonthOverview);
+router.get("/history", requireProSubscription, getCustomerHistory);
 router.get("/", listAppointments);
 router.post("/", createAppointment);
 router.delete('/:appointmentId',  deleteAppointment);

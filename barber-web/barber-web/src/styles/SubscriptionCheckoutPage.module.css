@@ -138,6 +138,38 @@
   align-items: end;
 }
 
+.modeSwitch {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.modeButton {
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(18,18,24,0.92);
+  color: #d7d7e0;
+  min-height: 44px;
+  border-radius: 999px;
+  padding: 0 16px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.modeButtonActive {
+  border-color: rgba(255,20,147,0.35);
+  background: rgba(255,20,147,0.14);
+  color: #fff;
+}
+
+.modeHelper {
+  grid-column: 1 / -1;
+  margin: -2px 0 0;
+  color: #a5a5b3;
+  line-height: 1.5;
+}
+
 .field {
   display: flex;
   flex-direction: column;

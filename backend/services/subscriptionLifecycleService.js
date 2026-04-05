@@ -21,12 +21,22 @@ function formatDateLabel(value) {
   }).format(date);
 }
 
+function buildRenewalUrl({ email, plan, renewalMode }) {
+  const base = String(process.env.PUBLIC_BOOKING_BASE_URL || "https://barberappbycodex.com").replace(/\/+$/, "");
+  const params = new URLSearchParams();
+  if (plan) params.set("plan", String(plan));
+  if (email) params.set("email", String(email));
+  if (renewalMode) params.set("mode", String(renewalMode));
+  return `${base}/planes?${params.toString()}`;
+}
+
 function buildSubscriptionMailHtml({
   title,
   intro,
   ctaLabel,
   expiresAt,
   statusColor,
+  ctaUrl,
 }) {
   return `
     <div style="background:#121212;color:#ffffff;padding:30px;font-family:sans-serif;border-radius:15px;max-width:520px;margin:auto;border:1px solid ${statusColor};">
@@ -39,8 +49,15 @@ function buildSubscriptionMailHtml({
         <span style="color:#FF1493;font-weight:700;"> ${formatDateLabel(expiresAt)}</span>
       </p>
       <p style="margin:14px 0 0;color:#bbb;font-size:14px;line-height:1.6;">
-        Podés entrar a la app y tocar <strong>${ctaLabel}</strong> para mantener la cuenta activa.
+        Podés completar la renovación desde la web cuando quieras.
       </p>
+      ${ctaUrl ? `
+      <div style="text-align:center;margin-top:18px;">
+        <a href="${ctaUrl}" style="display:inline-block;background:${statusColor};color:#111;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:800;">
+          ${ctaLabel}
+        </a>
+      </div>
+      ` : ""}
       <div style="text-align:center;margin-top:18px;">
         <p style="font-size:9px;color:#444;letter-spacing:3px;margin:0;text-transform:uppercase;">POWERED BY CODEX® SYSTEM</p>
       </div>
@@ -62,6 +79,7 @@ async function sendSubscriptionMail({
   ctaLabel,
   expiresAt,
   statusColor,
+  ctaUrl,
 }) {
   if (!userDoc?.email) return false;
 
@@ -74,6 +92,7 @@ async function sendSubscriptionMail({
       ctaLabel,
       expiresAt,
       statusColor,
+      ctaUrl,
     }),
   });
 
@@ -156,9 +175,14 @@ export async function processSubscriptionLifecycle({ now = new Date() } = {}) {
             userDoc,
             title: "Tu plan venció",
             intro: "Tu plan ya venció. Tenés unos días de gracia para renovarlo sin perder continuidad.",
-            ctaLabel: "Renovar plan",
+            ctaLabel: "Renovar ahora",
             expiresAt,
             statusColor: "#F5C451",
+            ctaUrl: buildRenewalUrl({
+              email: userDoc.email,
+              plan: userDoc.subscription?.plan || "basic",
+              renewalMode: "manual",
+            }),
           });
           await sendSubscriptionPush({
             userDoc,
@@ -189,9 +213,14 @@ export async function processSubscriptionLifecycle({ now = new Date() } = {}) {
             userDoc,
             title: `Tu plan vence en ${reminder.days} día${reminder.days === 1 ? "" : "s"}`,
             intro: `Tu suscripción está por vencer. Renovala antes del ${formatDateLabel(expiresAt)} para no perder acceso.`,
-            ctaLabel: "Renovar plan",
+            ctaLabel: "Renovar ahora",
             expiresAt,
             statusColor: reminder.days === 1 ? "#FF8A00" : "#21C063",
+            ctaUrl: buildRenewalUrl({
+              email: userDoc.email,
+              plan: userDoc.subscription?.plan || "basic",
+              renewalMode: "manual",
+            }),
           });
           await sendSubscriptionPush({
             userDoc,
@@ -227,9 +256,14 @@ export async function processSubscriptionLifecycle({ now = new Date() } = {}) {
             userDoc,
             title: "Pago pendiente del plan",
             intro: "Tu cuenta está pendiente de pago. Renovala antes de la fecha límite para evitar la baja comercial.",
-            ctaLabel: "Renovar plan",
+            ctaLabel: "Renovar ahora",
             expiresAt: graceUntil,
             statusColor: "#F5C451",
+            ctaUrl: buildRenewalUrl({
+              email: userDoc.email,
+              plan: userDoc.subscription?.plan || "basic",
+              renewalMode: "manual",
+            }),
           });
           await sendSubscriptionPush({
             userDoc,
@@ -265,6 +299,11 @@ export async function processSubscriptionLifecycle({ now = new Date() } = {}) {
             ctaLabel: "Activar plan",
             expiresAt: graceUntil,
             statusColor: "#FF5A5F",
+            ctaUrl: buildRenewalUrl({
+              email: userDoc.email,
+              plan: userDoc.subscription?.plan || "basic",
+              renewalMode: "manual",
+            }),
           });
           await sendSubscriptionPush({
             userDoc,

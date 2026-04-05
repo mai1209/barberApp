@@ -11,6 +11,7 @@ const themeConfigSchema = new mongoose.Schema(
       default: [],
     },
     logoDataUrl: { type: String, default: null },
+    bannerDataUrl: { type: String, default: null },
   },
   {
     _id: false,
@@ -108,6 +109,12 @@ const subscriptionSchema = new mongoose.Schema(
       default: null,
       min: 0,
     },
+    internalNotes: {
+      type: String,
+      trim: true,
+      default: "",
+      maxlength: 400,
+    },
     startedAt: {
       type: Date,
       default: Date.now,
@@ -125,8 +132,20 @@ const subscriptionSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    mercadoPagoPreapprovalId: {
+      type: String,
+      default: null,
+    },
+    mercadoPagoPreapprovalStatus: {
+      type: String,
+      default: null,
+    },
     mercadoPagoPaymentId: {
       type: String,
+      default: null,
+    },
+    nextBillingAt: {
+      type: Date,
       default: null,
     },
     lastPaymentAt: {

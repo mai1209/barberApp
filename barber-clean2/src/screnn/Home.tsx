@@ -26,7 +26,9 @@ import { Swipeable } from 'react-native-gesture-handler';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
-import { getUserProfile } from '../services/authStorage';
+import { getUserProfile, subscribeToUserProfile } from '../services/authStorage';
+import { hasProPlanAccess } from '../services/planAccess';
+import ProFeatureModal from '../components/ProFeatureModal';
 import {
   fetchAppointments,
   Appointment,
@@ -40,6 +42,7 @@ type Props = {
 };
 
 const PUBLIC_BOOKING_BASE = 'https://barberappbycodex.com';
+const PRO_PLAN_URL = 'https://barberappbycodex.com/planes?plan=pro';
 const hexToRgba = (hex: string, alpha: number) => {
   const sanitized = hex.replace('#', '');
   const bigint = parseInt(
@@ -110,6 +113,8 @@ function Home({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [hasProAccess, setHasProAccess] = useState(false);
+  const [proModalVariant, setProModalVariant] = useState<null | 'metrics' | 'history'>(null);
 
   const selectedDateRef = useRef(selectedDate);
   const didInitDateEffect = useRef(false);
@@ -186,11 +191,38 @@ function Home({ navigation }: Props) {
     let isMounted = true;
     (async () => {
       const storedUser = await getUserProfile<{ fullName?: string }>();
-      if (isMounted && storedUser?.fullName) setFullName(storedUser.fullName);
+      if (isMounted && storedUser) {
+        if (storedUser?.fullName) setFullName(storedUser.fullName);
+        setHasProAccess(hasProPlanAccess(storedUser));
+      }
     })();
     return () => {
       isMounted = false;
     };
+  }, []);
+
+  useEffect(() => {
+    return subscribeToUserProfile(user => {
+      setHasProAccess(hasProPlanAccess(user));
+      setFullName(user?.fullName || '');
+    });
+  }, []);
+
+  const handleOpenProModal = useCallback((variant: 'metrics' | 'history') => {
+    setProModalVariant(variant);
+  }, []);
+
+  const handleCloseProModal = useCallback(() => {
+    setProModalVariant(null);
+  }, []);
+
+  const handleOpenSubscriptionSettings = useCallback(async () => {
+    setProModalVariant(null);
+    try {
+      await Linking.openURL(PRO_PLAN_URL);
+    } catch (_error) {
+      Alert.alert('No pudimos abrir el sitio de planes', PRO_PLAN_URL);
+    }
   }, []);
 
   useFocusEffect(
@@ -514,23 +546,29 @@ function Home({ navigation }: Props) {
 
         <View style={styles.compactCardsRow}>
           <Pressable
-            style={styles.dualCompactCard}
-            onPress={() => navigation.navigate('Owner-Metrics')}
+            style={[styles.dualCompactCard, !hasProAccess && styles.dualCompactCardLocked]}
+            onPress={() =>
+              hasProAccess ? navigation.navigate('Owner-Metrics') : handleOpenProModal('metrics')
+            }
           >
             <View style={styles.metricsIconBox}>
               <TrendingUp size={20} color={theme.primary} />
             </View>
             <Text style={styles.metricsTitleCompact}>Métricas</Text>
+            {!hasProAccess ? <Text style={styles.proBadgeCompact}>PRO</Text> : null}
           </Pressable>
 
           <Pressable
-            style={styles.dualCompactCard}
-            onPress={() => navigation.navigate('Customer-History')}
+            style={[styles.dualCompactCard, !hasProAccess && styles.dualCompactCardLocked]}
+            onPress={() =>
+              hasProAccess ? navigation.navigate('Customer-History') : handleOpenProModal('history')
+            }
           >
             <View style={styles.metricsIconBox}>
               <Users size={20} color={theme.primary} />
             </View>
             <Text style={styles.metricsTitleCompact}>Historial</Text>
+            {!hasProAccess ? <Text style={styles.proBadgeCompact}>PRO</Text> : null}
           </Pressable>
         </View>
 
@@ -620,6 +658,13 @@ function Home({ navigation }: Props) {
           </View>
         </View>
       </ScrollView>
+      <ProFeatureModal
+        visible={proModalVariant != null}
+        variant={proModalVariant ?? 'metrics'}
+        theme={theme}
+        onClose={handleCloseProModal}
+        onOpenPlan={handleOpenSubscriptionSettings}
+      />
     </View>
   );
 }
@@ -668,6 +713,18 @@ const createStyles = (theme: Theme) =>
     dualCompactCard: { flex: 1, backgroundColor: theme.card, borderRadius: 20, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: '#2A2A2A', flexDirection: 'row' },
     metricsIconBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: hexToRgba(theme.primary, 0.1), alignItems: 'center', justifyContent: 'center' },
     metricsTitleCompact: { color: '#FFF', fontSize: 13, fontWeight: '800' },
+    dualCompactCardLocked: {
+      opacity: 0.82,
+      borderColor: hexToRgba(theme.primary, 0.25),
+    },
+    proBadgeCompact: {
+      marginTop: 6,
+      color: theme.primary,
+      fontSize: 10,
+      fontWeight: '900',
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
+    },
 
     // Agenda Section
     section: { marginTop: 25 },

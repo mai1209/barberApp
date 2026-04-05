@@ -114,3 +114,10 @@ export async function createPublicSubscriptionCheckout(payload) {
     body: payload,
   });
 }
+
+export async function createPublicRecurringSubscription(payload) {
+  return request('/subscriptions/recurring/start', {
+    method: 'POST',
+    body: payload,
+  });
+}

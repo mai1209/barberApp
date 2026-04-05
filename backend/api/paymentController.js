@@ -9,6 +9,7 @@ import {
   createMercadoPagoPreference,
   getMercadoPagoConfig,
   getMercadoPagoPayment,
+  getMercadoPagoSystemPreapproval,
   getMercadoPagoSystemPayment,
   refreshMercadoPagoAccessToken,
 } from "../services/mercadoPago.js";
@@ -215,6 +216,15 @@ function normalizeSubscriptionReference(value) {
   return { userId, plan };
 }
 
+function resolvePreapprovalStatus(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "authorized") return "authorized";
+  if (normalized === "pending") return "pending";
+  if (normalized === "paused") return "paused";
+  if (normalized === "cancelled") return "cancelled";
+  return "unknown";
+}
+
 function calculateSubscriptionExpiry({ billingCycle, paidAt }) {
   if (!billingCycle || billingCycle === "custom") return null;
   const base = new Date(paidAt);
@@ -224,6 +234,74 @@ function calculateSubscriptionExpiry({ billingCycle, paidAt }) {
   }
   base.setMonth(base.getMonth() + 1);
   return base;
+}
+
+async function syncAutomaticSubscriptionFromPreapproval(preapproval) {
+  const parsedReference = normalizeSubscriptionReference(preapproval?.external_reference);
+  const userId = parsedReference?.userId || "";
+  const plan = parsedReference?.plan || "";
+
+  if (!userId || !plan) {
+    return false;
+  }
+
+  const userDoc = await UserModel.findById(userId);
+  if (!userDoc || userDoc.isActive === false) {
+    return false;
+  }
+
+  const normalizedStatus = resolvePreapprovalStatus(preapproval?.status);
+  const nextBillingAt = preapproval?.auto_recurring?.next_payment_date
+    ? new Date(preapproval.auto_recurring.next_payment_date)
+    : null;
+
+  if (normalizedStatus === "authorized") {
+    const startedAt = preapproval?.date_created ? new Date(preapproval.date_created) : new Date();
+    userDoc.subscription = {
+      ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
+      plan,
+      status: "active",
+      billingCycle: "monthly",
+      renewalMode: "automatic",
+      startedAt: userDoc.subscription?.startedAt || startedAt,
+      expiresAt: nextBillingAt,
+      nextBillingAt,
+      pendingPlan: null,
+      mercadoPagoPreapprovalId:
+        String(preapproval.id || userDoc.subscription?.mercadoPagoPreapprovalId || "") || null,
+      mercadoPagoPreapprovalStatus: normalizedStatus,
+      renewalReminder7dAt: null,
+      renewalReminder3dAt: null,
+      renewalReminder1dAt: null,
+      pastDueAt: null,
+      pastDueReminderSentAt: null,
+      graceUntil: null,
+      cancelledAt: null,
+    };
+    await userDoc.save();
+    return true;
+  }
+
+  userDoc.subscription = {
+    ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
+    renewalMode: "automatic",
+    mercadoPagoPreapprovalId:
+      String(preapproval.id || userDoc.subscription?.mercadoPagoPreapprovalId || "") || null,
+    mercadoPagoPreapprovalStatus: normalizedStatus,
+    nextBillingAt,
+    status:
+      normalizedStatus === "cancelled"
+        ? "cancelled"
+        : normalizedStatus === "paused"
+          ? "past_due"
+          : userDoc.subscription?.status || "trial",
+    cancelledAt:
+      normalizedStatus === "cancelled"
+        ? new Date()
+        : userDoc.subscription?.cancelledAt || null,
+  };
+  await userDoc.save();
+  return true;
 }
 
 async function ensureMercadoPagoAccessToken(userDoc) {
@@ -471,8 +549,17 @@ export async function handleSubscriptionMercadoPagoWebhook(req, res, next) {
       req.body?.data?.id || req.query?.["data.id"] || req.body?.id || "",
     ).trim();
 
-    if (type && type !== "payment") {
+    if (type && type !== "payment" && !type.toLowerCase().includes("preapproval")) {
       return res.status(200).json({ received: true, ignored: true });
+    }
+
+    if (type.toLowerCase().includes("preapproval")) {
+      if (!paymentId) {
+        return res.status(200).json({ received: true, ignored: true });
+      }
+      const preapproval = await getMercadoPagoSystemPreapproval({ preapprovalId: paymentId });
+      await syncAutomaticSubscriptionFromPreapproval(preapproval);
+      return res.status(200).json({ received: true, kind: "preapproval" });
     }
 
     if (!paymentId) {
@@ -509,8 +596,13 @@ export async function handleSubscriptionMercadoPagoWebhook(req, res, next) {
         plan,
         status: "active",
         billingCycle,
+        renewalMode: userDoc.subscription?.renewalMode || "manual",
         startedAt: paidAt,
         expiresAt: calculateSubscriptionExpiry({ billingCycle, paidAt }),
+        nextBillingAt:
+          userDoc.subscription?.renewalMode === "automatic"
+            ? userDoc.subscription?.nextBillingAt || null
+            : calculateSubscriptionExpiry({ billingCycle, paidAt }),
         pendingPlan: null,
         mercadoPagoPaymentId: String(payment.id || paymentId),
         mercadoPagoPreferenceId:
@@ -544,6 +636,15 @@ export async function handleSubscriptionMercadoPagoWebhook(req, res, next) {
 export async function handleSubscriptionPaymentReturnPage(req, res, next) {
   try {
     const result = String(req.query?.result || "").trim() || "unknown";
+    const preapprovalId = String(
+      req.query?.preapproval_id || req.query?.preapproval || req.query?.subscription_id || req.query?.id || "",
+    ).trim();
+    if (preapprovalId) {
+      try {
+        const preapproval = await getMercadoPagoSystemPreapproval({ preapprovalId });
+        await syncAutomaticSubscriptionFromPreapproval(preapproval);
+      } catch (_error) {}
+    }
     return res.status(200).send(buildSubscriptionPaymentReturnHtml({ result }));
   } catch (err) {
     return next(err);
