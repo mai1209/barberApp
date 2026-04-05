@@ -103,3 +103,14 @@ export async function createAppointment(payload) {
 export async function fetchShopInfo() {
   return request(buildShopPath());
 }
+
+export async function fetchPlanPricing() {
+  return request('/plans');
+}
+
+export async function createPublicSubscriptionCheckout(payload) {
+  return request('/subscriptions/checkout', {
+    method: 'POST',
+    body: payload,
+  });
+}

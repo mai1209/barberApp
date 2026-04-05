@@ -1,0 +1,647 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { getCurrentUser, getPlanPricing } from '../services/api';
+import { saveUserProfile } from '../services/authStorage';
+import { useTheme } from '../context/ThemeContext';
+import type { Theme } from '../context/ThemeContext';
+
+const COMMERCIAL_EMAIL = 'barberappbycodex@gmail.com';
+const CUSTOM_PLAN_URL =
+  'https://wa.me/543425543308?text=Hola%20quiero%20consultar%20por%20el%20plan%20personalizable%20de%20BarberApp';
+const PLANS_WEBSITE_URL = 'https://barberappbycodex.com/planes';
+
+type SubscriptionState = {
+  plan?: 'basic' | 'pro' | 'custom';
+  status?: 'trial' | 'active' | 'past_due' | 'cancelled';
+  billingCycle?: 'monthly' | 'yearly' | 'custom' | null;
+  renewalMode?: 'manual' | 'automatic';
+  customPriceArs?: number | null;
+  customPriceUsdReference?: number | null;
+  startedAt?: string | null;
+  expiresAt?: string | null;
+};
+
+const PLAN_COPY: Record<
+  NonNullable<SubscriptionState['plan']>,
+  {
+    label: string;
+    accent: string;
+    summary: string;
+    price: string;
+    includes: string[];
+  }
+> = {
+  basic: {
+    label: 'Básico',
+    accent: '#FF1493',
+    summary: 'Todo lo necesario para vender turnos online y ordenar la agenda.',
+    price: 'ARS 25.000 / mes · ref. USD 25',
+    includes: [
+      'Logo, colores y link personalizado',
+      'Mercado Pago y cobro online',
+      'Barberos, servicios y turnos ilimitados',
+      'Mails y recordatorios automáticos',
+    ],
+  },
+  pro: {
+    label: 'Pro',
+    accent: '#21C063',
+    summary: 'Más control del negocio con métricas, historial y exportaciones.',
+    price: 'ARS 35.000 / mes · ref. USD 35',
+    includes: [
+      'Todo lo del plan Básico',
+      'Métricas generales e individuales',
+      'Historial de turnos, servicios y caja',
+      'Exportación por mail, PDF y Excel',
+    ],
+  },
+  custom: {
+    label: 'Personalizable',
+    accent: '#F5C451',
+    summary: 'Marca propia, dominio propio y solución hecha a medida.',
+    price: 'A medida',
+    includes: [
+      'Todo lo del plan Pro',
+      'Web personalizada',
+      'Dominio y branding propios',
+      'App con nombre propio',
+    ],
+  },
+};
+
+function formatDateLabel(value?: string | null) {
+  if (!value) return 'Sin fecha definida';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Sin fecha definida';
+  return new Intl.DateTimeFormat('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+}
+
+function getStatusCopy(status?: SubscriptionState['status']) {
+  switch (status) {
+    case 'active':
+      return { label: 'Activa', color: '#21C063' };
+    case 'past_due':
+      return { label: 'Pago pendiente', color: '#F5C451' };
+    case 'cancelled':
+      return { label: 'Cancelada', color: '#FF5A5F' };
+    case 'trial':
+    default:
+      return { label: 'Cuenta de prueba', color: '#5A8CFF' };
+  }
+}
+
+function getCycleCopy(cycle?: SubscriptionState['billingCycle']) {
+  switch (cycle) {
+    case 'yearly':
+      return 'Anual';
+    case 'custom':
+      return 'Manual / especial';
+    case 'monthly':
+    default:
+      return 'Mensual';
+  }
+}
+
+export default function SubscriptionSettingsScreen({ navigation }: { navigation: any }) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const [subscription, setSubscription] = useState<SubscriptionState | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [priceOverrides, setPriceOverrides] = useState({
+    basic: { ars: 25000, usdReference: 25 },
+    pro: { ars: 35000, usdReference: 35 },
+  });
+
+  const loadSubscription = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+
+    try {
+      const [res, pricingResponse] = await Promise.all([getCurrentUser(), getPlanPricing()]);
+      setSubscription(res.user?.subscription ?? null);
+      await saveUserProfile(res.user);
+      setPriceOverrides({
+        basic: {
+          ars: Number(pricingResponse.pricing?.basic?.ars || 25000),
+          usdReference: Number(pricingResponse.pricing?.basic?.usdReference || 25),
+        },
+        pro: {
+          ars: Number(pricingResponse.pricing?.pro?.ars || 35000),
+          usdReference: Number(pricingResponse.pricing?.pro?.usdReference || 35),
+        },
+      });
+    } catch (error: any) {
+      Alert.alert('No pudimos cargar el plan', error?.message ?? 'Probá de nuevo.');
+    } finally {
+      if (isRefresh) setRefreshing(false);
+      else setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSubscription();
+  }, [loadSubscription]);
+
+  const planKey = subscription?.plan ?? 'basic';
+  const planInfo = PLAN_COPY[planKey];
+  const basePriceArs =
+    planKey === 'basic' ? priceOverrides.basic.ars : planKey === 'pro' ? priceOverrides.pro.ars : 0;
+  const baseUsdReference =
+    planKey === 'basic'
+      ? priceOverrides.basic.usdReference
+      : planKey === 'pro'
+        ? priceOverrides.pro.usdReference
+        : 0;
+  const effectiveArs =
+    planKey === 'basic' || planKey === 'pro'
+      ? Number(subscription?.customPriceArs ?? basePriceArs)
+      : null;
+  const effectiveUsdReference =
+    planKey === 'basic' || planKey === 'pro'
+      ? Number(subscription?.customPriceUsdReference ?? baseUsdReference)
+      : null;
+  const effectivePlanPrice =
+    planKey === 'basic' || planKey === 'pro'
+      ? `ARS ${Number(effectiveArs || 0).toLocaleString('es-AR')} / mes · ref. USD ${Number(
+          effectiveUsdReference || 0,
+        )}`
+      : planInfo.price;
+  const discountArs =
+    planKey === 'basic' || planKey === 'pro'
+      ? Math.max(0, Number(basePriceArs || 0) - Number(effectiveArs || 0))
+      : 0;
+  const statusInfo = getStatusCopy(subscription?.status);
+  const expiresAtDate = subscription?.expiresAt ? new Date(subscription.expiresAt) : null;
+  const daysRemaining =
+    expiresAtDate && !Number.isNaN(expiresAtDate.getTime())
+      ? Math.ceil((expiresAtDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+      : null;
+  const isRestrictedAccount =
+    subscription?.status === 'trial' ||
+    subscription?.status === 'past_due' ||
+    subscription?.status === 'cancelled';
+
+  const getRenewalHint = () => {
+    if (!expiresAtDate || Number.isNaN(expiresAtDate.getTime())) {
+      return 'Podés renovar tu plan desde esta pantalla cuando lo necesites.';
+    }
+
+    if (subscription?.status === 'past_due') {
+      return 'Tu plan está pendiente de pago. Renovalo para volver a quedar activo.';
+    }
+
+    if (subscription?.status === 'cancelled') {
+      return 'Tu plan fue desactivado. Podés activarlo otra vez desde esta pantalla.';
+    }
+
+    if (typeof daysRemaining === 'number' && daysRemaining <= 1) {
+      return 'Tu plan vence muy pronto. Renovalo ahora para evitar cortes.';
+    }
+
+    if (typeof daysRemaining === 'number' && daysRemaining <= 7) {
+      return `Tu plan vence en ${daysRemaining} día${daysRemaining === 1 ? '' : 's'}.`;
+    }
+
+    return 'Tu plan está activo. Si querés, podés renovarlo antes del vencimiento.';
+  };
+
+  const openCustomContact = async () => {
+    try {
+      await Linking.openURL(CUSTOM_PLAN_URL);
+    } catch (_error) {
+      Alert.alert('No pudimos abrir el contacto comercial', CUSTOM_PLAN_URL);
+    }
+  };
+
+  const openSupportMail = async () => {
+    try {
+      await Linking.openURL(
+        `mailto:${COMMERCIAL_EMAIL}?subject=${encodeURIComponent('Consulta sobre plan BarberApp')}`,
+      );
+    } catch (_error) {
+      Alert.alert('No pudimos abrir el mail', COMMERCIAL_EMAIL);
+    }
+  };
+
+  const openPlansWebsite = async () => {
+    try {
+      await Linking.openURL(PLANS_WEBSITE_URL);
+    } catch (_error) {
+      Alert.alert('No pudimos abrir el sitio de planes', PLANS_WEBSITE_URL);
+    }
+  };
+
+  return (
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={() => loadSubscription(true)} />
+      }
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.header}>
+        <Text style={styles.eyebrow}>PLAN Y SUSCRIPCIÓN</Text>
+        <Text style={styles.title}>Estado comercial de tu cuenta</Text>
+        <Text style={styles.subtitle}>
+          Acá ves qué plan tenés activo, cómo está la cuenta y qué incluye hoy tu barbería.
+        </Text>
+      </View>
+
+      {loading ? (
+        <View style={styles.loadingCard}>
+          <ActivityIndicator size="small" color={theme.primary} />
+          <Text style={styles.loadingText}>Cargando estado del plan...</Text>
+        </View>
+      ) : (
+        <>
+          {isRestrictedAccount ? (
+            <View style={styles.lockedCard}>
+              <Text style={styles.lockedEyebrow}>ACCESO LIMITADO</Text>
+              <Text style={styles.lockedTitle}>Activá tu plan para usar la barbería</Text>
+              <Text style={styles.lockedText}>
+                Esta cuenta todavía no tiene una suscripción activa. Hasta completar el alta o la renovación, dejamos bloqueado el panel principal y solo vas a ver el estado comercial.
+              </Text>
+              <Text style={styles.lockedHint}>
+                Para activar tu cuenta, completá el pago desde la web o pedile a soporte que la active.
+              </Text>
+            </View>
+          ) : null}
+
+          <View style={styles.statusCard}>
+            <View style={styles.statusTopRow}>
+              <View>
+                <Text style={styles.planLabel}>Plan actual</Text>
+                <Text style={styles.planValue}>{planInfo.label}</Text>
+              </View>
+              <View style={[styles.statusBadge, { backgroundColor: `${statusInfo.color}22` }]}>
+                <Text style={[styles.statusBadgeText, { color: statusInfo.color }]}>
+                  {statusInfo.label}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.planSummary}>{planInfo.summary}</Text>
+            <Text style={[styles.planPrice, { color: planInfo.accent }]}>Precio: {effectivePlanPrice}</Text>
+            {discountArs > 0 ? (
+              <View style={styles.discountCard}>
+                <Text style={styles.discountTitle}>Descuento aplicado</Text>
+                <Text style={styles.discountText}>
+                  Se te aplicó un descuento de ARS {discountArs.toLocaleString('es-AR')} sobre el valor del plan.
+                </Text>
+              </View>
+            ) : null}
+
+            <View style={styles.metaGrid}>
+              <View style={styles.metaItem}>
+                <Text style={styles.metaLabel}>Ciclo</Text>
+                <Text style={styles.metaValue}>{getCycleCopy(subscription?.billingCycle)}</Text>
+              </View>
+              <View style={styles.metaItem}>
+                <Text style={styles.metaLabel}>Inicio</Text>
+                <Text style={styles.metaValue}>{formatDateLabel(subscription?.startedAt)}</Text>
+              </View>
+              <View style={styles.metaItem}>
+                <Text style={styles.metaLabel}>Vencimiento</Text>
+                <Text style={styles.metaValue}>{formatDateLabel(subscription?.expiresAt)}</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.includesCard}>
+            <Text style={styles.sectionTitle}>Qué incluye hoy tu plan</Text>
+            {planInfo.includes.map(item => (
+              <View key={item} style={styles.includeRow}>
+                <View style={[styles.includeDot, { backgroundColor: planInfo.accent }]} />
+                <Text style={styles.includeText}>{item}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.actionsCard}>
+            <Text style={styles.sectionTitle}>Acciones rápidas</Text>
+            <View style={styles.renewalHintCard}>
+              <Text style={styles.renewalHintTitle}>
+                {subscription?.status === 'past_due' || subscription?.status === 'cancelled'
+                  ? 'Renovación pendiente'
+                  : 'Próximo vencimiento'}
+              </Text>
+              <Text style={styles.renewalHintText}>{getRenewalHint()}</Text>
+            </View>
+            {isRestrictedAccount ? (
+              <Pressable style={styles.primaryButton} onPress={openPlansWebsite}>
+                <Text style={styles.primaryButtonText}>Ver sitio de planes</Text>
+              </Pressable>
+            ) : null}
+            {!isRestrictedAccount ? (
+              <Pressable
+                style={styles.primaryButton}
+                onPress={() =>
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'Home' }],
+                  })
+                }
+              >
+                <Text style={styles.primaryButtonText}>Entrar al panel</Text>
+              </Pressable>
+            ) : null}
+            <Pressable style={styles.secondaryButton} onPress={openSupportMail}>
+              <Text style={styles.secondaryButtonText}>Hablar con soporte comercial</Text>
+            </Pressable>
+            <Pressable style={styles.ghostButton} onPress={openCustomContact}>
+              <Text style={styles.ghostButtonText}>Consultar plan personalizable</Text>
+            </Pressable>
+          </View>
+        </>
+      )}
+    </ScrollView>
+  );
+}
+
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: '#08080D',
+    },
+    content: {
+      paddingHorizontal: 18,
+      paddingTop: 32,
+      paddingBottom: 130,
+      gap: 16,
+    },
+    header: {
+      gap: 10,
+      paddingTop: 18,
+      paddingBottom: 10,
+    },
+    eyebrow: {
+      color: theme.primary,
+      fontSize: 11,
+      fontWeight: '800',
+      letterSpacing: 2,
+      textTransform: 'uppercase',
+    },
+    title: {
+      color: '#fff',
+      fontSize: 28,
+      lineHeight: 32,
+      fontWeight: '900',
+    },
+    subtitle: {
+      color: '#959595',
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    loadingCard: {
+      backgroundColor: '#17171E',
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: '#2A2A34',
+      padding: 20,
+      alignItems: 'center',
+      gap: 12,
+    },
+    loadingText: {
+      color: '#C9C9D2',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    lockedCard: {
+      backgroundColor: '#1C1012',
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: '#5A1E2A',
+      padding: 18,
+      gap: 8,
+    },
+    lockedEyebrow: {
+      color: '#FF7B8B',
+      fontSize: 11,
+      fontWeight: '900',
+      letterSpacing: 1.4,
+      textTransform: 'uppercase',
+    },
+    lockedTitle: {
+      color: '#FFFFFF',
+      fontSize: 20,
+      lineHeight: 24,
+      fontWeight: '900',
+    },
+    lockedText: {
+      color: '#E7C8CF',
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    lockedHint: {
+      color: '#FFC6D1',
+      fontSize: 13,
+      lineHeight: 19,
+      fontWeight: '700',
+    },
+    statusCard: {
+      backgroundColor: '#17171E',
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: '#2A2A34',
+      padding: 18,
+      gap: 16,
+    },
+    statusTopRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      gap: 12,
+    },
+    planLabel: {
+      color: '#8E8E98',
+      fontSize: 12,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      marginBottom: 4,
+    },
+    planValue: {
+      color: '#fff',
+      fontSize: 24,
+      fontWeight: '900',
+    },
+    statusBadge: {
+      borderRadius: 999,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    statusBadgeText: {
+      fontSize: 12,
+      fontWeight: '900',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    planSummary: {
+      color: '#C9C9D2',
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    planPrice: {
+      fontSize: 16,
+      fontWeight: '900',
+    },
+    discountCard: {
+      backgroundColor: '#101016',
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: '#2A2A34',
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      gap: 4,
+    },
+    discountTitle: {
+      color: '#21C063',
+      fontSize: 12,
+      fontWeight: '900',
+      textTransform: 'uppercase',
+      letterSpacing: 0.7,
+    },
+    discountText: {
+      color: '#DFDFE6',
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    metaGrid: {
+      gap: 12,
+    },
+    metaItem: {
+      backgroundColor: '#101016',
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: '#242430',
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    metaLabel: {
+      color: '#8E8E98',
+      fontSize: 12,
+      fontWeight: '700',
+      marginBottom: 4,
+    },
+    metaValue: {
+      color: '#fff',
+      fontSize: 15,
+      fontWeight: '700',
+    },
+    includesCard: {
+      backgroundColor: '#17171E',
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: '#2A2A34',
+      padding: 18,
+      gap: 14,
+    },
+    sectionTitle: {
+      color: '#fff',
+      fontSize: 18,
+      fontWeight: '800',
+    },
+    includeRow: {
+      flexDirection: 'row',
+      gap: 10,
+      alignItems: 'flex-start',
+    },
+    includeDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 999,
+      marginTop: 6,
+      flexShrink: 0,
+    },
+    includeText: {
+      flex: 1,
+      color: '#DFDFE6',
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    actionsCard: {
+      backgroundColor: '#17171E',
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: '#2A2A34',
+      padding: 18,
+      gap: 12,
+    },
+    renewalHintCard: {
+      backgroundColor: '#101016',
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: '#2A2A34',
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      gap: 6,
+    },
+    renewalHintTitle: {
+      color: '#F5C451',
+      fontSize: 12,
+      fontWeight: '900',
+      textTransform: 'uppercase',
+      letterSpacing: 0.7,
+    },
+    renewalHintText: {
+      color: '#DFDFE6',
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    primaryButton: {
+      backgroundColor: theme.primary,
+      borderRadius: 18,
+      minHeight: 52,
+      paddingVertical: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    primaryButtonDisabled: {
+      opacity: 0.7,
+    },
+    primaryButtonText: {
+      color: '#fff',
+      fontSize: 15,
+      fontWeight: '900',
+    },
+    secondaryButton: {
+      backgroundColor: '#252530',
+      borderRadius: 18,
+      paddingVertical: 15,
+      alignItems: 'center',
+    },
+    secondaryButtonText: {
+      color: '#fff',
+      fontSize: 15,
+      fontWeight: '800',
+    },
+    ghostButton: {
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: '#3A3A46',
+      paddingVertical: 15,
+      alignItems: 'center',
+    },
+    ghostButtonText: {
+      color: '#D8D8DE',
+      fontSize: 14,
+      fontWeight: '700',
+    },
+  });

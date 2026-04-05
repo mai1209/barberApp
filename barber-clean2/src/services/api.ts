@@ -18,7 +18,7 @@ type ApiError = Error & {
 const LAN_IP = "192.168.100.48"; 
 const ANDROID_EMULATOR_HOST = "10.0.2.2";
 const REQUEST_TIMEOUT_MS = 8000;
-const FORCE_PROD_IN_DEBUG = true;
+const FORCE_PROD_IN_DEBUG = false;
 
 const isAndroid = Platform.OS === "android";
 const isAndroidEmulator = Boolean(
@@ -174,7 +174,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 }
 
 export function registerUser(payload: { email: string; fullName: string; password: string; }) {
-  return request("/api/auth/register", { method: "POST", body: payload });
+  return request<{ token?: string; user?: any; message?: string }>("/api/auth/register", {
+    method: "POST",
+    body: payload,
+  });
 }
 
 export function loginUser(payload: { email: string; password: string; }) {
@@ -213,6 +216,40 @@ export type MercadoPagoConnectionInfo = {
   hasRefreshToken?: boolean;
 };
 
+export type NotificationSettings = {
+  barberReminderEnabled?: boolean;
+  barberReminderMinutesBefore?: 15 | 30 | 60 | 120 | 180 | 1440;
+  customerSameDayEmailEnabled?: boolean;
+};
+
+export type SubscriptionSettings = {
+  renewalMode?: 'manual' | 'automatic';
+};
+
+export type PlanPricingResponse = {
+  pricing: {
+    basic: { ars: number; usdReference: number };
+    pro: { ars: number; usdReference: number };
+    custom: { ars: null; usdReference: null };
+    updatedAt?: string | null;
+  };
+};
+
+export function createSubscriptionCheckout(plan: 'basic' | 'pro') {
+  return request<{ checkoutUrl: string | null; sandboxCheckoutUrl?: string | null }>(
+    "/api/auth/subscription/checkout",
+    {
+      method: "POST",
+      body: { plan },
+      auth: true,
+    },
+  );
+}
+
+export function getPlanPricing() {
+  return request<PlanPricingResponse>("/api/public/plans");
+}
+
 export function updateThemeConfig(payload: ThemeConfig) {
   return request<{ message: string; user: any }>("/api/auth/theme", {
     method: "PUT",
@@ -223,6 +260,22 @@ export function updateThemeConfig(payload: ThemeConfig) {
 
 export function updatePaymentSettings(payload: PaymentSettings) {
   return request<{ message: string; user: any }>("/api/auth/payment-settings", {
+    method: "PUT",
+    body: payload,
+    auth: true,
+  });
+}
+
+export function updateNotificationSettings(payload: NotificationSettings) {
+  return request<{ message: string; user: any }>("/api/auth/notification-settings", {
+    method: "PUT",
+    body: payload,
+    auth: true,
+  });
+}
+
+export function updateSubscriptionSettings(payload: SubscriptionSettings) {
+  return request<{ message: string; user: any }>("/api/auth/subscription-settings", {
     method: "PUT",
     body: payload,
     auth: true,
@@ -293,6 +346,13 @@ export type Barber = {
   photoUrl?: string | null;
   scheduleRange?: string; 
   scheduleRanges?: { label: string; start: string; end: string }[];
+  dayScheduleOverrides?: {
+    day: number;
+    validFrom?: string | null;
+    useBase?: boolean;
+    scheduleRange?: string | null;
+    scheduleRanges?: { label: string; start: string; end: string }[];
+  }[];
   workDays?: number[];
 };
 
@@ -453,8 +513,15 @@ export function createBarber(payload: {
   email?: string; 
   phone?: string; 
   photoUrl?: string;
-   scheduleRange?: string;
+  scheduleRange?: string;
   scheduleRanges?: { label: string; start: string; end: string }[];
+  dayScheduleOverrides?: {
+    day: number;
+    validFrom?: string | null;
+    useBase?: boolean;
+    scheduleRange?: string | null;
+    scheduleRanges?: { label: string; start: string; end: string }[];
+  }[];
   workDays: number[];
 }) {
   return request<{ barber: Barber }>("/api/barbers", { 
@@ -473,6 +540,13 @@ export function updateBarber(
     photoUrl?: string;
     scheduleRange?: string;
     scheduleRanges?: { label: string; start: string; end: string }[];
+    dayScheduleOverrides?: {
+      day: number;
+      validFrom?: string | null;
+      useBase?: boolean;
+      scheduleRange?: string | null;
+      scheduleRanges?: { label: string; start: string; end: string }[];
+    }[];
     workDays: number[];
   },
 ) {
@@ -497,7 +571,15 @@ export function fetchAppointments(params?: { date?: string }) {
 
 export function fetchBarberAppointments(barberId: string, date?: string) {
   const query = date ? `?date=${encodeURIComponent(date)}` : "";
-  return request<{ barber: Barber; appointments: Appointment[] }>(`/api/barbers/${barberId}/appointments${query}`, { auth: true });
+  return request<{
+    barber: Barber;
+    resolvedSchedule?: {
+      scheduleRange?: string | null;
+      scheduleRanges?: { label: string; start: string; end: string }[];
+      source?: string;
+    };
+    appointments: Appointment[];
+  }>(`/api/barbers/${barberId}/appointments${query}`, { auth: true });
 }
 
 export function createAppointment(payload: {

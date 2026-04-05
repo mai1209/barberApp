@@ -19,7 +19,7 @@ type Props = {
   onNavigate: (routeName: any) => void;
 };
 
-const HIDDEN_ROUTES = new Set(['Login', 'Register']);
+const HIDDEN_ROUTES = new Set(['Login', 'Register', 'Plans', 'Subscription-Settings']);
 
 function resolveActiveRoute(routeName?: string): MainRoute | undefined {
   if (

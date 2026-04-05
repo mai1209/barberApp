@@ -502,6 +502,9 @@ function Home({ navigation }: Props) {
               <Text style={styles.linkUrlCompact} numberOfLines={1}>
                 {shareLink}
               </Text>
+              <Text style={styles.linkHelperCompact}>
+                Copiá y enviá este link para turnos.
+              </Text>
             </View>
             <View style={styles.copyBadgeCompact}>
               <Text style={styles.copyBadgeTextCompact}>COPIAR</Text>
@@ -536,7 +539,7 @@ function Home({ navigation }: Props) {
             <Text style={styles.sectionTitle}>Agenda de turnos</Text>
             {!isToday && (
               <Pressable style={styles.todayButton} onPress={handleGoToToday}>
-                <Text style={styles.todayButtonText}>Hoy</Text>
+                <Text style={styles.todayButtonText}>Volver a hoy</Text>
               </Pressable>
             )}
           </View>
@@ -658,6 +661,7 @@ const createStyles = (theme: Theme) =>
     linkIconBox: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#222', alignItems: 'center', justifyContent: 'center' },
     linkTitleCompact: { color: '#666', fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
     linkUrlCompact: { color: '#AAA', fontSize: 13, marginTop: 1 },
+    linkHelperCompact: { color: '#6F7787', fontSize: 10, marginTop: 3, lineHeight: 14 },
     copyBadgeCompact: { backgroundColor: hexToRgba(theme.primary, 0.15), paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
     copyBadgeTextCompact: { color: theme.primary, fontSize: 9, fontWeight: '900' },
     compactCardsRow: { flexDirection: 'row', gap: 10, marginTop: 10 },

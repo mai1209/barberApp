@@ -6,6 +6,10 @@ import { UserModel } from "../models/User.js";
 import admin from "../firebase.js";
 import { sendAppMail } from "../services/mailer.js";
 import { getTimeZoneDayRange, getTimeZoneWeekday } from "../utils/timezone.js";
+import {
+  isReminderRunAuthorized,
+  processAppointmentReminders,
+} from "../services/reminderService.js";
 
 // Función auxiliar para calcular rangos de fecha
 function buildDayRange(dateLike) {
@@ -408,6 +412,19 @@ export async function createAppointment(req, res, next) {
     return res.status(201).json({ appointment });
   } catch (err) {
     console.error("Error en createAppointment:", err);
+    return next(err);
+  }
+}
+
+export async function runAppointmentReminders(req, res, next) {
+  try {
+    if (!isReminderRunAuthorized(req)) {
+      return res.status(401).json({ error: "No autorizado para ejecutar recordatorios." });
+    }
+
+    const result = await processAppointmentReminders();
+    return res.json(result);
+  } catch (err) {
     return next(err);
   }
 }

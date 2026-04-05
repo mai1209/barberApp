@@ -16,6 +16,7 @@ import {
 
 import { loginUser, savePushTokenApi } from "../services/api"; // Importado savePushTokenApi
 import { saveToken, saveUserProfile } from "../services/authStorage";
+import { resolvePostAuthRoute } from "../services/subscriptionAccess";
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Importado
 import { useTheme } from "../context/ThemeContext";
 import type { Theme } from "../context/ThemeContext";
@@ -68,7 +69,7 @@ function Login({ navigation }: any) {
       // 3. Ir al Home
       navigation.reset({
         index: 0,
-        routes: [{ name: "Home" }],
+        routes: [{ name: resolvePostAuthRoute(res.user) }],
       });
     } catch (err: any) {
       setError(err?.message ?? "No se pudo iniciar sesión");

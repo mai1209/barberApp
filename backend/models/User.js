@@ -61,6 +61,112 @@ const mercadoPagoAuthSchema = new mongoose.Schema(
   },
 );
 
+const notificationSettingsSchema = new mongoose.Schema(
+  {
+    barberReminderEnabled: { type: Boolean, default: true },
+    barberReminderMinutesBefore: {
+      type: Number,
+      enum: [15, 30, 60, 120, 180, 1440],
+      default: 60,
+    },
+    customerSameDayEmailEnabled: { type: Boolean, default: true },
+  },
+  {
+    _id: false,
+  },
+);
+
+const subscriptionSchema = new mongoose.Schema(
+  {
+    plan: {
+      type: String,
+      enum: ["basic", "pro", "custom"],
+      default: "basic",
+    },
+    status: {
+      type: String,
+      enum: ["trial", "active", "past_due", "cancelled"],
+      default: "trial",
+    },
+    billingCycle: {
+      type: String,
+      enum: ["monthly", "yearly", "custom", null],
+      default: "monthly",
+    },
+    renewalMode: {
+      type: String,
+      enum: ["manual", "automatic"],
+      default: "manual",
+    },
+    customPriceArs: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+    customPriceUsdReference: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+    startedAt: {
+      type: Date,
+      default: Date.now,
+    },
+    expiresAt: {
+      type: Date,
+      default: null,
+    },
+    pendingPlan: {
+      type: String,
+      enum: ["basic", "pro", "custom", null],
+      default: null,
+    },
+    mercadoPagoPreferenceId: {
+      type: String,
+      default: null,
+    },
+    mercadoPagoPaymentId: {
+      type: String,
+      default: null,
+    },
+    lastPaymentAt: {
+      type: Date,
+      default: null,
+    },
+    renewalReminder7dAt: {
+      type: Date,
+      default: null,
+    },
+    renewalReminder3dAt: {
+      type: Date,
+      default: null,
+    },
+    renewalReminder1dAt: {
+      type: Date,
+      default: null,
+    },
+    pastDueAt: {
+      type: Date,
+      default: null,
+    },
+    pastDueReminderSentAt: {
+      type: Date,
+      default: null,
+    },
+    graceUntil: {
+      type: Date,
+      default: null,
+    },
+    cancelledAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  {
+    _id: false,
+  },
+);
+
 const userSchema = new mongoose.Schema(
   {
     fullName: {
@@ -128,6 +234,14 @@ const userSchema = new mongoose.Schema(
       type: mercadoPagoAuthSchema,
       default: null,
       select: false,
+    },
+    notificationSettings: {
+      type: notificationSettingsSchema,
+      default: () => ({}),
+    },
+    subscription: {
+      type: subscriptionSchema,
+      default: () => ({}),
     },
   },
   {

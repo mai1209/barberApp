@@ -10,8 +10,10 @@ import {
   View,
 } from 'react-native';
 import {
+  BellRing,
   ChevronRight,
   CreditCard,
+  Crown,
   KeyRound,
   LogOut,
   Mail,
@@ -43,15 +45,23 @@ function MenuItem({
   styles,
 }: MenuItemProps) {
   return (
-    <Pressable 
-      onPress={onPress} 
-      style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.menuItem,
+        pressed && styles.menuItemPressed,
+      ]}
     >
       <View style={[styles.iconWrap, danger && styles.iconWrapDanger]}>
-        <Icon size={18} color={danger ? '#ff1414' : theme?.primary || '#FFFFFF'} />
+        <Icon
+          size={18}
+          color={danger ? '#ff1414' : theme?.primary || '#FFFFFF'}
+        />
       </View>
       <View style={styles.itemBody}>
-        <Text style={[styles.itemLabel, danger && styles.itemLabelDanger]}>{label}</Text>
+        <Text style={[styles.itemLabel, danger && styles.itemLabelDanger]}>
+          {label}
+        </Text>
         <Text style={styles.itemDescription}>{description}</Text>
       </View>
       <ChevronRight size={18} color="#6E7585" />
@@ -65,26 +75,32 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
   const styles = createStyles();
 
   const handleLogout = async () => {
-    Alert.alert('Cerrar sesión', 'Vas a salir de esta cuenta en este dispositivo.', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Cerrar sesión',
-        style: 'destructive',
-        onPress: async () => {
-          await removeToken();
-          await removeUserProfile();
-          applyUserTheme(null);
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'Login' }],
-          });
+    Alert.alert(
+      'Cerrar sesión',
+      'Vas a salir de esta cuenta en este dispositivo.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Cerrar sesión',
+          style: 'destructive',
+          onPress: async () => {
+            await removeToken();
+            await removeUserProfile();
+            applyUserTheme(null);
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Login' }],
+            });
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   const handleSupportMail = async () => {
-    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Soporte BarberApp')}`;
+    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
+      'Soporte BarberApp',
+    )}`;
     try {
       await Linking.openURL(url);
     } catch (_error) {
@@ -101,7 +117,9 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.title}>Ajustes</Text>
-          <Text style={styles.subtitle}>Todo lo importante, explicado en simple.</Text>
+          <Text style={styles.subtitle}>
+            Todo lo importante, explicado en simple.
+          </Text>
         </View>
       </View>
 
@@ -124,6 +142,16 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
           theme={theme}
           styles={styles}
         />
+
+        <View style={styles.separator} />
+        <MenuItem
+          icon={BellRing}
+          label="Notificaciones y recordatorios"
+          description="Push al barbero y mail recordatorio al cliente el día del turno."
+          onPress={() => navigation.navigate('Notification-Settings')}
+          theme={theme}
+          styles={styles}
+        />
       </View>
 
       <Text style={styles.sectionLabel}>Cobros</Text>
@@ -133,6 +161,18 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
           label="Configurar cobros"
           description="Efectivo, seña online y estado de Mercado Pago."
           onPress={() => navigation.navigate('Payment-Settings')}
+          theme={theme}
+          styles={styles}
+        />
+      </View>
+
+      <Text style={styles.sectionLabel}>Plan</Text>
+      <View style={styles.groupCard}>
+        <MenuItem
+          icon={Crown}
+          label="Plan y suscripción"
+          description="Estado del plan, vencimiento y comparación de opciones."
+          onPress={() => navigation.navigate('Subscription-Settings')}
           theme={theme}
           styles={styles}
         />

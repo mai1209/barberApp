@@ -98,7 +98,7 @@ export default function PaymentSettingsScreen() {
 
   const advanceHelper = useMemo(() => {
     if (!form.advancePaymentEnabled) return 'El cliente solo ve pago en el local.';
-    if (form.mercadoPagoConnectionStatus !== 'connected') return 'Para mostrar la seña online, conectá Mercado Pago.';
+    if (form.mercadoPagoConnectionStatus !== 'connected') return 'Para mostrar el pago online, conectá Mercado Pago.';
     if (form.advanceMode === 'full') return 'El cliente paga el turno completo antes de confirmar.';
     return form.advanceType === 'fixed'
       ? `El cliente paga ${form.advanceValue || '0'} pesos por adelantado.`
@@ -207,7 +207,7 @@ export default function PaymentSettingsScreen() {
         />
         <View style={styles.separator} />
         <RowSwitch
-          label="Aceptar seña online"
+          label="Aceptar pago online"
           description="Cobro adelantado vía Mercado Pago."
           value={form.advancePaymentEnabled}
           onValueChange={(v: boolean) =>
@@ -245,73 +245,75 @@ export default function PaymentSettingsScreen() {
         )}
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Mercado Pago</Text>
-        <View
-          style={[
-            styles.statusNotice,
-            mercadoPagoStatusTone === 'connected'
-              ? styles.statusNoticeConnected
-              : mercadoPagoStatusTone === 'pending'
-                ? styles.statusNoticePending
-                : styles.statusNoticeDisconnected,
-          ]}
-        >
-          <Text
+      {form.advancePaymentEnabled ? (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Mercado Pago</Text>
+          <View
             style={[
-              styles.statusNoticeTitle,
+              styles.statusNotice,
               mercadoPagoStatusTone === 'connected'
-                ? styles.statusNoticeTitleConnected
+                ? styles.statusNoticeConnected
                 : mercadoPagoStatusTone === 'pending'
-                  ? styles.statusNoticeTitlePending
-                  : styles.statusNoticeTitleDisconnected,
+                  ? styles.statusNoticePending
+                  : styles.statusNoticeDisconnected,
             ]}
           >
-            {mercadoPagoStatusTone === 'connected'
-              ? 'Mercado Pago activo'
-              : mercadoPagoStatusTone === 'pending'
-                ? 'Conexión pendiente'
-                : 'Mercado Pago desconectado'}
-          </Text>
-          <Text
-            style={[
-              styles.statusNoticeText,
-              mercadoPagoStatusTone === 'connected'
-                ? styles.statusNoticeTextConnected
+            <Text
+              style={[
+                styles.statusNoticeTitle,
+                mercadoPagoStatusTone === 'connected'
+                  ? styles.statusNoticeTitleConnected
+                  : mercadoPagoStatusTone === 'pending'
+                    ? styles.statusNoticeTitlePending
+                    : styles.statusNoticeTitleDisconnected,
+              ]}
+            >
+              {mercadoPagoStatusTone === 'connected'
+                ? 'Mercado Pago activo'
                 : mercadoPagoStatusTone === 'pending'
-                  ? styles.statusNoticeTextPending
-                  : styles.statusNoticeTextDisconnected,
-            ]}
-          >
-            {mercadoPagoStatusLabel}
-          </Text>
-        </View>
-        <View style={styles.actionStack}>
-          <SegmentButton
-            label={connecting ? 'Abriendo...' : 'Conectar'}
-            active={false}
-            onPress={handleConnectMercadoPago}
-            theme={theme}
-            containerStyle={styles.actionButton}
-          />
-          <SegmentButton
-            label="Actualizar estado"
-            active={false}
-            onPress={loadSettings}
-            theme={theme}
-            containerStyle={styles.actionButton}
-          />
-          {form.mercadoPagoConnectionStatus === 'connected' ? (
+                  ? 'Conexión pendiente'
+                  : 'Mercado Pago desconectado'}
+            </Text>
+            <Text
+              style={[
+                styles.statusNoticeText,
+                mercadoPagoStatusTone === 'connected'
+                  ? styles.statusNoticeTextConnected
+                  : mercadoPagoStatusTone === 'pending'
+                    ? styles.statusNoticeTextPending
+                    : styles.statusNoticeTextDisconnected,
+              ]}
+            >
+              {mercadoPagoStatusLabel}
+            </Text>
+          </View>
+          <View style={styles.actionStack}>
             <SegmentButton
-              label="Desconectar"
+              label={connecting ? 'Abriendo...' : 'Conectar'}
               active={false}
-              onPress={handleDisconnectMercadoPago}
+              onPress={handleConnectMercadoPago}
               theme={theme}
               containerStyle={styles.actionButton}
             />
-          ) : null}
+            <SegmentButton
+              label="Actualizar estado"
+              active={false}
+              onPress={loadSettings}
+              theme={theme}
+              containerStyle={styles.actionButton}
+            />
+            {form.mercadoPagoConnectionStatus === 'connected' ? (
+              <SegmentButton
+                label="Desconectar"
+                active={false}
+                onPress={handleDisconnectMercadoPago}
+                theme={theme}
+                containerStyle={styles.actionButton}
+              />
+            ) : null}
+          </View>
         </View>
-      </View>
+      ) : null}
 
       <Pressable
         style={[styles.saveButton, { backgroundColor: theme.primary }, saving && styles.saveButtonDisabled]}

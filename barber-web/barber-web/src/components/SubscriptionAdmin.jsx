@@ -1,0 +1,970 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  fetchPlanPricing,
+  fetchSubscriptions,
+  updatePlanPricing,
+  updateSubscription,
+} from '../services/adminApi';
+import styles from '../styles/SubscriptionAdmin.module.css';
+
+const PLAN_OPTIONS = [
+  { value: 'basic', label: 'Básico' },
+  { value: 'pro', label: 'Pro' },
+  { value: 'custom', label: 'Personalizable' },
+];
+
+const STATUS_OPTIONS = [
+  { value: 'trial', label: 'Cuenta de prueba' },
+  { value: 'active', label: 'Activa' },
+  { value: 'past_due', label: 'Pago pendiente' },
+  { value: 'cancelled', label: 'Cancelada' },
+];
+
+const BILLING_OPTIONS = [
+  { value: 'monthly', label: 'Mensual' },
+  { value: 'yearly', label: 'Anual' },
+  { value: 'custom', label: 'Manual / especial' },
+];
+
+const PLAN_PRICE_META = [
+  {
+    key: 'basic',
+    label: 'Básico',
+    accentClassName: styles.priceCardPink,
+    description: 'Turnos online, cobro online, mails y automatización base.',
+  },
+  {
+    key: 'pro',
+    label: 'Pro',
+    accentClassName: styles.priceCardGreen,
+    description: 'Todo lo anterior más métricas, historial y exportaciones.',
+  },
+  {
+    key: 'custom',
+    label: 'Personalizable',
+    accentClassName: styles.priceCardGold,
+    description: 'Marca propia, dominio propio y solución comercial a medida.',
+  },
+];
+
+const MONTH_LABELS = [
+  'Ene',
+  'Feb',
+  'Mar',
+  'Abr',
+  'May',
+  'Jun',
+  'Jul',
+  'Ago',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dic',
+];
+
+function formatDate(value) {
+  if (!value) return 'Sin fecha';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Sin fecha';
+  return new Intl.DateTimeFormat('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+}
+
+function getBasePlanValues(plan, pricingDraft) {
+  if (plan === 'basic') {
+    return {
+      ars: Number(pricingDraft.basicPriceArs || 0),
+      usdReference: Number(pricingDraft.basicPriceUsdReference || 0),
+    };
+  }
+
+  if (plan === 'pro') {
+    return {
+      ars: Number(pricingDraft.proPriceArs || 0),
+      usdReference: Number(pricingDraft.proPriceUsdReference || 0),
+    };
+  }
+
+  return { ars: 0, usdReference: 0 };
+}
+
+function calculateDiscountPercent({ plan, subscription, pricingDraft }) {
+  const base = getBasePlanValues(plan, pricingDraft);
+  const customArs = Number(subscription?.customPriceArs ?? 0);
+
+  if (!(base.ars > 0) || !(customArs >= 0) || customArs === 0 || customArs >= base.ars) {
+    return '';
+  }
+
+  const discount = ((base.ars - customArs) / base.ars) * 100;
+  return Number(discount.toFixed(2));
+}
+
+function buildDrafts(users, pricingDraft) {
+  return Object.fromEntries(
+    users.map((user) => [
+      user._id,
+      {
+        plan: user.subscription?.plan || 'basic',
+        status: user.subscription?.status || 'trial',
+        billingCycle: user.subscription?.billingCycle || 'monthly',
+        customPriceArs: user.subscription?.customPriceArs ?? '',
+        customPriceUsdReference: user.subscription?.customPriceUsdReference ?? '',
+        discountPercent: calculateDiscountPercent({
+          plan: user.subscription?.plan || 'basic',
+          subscription: user.subscription,
+          pricingDraft,
+        }),
+      },
+    ]),
+  );
+}
+
+export default function SubscriptionAdmin() {
+  const [secret, setSecret] = useState('');
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [savingUserId, setSavingUserId] = useState(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [users, setUsers] = useState([]);
+  const [drafts, setDrafts] = useState({});
+  const [pricingDraft, setPricingDraft] = useState({
+    basicPriceArs: 25000,
+    basicPriceUsdReference: 25,
+    proPriceArs: 35000,
+    proPriceUsdReference: 35,
+  });
+  const [savingPricing, setSavingPricing] = useState(false);
+  const [selectedYear, setSelectedYear] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState('all');
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState('all');
+  const [selectedDiscountFilter, setSelectedDiscountFilter] = useState('all');
+
+  const hasUsers = users.length > 0;
+
+  const getPlanAmount = useCallback(
+    (plan, userSubscription = {}) => {
+      if (plan === 'basic') {
+        return Number(
+          userSubscription?.customPriceArs != null && userSubscription?.customPriceArs !== ''
+            ? userSubscription.customPriceArs
+            : pricingDraft.basicPriceArs || 0,
+        );
+      }
+      if (plan === 'pro') {
+        return Number(
+          userSubscription?.customPriceArs != null && userSubscription?.customPriceArs !== ''
+            ? userSubscription.customPriceArs
+            : pricingDraft.proPriceArs || 0,
+        );
+      }
+      return 0;
+    },
+    [pricingDraft.basicPriceArs, pricingDraft.proPriceArs],
+  );
+
+  const loadUsers = useCallback(async () => {
+    if (!secret.trim()) {
+      setError('Ingresá el secret de administración para cargar las cuentas.');
+      setSuccess('');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const [subscriptionsResponse, pricingResponse] = await Promise.all([
+        fetchSubscriptions({
+          secret: secret.trim(),
+          search: search.trim(),
+        }),
+        fetchPlanPricing({
+          secret: secret.trim(),
+        }),
+      ]);
+      const nextUsers = subscriptionsResponse.users || [];
+      const nextPricingDraft = {
+        basicPriceArs: Number(pricingResponse.pricing?.basic?.ars || 25000),
+        basicPriceUsdReference: Number(pricingResponse.pricing?.basic?.usdReference || 25),
+        proPriceArs: Number(pricingResponse.pricing?.pro?.ars || 35000),
+        proPriceUsdReference: Number(pricingResponse.pricing?.pro?.usdReference || 35),
+      };
+      setUsers(nextUsers);
+      setPricingDraft(nextPricingDraft);
+      setDrafts(buildDrafts(nextUsers, nextPricingDraft));
+    } catch (err) {
+      setError(err.message || 'No pudimos cargar las cuentas.');
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [search, secret]);
+
+  const handleDraftChange = (userId, field, value) => {
+    setDrafts((current) => ({
+      ...current,
+      [userId]: {
+        ...current[userId],
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleDiscountPercentChange = (userId, value) => {
+    setDrafts((current) => {
+      const currentDraft = current[userId] || {};
+      const plan = currentDraft.plan || 'basic';
+      const base = getBasePlanValues(plan, pricingDraft);
+      const normalized = value == null || String(value).trim() === '' ? '' : Number(value);
+
+      if (normalized === '') {
+        return {
+          ...current,
+          [userId]: {
+            ...currentDraft,
+            discountPercent: '',
+            customPriceArs: '',
+            customPriceUsdReference: '',
+          },
+        };
+      }
+
+      if (!Number.isFinite(normalized) || normalized < 0) {
+        return {
+          ...current,
+          [userId]: {
+            ...currentDraft,
+            discountPercent: value,
+          },
+        };
+      }
+
+      const multiplier = Math.max(0, 1 - normalized / 100);
+      const discountedArs = base.ars > 0 ? Number((base.ars * multiplier).toFixed(2)) : '';
+      const discountedUsd =
+        base.usdReference > 0 ? Number((base.usdReference * multiplier).toFixed(2)) : '';
+
+      return {
+        ...current,
+        [userId]: {
+          ...currentDraft,
+          discountPercent: normalized,
+          customPriceArs: discountedArs,
+          customPriceUsdReference: discountedUsd,
+        },
+      };
+    });
+  };
+
+  const handleResetCustomPricing = (userId) => {
+    setDrafts((current) => ({
+      ...current,
+      [userId]: {
+        ...current[userId],
+        customPriceArs: '',
+        customPriceUsdReference: '',
+        discountPercent: '',
+      },
+    }));
+  };
+
+  const handlePricingDraftChange = (field, value) => {
+    setPricingDraft((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const handleSavePricing = async () => {
+    if (!secret.trim()) {
+      setError('Ingresá el secret de administración para guardar precios.');
+      setSuccess('');
+      return;
+    }
+
+    setSavingPricing(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await updatePlanPricing({
+        secret: secret.trim(),
+        payload: {
+          basicPriceArs: Number(pricingDraft.basicPriceArs),
+          basicPriceUsdReference: Number(pricingDraft.basicPriceUsdReference),
+          proPriceArs: Number(pricingDraft.proPriceArs),
+          proPriceUsdReference: Number(pricingDraft.proPriceUsdReference),
+        },
+      });
+
+      setPricingDraft({
+        basicPriceArs: Number(response.pricing?.basic?.ars || 25000),
+        basicPriceUsdReference: Number(response.pricing?.basic?.usdReference || 25),
+        proPriceArs: Number(response.pricing?.pro?.ars || 35000),
+        proPriceUsdReference: Number(response.pricing?.pro?.usdReference || 35),
+      });
+      setSuccess('Precios guardados correctamente.');
+    } catch (err) {
+      setError(err.message || 'No pudimos guardar los precios.');
+    } finally {
+      setSavingPricing(false);
+    }
+  };
+
+  const handleSave = async (userId) => {
+    const draft = drafts[userId];
+    if (!draft || !secret.trim()) return;
+
+    setSavingUserId(userId);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await updateSubscription({
+        userId,
+        secret: secret.trim(),
+        payload: draft,
+      });
+
+      setUsers((current) =>
+        current.map((user) =>
+          user._id === userId
+            ? {
+                ...user,
+                subscription: {
+                  ...user.subscription,
+                  ...response.user.subscription,
+                },
+              }
+            : user,
+        ),
+      );
+      setDrafts((current) => ({
+        ...current,
+        [userId]: {
+          plan: response.user.subscription?.plan || 'basic',
+          status: response.user.subscription?.status || 'trial',
+          billingCycle: response.user.subscription?.billingCycle || 'monthly',
+          customPriceArs: response.user.subscription?.customPriceArs ?? '',
+          customPriceUsdReference: response.user.subscription?.customPriceUsdReference ?? '',
+          discountPercent: calculateDiscountPercent({
+            plan: response.user.subscription?.plan || 'basic',
+            subscription: response.user.subscription,
+            pricingDraft,
+          }),
+        },
+      }));
+      setSuccess('Cambios guardados correctamente.');
+    } catch (err) {
+      setError(err.message || 'No pudimos guardar la suscripción.');
+    } finally {
+      setSavingUserId(null);
+    }
+  };
+
+  const yearOptions = useMemo(() => {
+    const years = users
+      .map((user) => new Date(user.createdAt))
+      .filter((date) => !Number.isNaN(date.getTime()))
+      .map((date) => String(date.getFullYear()));
+
+    return [...new Set(years)].sort((a, b) => Number(b) - Number(a));
+  }, [users]);
+
+  useEffect(() => {
+    if (!yearOptions.length) {
+      setSelectedYear('');
+      setSelectedMonth('all');
+      return;
+    }
+
+    setSelectedYear((current) => (yearOptions.includes(current) ? current : yearOptions[0]));
+  }, [yearOptions]);
+
+  const monthOptions = useMemo(() => {
+    if (!selectedYear) return [];
+
+    const counts = new Map();
+
+    users.forEach((user) => {
+      const date = new Date(user.createdAt);
+      if (Number.isNaN(date.getTime())) return;
+      if (String(date.getFullYear()) !== selectedYear) return;
+
+      const monthIndex = date.getMonth();
+      counts.set(monthIndex, (counts.get(monthIndex) || 0) + 1);
+    });
+
+    return [...counts.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([monthIndex, count]) => ({
+        value: String(monthIndex),
+        label: MONTH_LABELS[monthIndex],
+        count,
+      }));
+  }, [selectedYear, users]);
+
+  useEffect(() => {
+    if (selectedMonth === 'all') return;
+    if (!monthOptions.some((option) => option.value === selectedMonth)) {
+      setSelectedMonth('all');
+    }
+  }, [monthOptions, selectedMonth]);
+
+  const visibleUsers = useMemo(() => {
+    return users.filter((user) => {
+      const date = new Date(user.createdAt);
+      if (Number.isNaN(date.getTime())) return false;
+
+      const yearMatches = !selectedYear || String(date.getFullYear()) === selectedYear;
+      const monthMatches =
+        selectedMonth === 'all' || String(date.getMonth()) === String(selectedMonth);
+      const subscriptionStatus = String(user.subscription?.status || 'trial');
+      const statusMatches =
+        selectedStatusFilter === 'all'
+          ? true
+          : selectedStatusFilter === 'active'
+            ? subscriptionStatus === 'active'
+            : subscriptionStatus === 'past_due' || subscriptionStatus === 'cancelled';
+      const hasDiscount =
+        user.subscription?.customPriceArs != null ||
+        user.subscription?.customPriceUsdReference != null;
+      const discountMatches =
+        selectedDiscountFilter === 'all'
+          ? true
+          : selectedDiscountFilter === 'discounted'
+            ? hasDiscount
+            : !hasDiscount;
+
+      return yearMatches && monthMatches && statusMatches && discountMatches;
+    });
+  }, [selectedDiscountFilter, selectedMonth, selectedStatusFilter, selectedYear, users]);
+
+  const summary = useMemo(() => {
+    const activeUsers = visibleUsers.filter((user) => user.subscription?.status === 'active');
+    const activeBasic = activeUsers.filter((user) => user.subscription?.plan === 'basic').length;
+    const activePro = activeUsers.filter((user) => user.subscription?.plan === 'pro').length;
+    const activeCustom = activeUsers.filter((user) => user.subscription?.plan === 'custom').length;
+    const estimatedMrr = activeUsers.reduce(
+      (total, user) => total + getPlanAmount(user.subscription?.plan, user.subscription),
+      0,
+    );
+
+    return {
+      total: visibleUsers.length,
+      active: activeUsers.length,
+      trial: visibleUsers.filter((user) => user.subscription?.status === 'trial').length,
+      pastDue: visibleUsers.filter((user) => user.subscription?.status === 'past_due').length,
+      activeBasic,
+      activePro,
+      activeCustom,
+      estimatedMrr,
+    };
+  }, [getPlanAmount, visibleUsers]);
+
+  const revenueSummary = useMemo(() => {
+    const activeUsers = visibleUsers.filter((user) => user.subscription?.status === 'active');
+    const pendingUsers = visibleUsers.filter((user) => user.subscription?.status === 'past_due');
+
+    const activeBasicRevenue = activeUsers
+      .filter((user) => user.subscription?.plan === 'basic')
+      .reduce((total, user) => total + getPlanAmount(user.subscription?.plan, user.subscription), 0);
+
+    const activeProRevenue = activeUsers
+      .filter((user) => user.subscription?.plan === 'pro')
+      .reduce((total, user) => total + getPlanAmount(user.subscription?.plan, user.subscription), 0);
+
+    const pendingRevenue = pendingUsers.reduce(
+      (total, user) => total + getPlanAmount(user.subscription?.plan, user.subscription),
+      0,
+    );
+
+    return {
+      activeRevenue: activeBasicRevenue + activeProRevenue,
+      activeBasicRevenue,
+      activeProRevenue,
+      pendingRevenue,
+      totalProjectedRevenue:
+        activeBasicRevenue +
+        activeProRevenue +
+        pendingUsers
+          .filter((user) => user.subscription?.plan === 'basic' || user.subscription?.plan === 'pro')
+          .reduce(
+            (total, user) => total + getPlanAmount(user.subscription?.plan, user.subscription),
+            0,
+          ),
+    };
+  }, [getPlanAmount, visibleUsers]);
+
+  return (
+    <main className={styles.screen}>
+      <div className={styles.heroGlow} aria-hidden="true" />
+
+      <section className={styles.header}>
+        <p className={styles.eyebrow}>ADMIN SUSCRIPCIONES</p>
+        <h1 className={styles.title}>Control de planes y estado comercial</h1>
+        <p className={styles.subtitle}>
+          Panel interno para ver cuentas, buscar barberías y cambiar plan o estado sin entrar a la base.
+        </p>
+      </section>
+
+      <section className={styles.toolbar}>
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Secret admin</span>
+          <input
+            type="password"
+            value={secret}
+            onChange={(e) => setSecret(e.target.value)}
+            placeholder="Pegá tu secret del backend"
+            className={styles.input}
+          />
+        </label>
+
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Buscar</span>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Nombre, mail o slug"
+            className={styles.input}
+          />
+        </label>
+
+        <button className={styles.loadButton} onClick={loadUsers} disabled={loading}>
+          {loading ? 'Cargando...' : 'Cargar cuentas'}
+        </button>
+      </section>
+
+      {error ? <div className={styles.errorBox}>{error}</div> : null}
+      {success ? <div className={styles.successBox}>{success}</div> : null}
+
+      {hasUsers ? (
+        <>
+          <section className={styles.pricingSection}>
+            <div className={styles.sectionHeadingRow}>
+              <div>
+                <p className={styles.sectionEyebrow}>PRECIOS</p>
+                <h2 className={styles.sectionTitle}>Referencia comercial actual</h2>
+              </div>
+            </div>
+
+            <div className={styles.pricingGrid}>
+              {PLAN_PRICE_META.map((plan) => (
+                <article key={plan.key} className={`${styles.priceCard} ${plan.accentClassName}`}>
+                  <span className={styles.priceBadge}>{plan.label}</span>
+                  {plan.key === 'custom' ? (
+                    <>
+                      <strong className={styles.priceValue}>A medida</strong>
+                      <span className={styles.priceBilling}>consultar por WhatsApp</span>
+                    </>
+                  ) : (
+                    <>
+                      <label className={styles.priceField}>
+                        <span>Precio principal ARS</span>
+                        <input
+                          type="number"
+                          value={
+                            plan.key === 'basic'
+                              ? pricingDraft.basicPriceArs
+                              : pricingDraft.proPriceArs
+                          }
+                          onChange={(e) =>
+                            handlePricingDraftChange(
+                              plan.key === 'basic' ? 'basicPriceArs' : 'proPriceArs',
+                              e.target.value,
+                            )
+                          }
+                          className={styles.priceInput}
+                        />
+                      </label>
+                      <label className={styles.priceField}>
+                        <span>Referencia USD</span>
+                        <input
+                          type="number"
+                          value={
+                            plan.key === 'basic'
+                              ? pricingDraft.basicPriceUsdReference
+                              : pricingDraft.proPriceUsdReference
+                          }
+                          onChange={(e) =>
+                            handlePricingDraftChange(
+                              plan.key === 'basic'
+                                ? 'basicPriceUsdReference'
+                                : 'proPriceUsdReference',
+                              e.target.value,
+                            )
+                          }
+                          className={styles.priceInput}
+                        />
+                      </label>
+                    </>
+                  )}
+                  <p className={styles.priceDescription}>{plan.description}</p>
+                </article>
+              ))}
+            </div>
+            <div className={styles.pricingActions}>
+              <button
+                type="button"
+                className={styles.saveButton}
+                onClick={handleSavePricing}
+                disabled={savingPricing}
+              >
+                {savingPricing ? 'Guardando precios...' : 'Guardar precios'}
+              </button>
+            </div>
+          </section>
+
+          <section className={styles.metricsSection}>
+            <div className={styles.sectionHeadingRow}>
+              <div>
+                <p className={styles.sectionEyebrow}>MONITOREO</p>
+                <h2 className={styles.sectionTitle}>Estado comercial rápido</h2>
+                <p className={styles.sectionMeta}>
+                  {selectedYear
+                    ? selectedMonth === 'all'
+                      ? `Viendo altas de ${selectedYear}`
+                      : `Viendo altas de ${MONTH_LABELS[Number(selectedMonth)]} ${selectedYear}`
+                    : 'Cargá cuentas para usar los filtros'}
+                </p>
+              </div>
+            </div>
+
+            <div className={styles.summaryGrid}>
+              <article className={styles.summaryCard}>
+                <span className={styles.summaryLabel}>Cuentas</span>
+                <strong className={styles.summaryValue}>{summary.total}</strong>
+              </article>
+              <article className={styles.summaryCard}>
+                <span className={styles.summaryLabel}>Activas</span>
+                <strong className={styles.summaryValue}>{summary.active}</strong>
+              </article>
+              <article className={styles.summaryCard}>
+                <span className={styles.summaryLabel}>Prueba</span>
+                <strong className={styles.summaryValue}>{summary.trial}</strong>
+              </article>
+              <article className={styles.summaryCard}>
+                <span className={styles.summaryLabel}>Pendientes</span>
+                <strong className={styles.summaryValue}>{summary.pastDue}</strong>
+              </article>
+              <article className={styles.summaryCard}>
+                <span className={styles.summaryLabel}>Activas Básico</span>
+                <strong className={styles.summaryValue}>{summary.activeBasic}</strong>
+              </article>
+              <article className={styles.summaryCard}>
+                <span className={styles.summaryLabel}>Activas Pro</span>
+                <strong className={styles.summaryValue}>{summary.activePro}</strong>
+              </article>
+              <article className={styles.summaryCard}>
+                <span className={styles.summaryLabel}>Activas Personalizable</span>
+                <strong className={styles.summaryValue}>{summary.activeCustom}</strong>
+              </article>
+              <article className={styles.summaryCard}>
+                <span className={styles.summaryLabel}>MRR estimado</span>
+                <strong className={styles.summaryValue}>
+                  ARS {summary.estimatedMrr.toLocaleString('es-AR')}
+                </strong>
+              </article>
+            </div>
+          </section>
+
+          <section className={styles.metricsSection}>
+            <div className={styles.sectionHeadingRow}>
+              <div>
+                <p className={styles.sectionEyebrow}>MONITOREO PLATA</p>
+                <h2 className={styles.sectionTitle}>Resumen comercial del período</h2>
+                <p className={styles.sectionMeta}>
+                  Los valores usan los precios actuales configurados en ARS y respetan los filtros aplicados.
+                </p>
+              </div>
+            </div>
+
+            <div className={styles.summaryGrid}>
+              <article className={styles.summaryCard}>
+                <span className={styles.summaryLabel}>Total proyectado</span>
+                <strong className={styles.summaryValue}>
+                  ARS {revenueSummary.totalProjectedRevenue.toLocaleString('es-AR')}
+                </strong>
+              </article>
+              <article className={styles.summaryCard}>
+                <span className={styles.summaryLabel}>Activos cobrando</span>
+                <strong className={styles.summaryValue}>
+                  ARS {revenueSummary.activeRevenue.toLocaleString('es-AR')}
+                </strong>
+              </article>
+              <article className={styles.summaryCard}>
+                <span className={styles.summaryLabel}>Pendiente por cobrar</span>
+                <strong className={styles.summaryValue}>
+                  ARS {revenueSummary.pendingRevenue.toLocaleString('es-AR')}
+                </strong>
+              </article>
+              <article className={styles.summaryCard}>
+                <span className={styles.summaryLabel}>Básico activo</span>
+                <strong className={styles.summaryValue}>
+                  ARS {revenueSummary.activeBasicRevenue.toLocaleString('es-AR')}
+                </strong>
+              </article>
+              <article className={styles.summaryCard}>
+                <span className={styles.summaryLabel}>Pro activo</span>
+                <strong className={styles.summaryValue}>
+                  ARS {revenueSummary.activeProRevenue.toLocaleString('es-AR')}
+                </strong>
+              </article>
+            </div>
+          </section>
+
+          <section className={styles.filterShell}>
+            <aside className={styles.yearSidebar}>
+              <div className={styles.filterHeader}>
+                <p className={styles.sectionEyebrow}>AÑOS</p>
+                <h2 className={styles.sectionTitle}>Altas por cohorte</h2>
+              </div>
+
+              <div className={styles.yearList}>
+                {yearOptions.map((year) => (
+                  <button
+                    key={year}
+                    type="button"
+                    className={`${styles.yearButton} ${selectedYear === year ? styles.yearButtonActive : ''}`}
+                    onClick={() => {
+                      setSelectedYear(year);
+                      setSelectedMonth('all');
+                    }}
+                  >
+                    {year}
+                  </button>
+                ))}
+              </div>
+            </aside>
+
+            <div className={styles.filteredContent}>
+              <div className={styles.monthToolbar}>
+                <button
+                  type="button"
+                  className={`${styles.monthChip} ${selectedMonth === 'all' ? styles.monthChipActive : ''}`}
+                  onClick={() => setSelectedMonth('all')}
+                >
+                  Todos ({visibleUsers.length})
+                </button>
+
+                {monthOptions.map((month) => (
+                  <button
+                    key={month.value}
+                    type="button"
+                    className={`${styles.monthChip} ${selectedMonth === month.value ? styles.monthChipActive : ''}`}
+                    onClick={() => setSelectedMonth(month.value)}
+                  >
+                    {month.label} ({month.count})
+                  </button>
+                ))}
+              </div>
+
+              <div className={styles.statusToolbar}>
+                <button
+                  type="button"
+                  className={`${styles.statusChip} ${selectedStatusFilter === 'all' ? styles.statusChipActive : ''}`}
+                  onClick={() => setSelectedStatusFilter('all')}
+                >
+                  Todos
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.statusChip} ${selectedStatusFilter === 'active' ? styles.statusChipActive : ''}`}
+                  onClick={() => setSelectedStatusFilter('active')}
+                >
+                  Activos
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.statusChip} ${selectedStatusFilter === 'inactive' ? styles.statusChipActive : ''}`}
+                  onClick={() => setSelectedStatusFilter('inactive')}
+                >
+                  Inactivos
+                </button>
+              </div>
+
+              <div className={styles.statusToolbar}>
+                <button
+                  type="button"
+                  className={`${styles.statusChip} ${selectedDiscountFilter === 'all' ? styles.statusChipActive : ''}`}
+                  onClick={() => setSelectedDiscountFilter('all')}
+                >
+                  Todos los precios
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.statusChip} ${selectedDiscountFilter === 'discounted' ? styles.discountChipActive : ''}`}
+                  onClick={() => setSelectedDiscountFilter('discounted')}
+                >
+                  Con descuento
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.statusChip} ${selectedDiscountFilter === 'standard' ? styles.statusChipActive : ''}`}
+                  onClick={() => setSelectedDiscountFilter('standard')}
+                >
+                  Precio normal
+                </button>
+              </div>
+
+              <section className={styles.list}>
+                {visibleUsers.map((user) => {
+                  const draft = drafts[user._id] || {};
+                  const hasDiscount =
+                    user.subscription?.customPriceArs != null ||
+                    user.subscription?.customPriceUsdReference != null;
+                  return (
+                    <article key={user._id} className={styles.card}>
+                      <div className={styles.cardTop}>
+                        <div>
+                          <h2 className={styles.cardTitle}>{user.fullName}</h2>
+                          <p className={styles.cardMeta}>
+                            {user.email} · /{user.shopSlug}
+                          </p>
+                          {hasDiscount ? (
+                            <span className={styles.discountBadge}>Plan diferenciado activo</span>
+                          ) : null}
+                        </div>
+                        <div className={styles.cardDates}>
+                          <span>Alta: {formatDate(user.createdAt)}</span>
+                          <span>Vence: {formatDate(user.subscription?.expiresAt)}</span>
+                        </div>
+                      </div>
+
+                      <div className={styles.controls}>
+                        <label className={styles.selectField}>
+                          <span>Plan</span>
+                          <select
+                            value={draft.plan || 'basic'}
+                            onChange={(e) => handleDraftChange(user._id, 'plan', e.target.value)}
+                          >
+                            {PLAN_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className={styles.selectField}>
+                          <span>Estado</span>
+                          <select
+                            value={draft.status || 'trial'}
+                            onChange={(e) => handleDraftChange(user._id, 'status', e.target.value)}
+                          >
+                            {STATUS_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className={styles.selectField}>
+                          <span>Ciclo</span>
+                          <select
+                            value={draft.billingCycle || 'monthly'}
+                            onChange={(e) =>
+                              handleDraftChange(user._id, 'billingCycle', e.target.value)
+                            }
+                          >
+                            {BILLING_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className={styles.selectField}>
+                          <span>Precio especial ARS</span>
+                          <input
+                            type="number"
+                            value={draft.customPriceArs ?? ''}
+                            onChange={(e) =>
+                              handleDraftChange(user._id, 'customPriceArs', e.target.value)
+                            }
+                            placeholder="Automático por plan"
+                          />
+                          <small className={styles.fieldHint}>
+                            Si lo dejás vacío, usa el precio general del plan.
+                          </small>
+                        </label>
+
+                        <label className={styles.selectField}>
+                          <span>Descuento %</span>
+                          <input
+                            type="number"
+                            value={draft.discountPercent ?? ''}
+                            onChange={(e) =>
+                              handleDiscountPercentChange(user._id, e.target.value)
+                            }
+                            placeholder="Ej. 5"
+                          />
+                          <small className={styles.fieldHint}>
+                            Calcula automáticamente el precio especial final para esta cuenta.
+                          </small>
+                        </label>
+
+                        <label className={styles.selectField}>
+                          <span>Ref. USD especial</span>
+                          <input
+                            type="number"
+                            value={draft.customPriceUsdReference ?? ''}
+                            onChange={(e) =>
+                              handleDraftChange(user._id, 'customPriceUsdReference', e.target.value)
+                            }
+                            placeholder="Automático por plan"
+                          />
+                          <small className={styles.fieldHint}>
+                            Solo referencia. El cobro real sigue el valor principal configurado.
+                          </small>
+                        </label>
+                      </div>
+
+                      <div className={styles.cardActions}>
+                        <span className={`${styles.currentState} ${hasDiscount ? styles.currentStateDiscount : ''}`}>
+                          Actual: {user.subscription?.plan || 'basic'} · {user.subscription?.status || 'trial'} ·{' '}
+                          ARS {getPlanAmount(user.subscription?.plan, user.subscription).toLocaleString('es-AR')}
+                        </span>
+                        <div className={styles.inlineActions}>
+                          <button
+                            type="button"
+                            className={styles.secondaryInlineButton}
+                            onClick={() => handleResetCustomPricing(user._id)}
+                          >
+                            Aplicar precio normal
+                          </button>
+                          <button
+                            className={styles.saveButton}
+                            onClick={() => handleSave(user._id)}
+                            disabled={savingUserId === user._id}
+                          >
+                            {savingUserId === user._id ? 'Guardando...' : 'Guardar cambios'}
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </section>
+            </div>
+          </section>
+        </>
+      ) : (
+        <section className={styles.emptyState}>
+          <p>
+            Cargá el secret y tocá <strong>Cargar cuentas</strong> para ver el panel.
+          </p>
+        </section>
+      )}
+    </main>
+  );
+}

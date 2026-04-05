@@ -21,6 +21,11 @@ export function getMercadoPagoConfig() {
     authUrl: String(process.env.MERCADO_PAGO_OAUTH_AUTHORIZE_URL || DEFAULT_AUTH_URL).trim(),
     apiBaseUrl: String(process.env.MERCADO_PAGO_API_BASE_URL || DEFAULT_API_BASE_URL).trim(),
     webhookSecret: String(process.env.MERCADO_PAGO_WEBHOOK_SECRET || "").trim() || null,
+    subscriptionsAccessToken: String(
+      process.env.MERCADO_PAGO_SUBSCRIPTIONS_ACCESS_TOKEN ||
+        process.env.MERCADO_PAGO_ACCESS_TOKEN ||
+        "",
+    ).trim(),
   };
 }
 
@@ -119,6 +124,28 @@ export async function getMercadoPagoPayment({ accessToken, paymentId }) {
   });
 }
 
+export function getMercadoPagoSubscriptionsAccessToken() {
+  const { subscriptionsAccessToken } = getMercadoPagoConfig();
+  if (!subscriptionsAccessToken) {
+    const error = new Error(
+      "Falta MERCADO_PAGO_SUBSCRIPTIONS_ACCESS_TOKEN en variables de entorno.",
+    );
+    error.statusCode = 500;
+    throw error;
+  }
+  return subscriptionsAccessToken;
+}
+
+export async function createMercadoPagoSystemPreference({ payload }) {
+  const accessToken = getMercadoPagoSubscriptionsAccessToken();
+  return createMercadoPagoPreference({ accessToken, payload });
+}
+
+export async function getMercadoPagoSystemPayment({ paymentId }) {
+  const accessToken = getMercadoPagoSubscriptionsAccessToken();
+  return getMercadoPagoPayment({ accessToken, paymentId });
+}
+
 export function buildMercadoPagoBookingReturnUrls(shopSlug) {
   const { publicBookingBaseUrl } = getMercadoPagoConfig();
   const base = publicBookingBaseUrl.replace(/\/+$/, "");
@@ -135,3 +162,17 @@ export function buildMercadoPagoWebhookUrl() {
   return `${backendBaseUrl.replace(/\/+$/, "")}/api/payments/mercadopago/webhook`;
 }
 
+export function buildMercadoPagoSubscriptionReturnUrls() {
+  const { backendBaseUrl } = getMercadoPagoConfig();
+  const base = backendBaseUrl.replace(/\/+$/, "");
+  return {
+    success: `${base}/api/payments/subscriptions/return?result=success`,
+    pending: `${base}/api/payments/subscriptions/return?result=pending`,
+    failure: `${base}/api/payments/subscriptions/return?result=failure`,
+  };
+}
+
+export function buildMercadoPagoSubscriptionWebhookUrl() {
+  const { backendBaseUrl } = getMercadoPagoConfig();
+  return `${backendBaseUrl.replace(/\/+$/, "")}/api/payments/subscriptions/mercadopago/webhook`;
+}

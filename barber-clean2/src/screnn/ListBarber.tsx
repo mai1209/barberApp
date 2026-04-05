@@ -14,6 +14,7 @@ import {
   RefreshControl,
   Alert,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { fetchBarbers, Barber, deleteBarber } from "../services/api";
 import { useTheme } from "../context/ThemeContext";
 import type { Theme } from "../context/ThemeContext";
@@ -59,6 +60,12 @@ function ListBarber({ navigation }: Props) {
   useEffect(() => {
     loadBarbers();
   }, [loadBarbers]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadBarbers();
+    }, [loadBarbers]),
+  );
 
   const handleRefresh = () => {
     setRefreshing(true);

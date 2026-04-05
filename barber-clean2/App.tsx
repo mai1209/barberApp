@@ -12,7 +12,9 @@ import {
   removeToken,
   removeUserProfile,
   saveUserProfile,
+  subscribeToUserProfile,
 } from './src/services/authStorage';
+import { isSubscriptionRestricted, resolvePostAuthRoute } from './src/services/subscriptionAccess';
 import { ThemeProvider } from './src/context/ThemeContext';
 
 export const navigationRef = createNavigationContainerRef();
@@ -30,8 +32,15 @@ const appNavigationTheme = {
 
 export default function App() {
   const [currentRouteName, setCurrentRouteName] = useState<string | undefined>();
-  const [initialRouteName, setInitialRouteName] = useState<'Login' | 'Home'>('Login');
+  const [initialRouteName, setInitialRouteName] = useState<'Login' | 'Home' | 'Subscription-Settings'>('Login');
   const [sessionReady, setSessionReady] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any | null>(null);
+
+  useEffect(() => {
+    return subscribeToUserProfile(user => {
+      setCurrentUser(user);
+    });
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -44,6 +53,7 @@ export default function App() {
         if (!token) {
           if (isMounted) {
             setInitialRouteName('Login');
+            setCurrentUser(null);
           }
           return;
         }
@@ -53,7 +63,8 @@ export default function App() {
           await saveUserProfile(response.user);
 
           if (isMounted) {
-            setInitialRouteName('Home');
+            setCurrentUser(response.user);
+            setInitialRouteName(resolvePostAuthRoute(response.user));
           }
         } catch (error: any) {
           const unauthorized = error?.status === 401 || error?.status === 403;
@@ -64,12 +75,14 @@ export default function App() {
 
             if (isMounted) {
               setInitialRouteName('Login');
+              setCurrentUser(null);
             }
           } else if (isMounted) {
             if (storedUser) {
               await saveUserProfile(storedUser);
+              setCurrentUser(storedUser);
             }
-            setInitialRouteName('Home');
+            setInitialRouteName(storedUser ? resolvePostAuthRoute(storedUser) : 'Login');
           }
         }
       } finally {
@@ -156,6 +169,8 @@ useEffect(() => {
       </GestureHandlerRootView>
     );
   }
+
+  const isSubscriptionLocked = isSubscriptionRestricted(currentUser?.subscription?.status);
 	
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -174,6 +189,7 @@ useEffect(() => {
             <StackNavigator
               currentRouteName={currentRouteName}
               initialRouteName={initialRouteName}
+              isSubscriptionLocked={isSubscriptionLocked}
             />
           </NavigationContainer>
         </View>

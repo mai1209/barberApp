@@ -103,6 +103,14 @@ const appointmentSchema = new mongoose.Schema(
       enum: ["pending", "completed", "cancelled"],
       default: "pending",
     },
+    barberReminderSentAt: {
+      type: Date,
+      default: null,
+    },
+    customerReminderSentAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

@@ -3,6 +3,8 @@ import BookingForm from './BookingForm';
 import styles from '../styles/App.module.css';
 import { setShopSlug as registerShopSlug } from '../services/api';
 import LandingPage from './LandingPage';
+import SubscriptionAdmin from './SubscriptionAdmin';
+import SubscriptionCheckoutPage from './SubscriptionCheckoutPage';
 //import landingStyles from '../styles/LandingPage.module.css';
 
 
@@ -32,10 +34,34 @@ function resolveInitialSlug() {
   return sanitizeSlug(firstSegment);
 }
 
+function resolveInternalPage() {
+  const url = new URL(window.location.href);
+  const pathname = url.pathname.replace(/^\/+|\/+$/g, '');
+
+  if (pathname === 'admin' || pathname === 'admin/subscriptions') {
+    return 'subscription-admin';
+  }
+
+  if (pathname === 'planes' || pathname === 'suscripcion') {
+    return 'subscription-checkout';
+  }
+
+  return null;
+}
 
 
 function App() {
+  const [internalPage] = useState(() => resolveInternalPage());
   const [shopSlug] = useState(() => resolveInitialSlug());
+
+  if (internalPage === 'subscription-admin') {
+    return <SubscriptionAdmin />;
+  }
+
+  if (internalPage === 'subscription-checkout') {
+    return <SubscriptionCheckoutPage />;
+  }
+
   if (shopSlug) registerShopSlug(shopSlug);
 
   if (!shopSlug) {

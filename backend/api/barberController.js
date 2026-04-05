@@ -1,14 +1,13 @@
 import { BarberModel } from "../models/Barber.js";
 import { AppointmentModel } from "../models/Appointment.js";
-import { getTimeZoneDayRange } from "../utils/timezone.js";
-
-const DEFAULT_SCHEDULE_RANGE = "08:00 - 22:00";
-const SHIFT_RANGES = {
-  morning: "08:00 - 12:00",
-  afternoon: "12:00 - 18:00",
-  evening: "18:00 - 22:00",
-  full: DEFAULT_SCHEDULE_RANGE,
-};
+import { getTimeZoneDayRange, getTimeZoneWeekday } from "../utils/timezone.js";
+import {
+  deriveScheduleRange,
+  normalizeDayScheduleOverrides,
+  normalizeScheduleRanges,
+  resolveBarberScheduleForWeekday,
+  sanitizeScheduleRange,
+} from "../utils/barberSchedule.js";
 
 function normalizeShift(value) {
   if (value == null) return undefined;
@@ -17,17 +16,17 @@ function normalizeShift(value) {
   return allowed.includes(normalized) ? normalized : undefined;
 }
 
-function sanitizeScheduleRange(value) {
-  const text = String(value ?? "").trim();
-  return text || undefined;
-}
-
-function deriveScheduleRange(barberDoc) {
-  return (
-    barberDoc?.scheduleRange ||
-    SHIFT_RANGES[barberDoc?.shift] ||
-    DEFAULT_SCHEDULE_RANGE
-  );
+function serializeBarber(doc) {
+  if (!doc) return null;
+  return {
+    ...doc,
+    scheduleRange: doc.scheduleRange || null,
+    scheduleRanges: normalizeScheduleRanges(doc.scheduleRanges),
+    dayScheduleOverrides: normalizeDayScheduleOverrides(doc.dayScheduleOverrides),
+    workDays: Array.from(new Set(doc.workDays || []))
+      .map(Number)
+      .sort(),
+  };
 }
 
 export async function listBarbers(req, res, next) {
@@ -43,17 +42,7 @@ export async function listBarbers(req, res, next) {
     console.log("Documentos encontrados en DB:", barbersDocs.length);
 
     // 2. MAPEADO FORZADO:
-    const barbers = barbersDocs.map((doc) => ({
-      _id: doc._id,
-      fullName: doc.fullName,
-      email: doc.email || undefined,
-      phone: doc.phone || undefined,
-      photoUrl: doc.photoUrl || null,
-      scheduleRange: doc.scheduleRange || null,
-      scheduleRanges: doc.scheduleRanges || [],
-      isActive: doc.isActive,
-      workDays: (doc.workDays || []).map(Number), // ← ESTO FALTABA
-    }));
+    const barbers = barbersDocs.map(serializeBarber);
 
     return res.json({ barbers });
   } catch (err) {
@@ -81,7 +70,11 @@ export async function createBarber(req, res, next) {
       (a, b) => a - b,
     );
 
-const scheduleRange = sanitizeScheduleRange(req.body?.scheduleRange) || undefined;
+    const scheduleRange = sanitizeScheduleRange(req.body?.scheduleRange) || undefined;
+    const scheduleRanges = normalizeScheduleRanges(req.body?.scheduleRanges);
+    const dayScheduleOverrides = normalizeDayScheduleOverrides(
+      req.body?.dayScheduleOverrides,
+    );
 
 
     if (!fullName) {
@@ -98,13 +91,14 @@ const scheduleRange = sanitizeScheduleRange(req.body?.scheduleRange) || undefine
       phone: phone || undefined,
       photoUrl: photoUrl || undefined,
       shift,
-scheduleRange: scheduleRange,
-      scheduleRanges: req.body?.scheduleRanges || [],
-      workDays: cleanWorkDays, // <--- ESTO FALTABA
+      scheduleRange: scheduleRange,
+      scheduleRanges,
+      dayScheduleOverrides,
+      workDays: cleanWorkDays,
       isActive: true,
     });
 
-    return res.status(201).json({ barber: barber.toJSON() });
+    return res.status(201).json({ barber: serializeBarber(barber.toJSON()) });
   } catch (err) {
     console.error("Error al crear barbero:", err);
     return next(err);
@@ -130,15 +124,10 @@ export async function updateBarber(req, res, next) {
       (a, b) => a - b,
     );
     const scheduleRange = sanitizeScheduleRange(req.body?.scheduleRange) || undefined;
-    const scheduleRanges = Array.isArray(req.body?.scheduleRanges)
-      ? req.body.scheduleRanges
-          .map((item) => ({
-            label: String(item?.label ?? "").trim(),
-            start: String(item?.start ?? "").trim(),
-            end: String(item?.end ?? "").trim(),
-          }))
-          .filter((item) => item.start && item.end)
-      : [];
+    const scheduleRanges = normalizeScheduleRanges(req.body?.scheduleRanges);
+    const dayScheduleOverrides = normalizeDayScheduleOverrides(
+      req.body?.dayScheduleOverrides,
+    );
 
     if (!fullName) {
       return res
@@ -166,6 +155,7 @@ export async function updateBarber(req, res, next) {
         shift,
         scheduleRange: scheduleRange ?? null,
         scheduleRanges,
+        dayScheduleOverrides,
         workDays: cleanWorkDays,
       },
       {
@@ -177,7 +167,7 @@ export async function updateBarber(req, res, next) {
       return res.status(404).json({ error: "Barbero no encontrado" });
     }
 
-    return res.json({ barber });
+    return res.json({ barber: serializeBarber(barber) });
   } catch (err) {
     console.error("Error al actualizar barbero:", err);
     return next(err);
@@ -209,7 +199,7 @@ export async function deactivateBarber(req, res, next) {
       return res.status(404).json({ error: "Barbero no encontrado" });
     }
 
-    return res.json({ barber });
+    return res.json({ barber: serializeBarber(barber) });
   } catch (err) {
     return next(err);
   }
@@ -220,6 +210,10 @@ export async function listBarberAppointments(req, res, next) {
   try {
     const { barberId } = req.params;
     const { date } = req.query;
+    const effectiveDate =
+      typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)
+        ? date
+        : undefined;
     const { startOfDay, endOfDay } = buildDayRange(date);
     const ownerId = req.user?.id;
     if (!ownerId) return res.status(401).json({ error: "Auth requerida" });
@@ -240,14 +234,19 @@ export async function listBarberAppointments(req, res, next) {
       status: { $ne: "cancelled" },
     }).lean();
 
+    const weekday = getTimeZoneWeekday(
+      effectiveDate ? `${effectiveDate}T12:00:00` : new Date(),
+    );
+    const resolvedSchedule = resolveBarberScheduleForWeekday(
+      barber,
+      weekday,
+      effectiveDate,
+    );
+
     // Enviamos el barbero CON sus workDays limpios
     return res.json({
-      barber: {
-        ...barber,
-        workDays: Array.from(new Set(barber.workDays || []))
-          .map(Number)
-          .sort(),
-      },
+      barber: serializeBarber(barber),
+      resolvedSchedule,
       appointments,
     });
   } catch (err) {

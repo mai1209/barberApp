@@ -9,6 +9,7 @@ import {
   createMercadoPagoPreference,
   getMercadoPagoConfig,
   getMercadoPagoPayment,
+  getMercadoPagoSystemPayment,
   refreshMercadoPagoAccessToken,
 } from "../services/mercadoPago.js";
 
@@ -40,6 +41,49 @@ function calculateAdvanceAmount({ amountTotal, settings }) {
 
 function buildWebhookManifest({ paymentId, xRequestId, ts }) {
   return `id:${paymentId};request-id:${xRequestId};ts:${ts};`;
+}
+
+function buildSubscriptionPaymentReturnHtml({ result }) {
+  const config = {
+    success: {
+      accent: "#34C759",
+      title: "Pago recibido",
+      message: "Tu pago fue aprobado. En unos segundos tu plan debería quedar activo.",
+    },
+    pending: {
+      accent: "#F5C451",
+      title: "Pago pendiente",
+      message: "Mercado Pago todavía está procesando el cobro. Volvé a revisar en unos minutos.",
+    },
+    failure: {
+      accent: "#FF5A5F",
+      title: "Pago no completado",
+      message: "El cobro no se pudo completar. Podés volver a intentar desde la app o el panel.",
+    },
+  }[result] || {
+    accent: "#8E8E98",
+    title: "Estado del pago",
+    message: "Podés volver a la app y revisar el estado de tu plan.",
+  };
+
+  return `<!doctype html>
+  <html lang="es">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>${config.title}</title>
+    </head>
+    <body style="margin:0;background:#0D0D11;color:#fff;font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;">
+      <div style="max-width:460px;width:100%;background:#17171C;border:1px solid rgba(255,255,255,0.08);border-radius:24px;padding:28px;text-align:center;">
+        <div style="width:64px;height:64px;border-radius:20px;margin:0 auto 18px;background:${config.accent};display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:800;">
+          ${result === "success" ? "✓" : result === "pending" ? "…" : "!"}
+        </div>
+        <h1 style="margin:0 0 12px;font-size:24px;">${config.title}</h1>
+        <p style="margin:0 0 18px;color:#B7BECC;line-height:1.5;">${config.message}</p>
+        <p style="margin:0;color:#7C8596;font-size:13px;">Ya podés volver a la app o al panel de suscripción.</p>
+      </div>
+    </body>
+  </html>`;
 }
 
 function buildPaymentApprovedMailHtml({
@@ -161,6 +205,25 @@ function isMercadoPagoWebhookValid(req) {
     .digest("hex");
 
   return digest === parts.v1;
+}
+
+function normalizeSubscriptionReference(value) {
+  const [prefix, userId, plan] = String(value || "").split(":");
+  if (prefix !== "subscription" || !userId || !plan) {
+    return null;
+  }
+  return { userId, plan };
+}
+
+function calculateSubscriptionExpiry({ billingCycle, paidAt }) {
+  if (!billingCycle || billingCycle === "custom") return null;
+  const base = new Date(paidAt);
+  if (billingCycle === "yearly") {
+    base.setFullYear(base.getFullYear() + 1);
+    return base;
+  }
+  base.setMonth(base.getMonth() + 1);
+  return base;
 }
 
 async function ensureMercadoPagoAccessToken(userDoc) {
@@ -392,6 +455,96 @@ export async function handleMercadoPagoWebhook(req, res, next) {
     }
 
     return res.status(200).json({ received: true, updated: true });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function handleSubscriptionMercadoPagoWebhook(req, res, next) {
+  try {
+    if (!isMercadoPagoWebhookValid(req)) {
+      return res.status(401).json({ error: "Webhook de Mercado Pago inválido." });
+    }
+
+    const type = String(req.body?.type || req.query?.type || "").trim();
+    const paymentId = String(
+      req.body?.data?.id || req.query?.["data.id"] || req.body?.id || "",
+    ).trim();
+
+    if (type && type !== "payment") {
+      return res.status(200).json({ received: true, ignored: true });
+    }
+
+    if (!paymentId) {
+      return res.status(200).json({ received: true, ignored: true });
+    }
+
+    const payment = await getMercadoPagoSystemPayment({ paymentId });
+    const normalizedStatus = normalizePaymentStatus(payment.status);
+    const metadataUserId =
+      String(payment.metadata?.user_id || req.query?.userId || req.body?.userId || "").trim();
+    const metadataPlan = String(payment.metadata?.plan || "").trim();
+    const parsedReference = normalizeSubscriptionReference(payment.external_reference);
+
+    const userId = metadataUserId || parsedReference?.userId || "";
+    const plan = metadataPlan || parsedReference?.plan || "";
+
+    if (!userId || !plan) {
+      return res.status(200).json({ received: true, ignored: true });
+    }
+
+    const userDoc = await UserModel.findById(userId);
+    if (!userDoc || userDoc.isActive === false) {
+      return res.status(200).json({ received: true, ignored: true });
+    }
+
+    if (normalizedStatus === "approved") {
+      const billingCycle =
+        String(payment.metadata?.billing_cycle || userDoc.subscription?.billingCycle || "monthly").trim() ||
+        "monthly";
+      const paidAt = payment.date_approved ? new Date(payment.date_approved) : new Date();
+
+      userDoc.subscription = {
+        ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
+        plan,
+        status: "active",
+        billingCycle,
+        startedAt: paidAt,
+        expiresAt: calculateSubscriptionExpiry({ billingCycle, paidAt }),
+        pendingPlan: null,
+        mercadoPagoPaymentId: String(payment.id || paymentId),
+        mercadoPagoPreferenceId:
+          payment.order?.id ? String(payment.order.id) : userDoc.subscription?.mercadoPagoPreferenceId || null,
+        lastPaymentAt: paidAt,
+        renewalReminder7dAt: null,
+        renewalReminder3dAt: null,
+        renewalReminder1dAt: null,
+        pastDueAt: null,
+        pastDueReminderSentAt: null,
+        graceUntil: null,
+        cancelledAt: null,
+      };
+      await userDoc.save();
+    } else if (normalizedStatus === "rejected") {
+      userDoc.subscription = {
+        ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
+        status: userDoc.subscription?.status === "active" ? "active" : "past_due",
+        pendingPlan: null,
+        mercadoPagoPaymentId: String(payment.id || paymentId),
+      };
+      await userDoc.save();
+    }
+
+    return res.status(200).json({ received: true });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function handleSubscriptionPaymentReturnPage(req, res, next) {
+  try {
+    const result = String(req.query?.result || "").trim() || "unknown";
+    return res.status(200).send(buildSubscriptionPaymentReturnHtml({ result }));
   } catch (err) {
     return next(err);
   }

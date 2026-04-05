@@ -1,10 +1,104 @@
 // LandingPage.jsx
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { fetchPlanPricing } from "../services/api";
 import styles from "../styles/LandingPage.module.css";
 
 function LandingPage() {
+  const [pricing, setPricing] = useState({
+    basic: { ars: 25000, usdReference: 25 },
+    pro: { ars: 35000, usdReference: 35 },
+  });
+
+  const plans = [
+    {
+      badge: "Básico",
+      title: "Todo lo necesario para vender turnos online",
+      price: `ARS ${pricing.basic.ars.toLocaleString("es-AR")}`,
+      billingLabel: `por mes · ref. USD ${pricing.basic.usdReference}`,
+      description:
+        "Ideal para barberías que quieren ordenar la agenda, automatizar turnos y empezar a cobrar online sin complejidad.",
+      features: [
+        "Personalización de colores y logo",
+        "Link personalizado",
+        "Vinculación con Mercado Pago",
+        "Carga infinita de barberos",
+        "Carga infinita de servicios",
+        "Turnos ilimitados",
+        "Vinculación con WhatsApp para cancelación de turnos",
+        "Confirmación y recordatorio de turno vía mail",
+        "Notificación y recordatorio de turnos vía app para el barbero",
+      ],
+      cta: "Conocer plan básico",
+      href: "/planes?plan=basic",
+      buttonClassName: styles.planButton,
+      badgeClassName: styles.planBadge,
+    },
+    {
+      badge: "Pro",
+      title: "Métricas, historial y control más profundo",
+      price: `ARS ${pricing.pro.ars.toLocaleString("es-AR")}`,
+      billingLabel: `por mes · ref. USD ${pricing.pro.usdReference}`,
+      description:
+        "Ideal para barberías que ya trabajan con más volumen y necesitan medir mejor el negocio.",
+      features: [
+        "Todo lo del plan Básico",
+        "Métricas generales e individuales",
+        "Métricas mensuales y anuales",
+        "Historial de servicios, turnos y caja",
+        "Exportación por mail, PDF y Excel",
+      ],
+      cta: "Conocer plan pro",
+      href: "/planes?plan=pro",
+      buttonClassName: `${styles.planButton} ${styles.planButtonGreen}`,
+      badgeClassName: `${styles.planBadge} ${styles.planBadgeGreen}`,
+    },
+    {
+      badge: "Personalizable",
+      title: "Marca propia y solución hecha a medida",
+      price: "A medida",
+      billingLabel: "consultar por WhatsApp",
+      description:
+        "Ideal para barberías o cadenas que buscan identidad propia, dominio propio y una app con nombre propio.",
+      features: [
+        "Todo lo del plan Pro",
+        "Personalización completa de la web",
+        "Dominio propio",
+        "App con nombre propio en App Store y Play Store",
+        "Implementación y presupuesto por fuera del flujo estándar",
+      ],
+      cta: "Hablar por un plan a medida",
+      href: "https://wa.me/543425543308?text=Hola%20quiero%20consultar%20por%20el%20plan%20personalizable%20de%20BarberApp",
+      external: true,
+      buttonClassName: `${styles.planButton} ${styles.planButtonGhost}`,
+      badgeClassName: `${styles.planBadge} ${styles.planBadgeGold}`,
+    },
+  ];
+
   // Parallax sutil en el hero
   const heroRef = useRef(null);
+  useEffect(() => {
+    let mounted = true;
+    fetchPlanPricing()
+      .then((response) => {
+        if (!mounted) return;
+        setPricing({
+          basic: {
+            ars: Number(response.pricing?.basic?.ars || 25000),
+            usdReference: Number(response.pricing?.basic?.usdReference || 25),
+          },
+          pro: {
+            ars: Number(response.pricing?.pro?.ars || 35000),
+            usdReference: Number(response.pricing?.pro?.usdReference || 35),
+          },
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   useEffect(() => {
     const onScroll = () => {
       if (heroRef.current) {
@@ -96,22 +190,6 @@ function LandingPage() {
     },
   ];
 
-  const appointments = [
-    {
-      time: "09:00",
-      name: "Matías G.",
-      service: "Corte + Barba",
-      color: "#ff1493",
-    },
-    {
-      time: "10:30",
-      name: "Rodrigo P.",
-      service: "Corte clásico",
-      color: "#ff1493",
-    },
-    { time: "12:00", name: "Lucas M.", service: "Degradé", color: "#2ecc71" },
-  ];
-
   return (
     <div className={styles.landing}>
       {/* PARTÍCULAS */}
@@ -132,7 +210,7 @@ function LandingPage() {
           <span className={styles.navLogoScissors}>✂</span>
           <span className={styles.navLogoText}>BarberAppByCodex</span>
         </div>
-        <a  href="https://www.letsbuilditcodex.com/" target="_blank"><span className={styles.navBadge}>by CODEX®</span>
+        <a  href="https://www.letsbuilditcodex.com/" target="_blank" rel="noreferrer"><span className={styles.navBadge}>by CODEX®</span>
 </a>
       </nav>
 
@@ -231,6 +309,47 @@ function LandingPage() {
         <div className={styles.scrollIndicator}>
           <span className={styles.scrollDot} />
           <span className={styles.scrollText}>scroll</span>
+        </div>
+      </section>
+
+      <section id="planes" className={styles.plansSection}>
+        <div className={`${styles.featuresLabel} ${styles.revealUp}`} data-animate>
+          Planes
+        </div>
+        <h2
+          className={`${styles.featuresTitle} ${styles.revealUp} ${styles.animDelay1}`}
+          data-animate
+        >
+          Elegí el nivel que mejor
+          <br />
+          acompaña tu barbería.
+        </h2>
+
+        <div className={styles.plansGrid}>
+          {plans.map((plan) => (
+            <article key={plan.badge} className={`${styles.planCard} ${styles.revealUp}`} data-animate>
+              <div className={plan.badgeClassName}>{plan.badge}</div>
+              <h3 className={styles.planTitle}>{plan.title}</h3>
+              <div className={styles.planPriceRow}>
+                <span className={styles.planPrice}>{plan.price}</span>
+                <span className={styles.planPriceLabel}>{plan.billingLabel}</span>
+              </div>
+              <p className={styles.planDescription}>{plan.description}</p>
+              <ul className={styles.planList}>
+                {plan.features.map((feature) => (
+                  <li key={feature}>{feature}</li>
+                ))}
+              </ul>
+              <a
+                href={plan.href}
+                target={plan.external ? "_blank" : undefined}
+                rel={plan.external ? "noreferrer" : undefined}
+                className={plan.buttonClassName}
+              >
+                {plan.cta}
+              </a>
+            </article>
+          ))}
         </div>
       </section>
 
@@ -359,7 +478,7 @@ function LandingPage() {
 
       <footer className={styles.footer}>
         <img className={styles.logo} src="./logo.png" alt="codex" />
-        <a href="https://www.letsbuilditcodex.com/" target="_blank" >
+        <a href="https://www.letsbuilditcodex.com/" target="_blank" rel="noreferrer">
           {" "}
           <span>
             BarberApp by <strong>CODEX®</strong> · {new Date().getFullYear()}

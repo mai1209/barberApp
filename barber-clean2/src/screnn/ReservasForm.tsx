@@ -93,6 +93,10 @@ const DAY_NAMES = [
 ];
 
 type SlotGroup = { label: string; slots: string[] };
+type ResolvedBarberSchedule = {
+  scheduleRange: string | null;
+  scheduleRanges: { label: string; start: string; end: string }[];
+};
 
 type PaymentOption = {
   value: PaymentMethod;
@@ -115,6 +119,69 @@ function getPaymentOptions(settings?: PaymentSettings | null): PaymentOption[] {
   return options;
 }
 
+function normalizeScheduleRanges(input?: ResolvedBarberSchedule['scheduleRanges']) {
+  if (!Array.isArray(input)) return [];
+  return input.filter(
+    item => item?.start?.trim() && item?.end?.trim(),
+  );
+}
+
+function normalizeOverrideValidFrom(value?: string | null) {
+  const text = String(value ?? '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '1970-01-01';
+}
+
+function resolveBarberScheduleForDate(
+  barber: Barber | null,
+  date: Date,
+): ResolvedBarberSchedule {
+  if (!barber) {
+    return { scheduleRange: null, scheduleRanges: [] };
+  }
+
+  const weekday = date.getDay();
+  const targetDate = formatDateInShopTZ(date);
+  const override =
+    barber.dayScheduleOverrides
+      ?.filter(item => Number(item.day) === weekday)
+      .map(item => ({
+        ...item,
+        validFrom: normalizeOverrideValidFrom(item.validFrom),
+        useBase: Boolean(item.useBase),
+      }))
+      .sort((a, b) => b.validFrom.localeCompare(a.validFrom))[0] ?? null;
+
+  if (override) {
+    if (override.useBase) {
+      return {
+        scheduleRange: barber.scheduleRange ?? null,
+        scheduleRanges: normalizeScheduleRanges(barber.scheduleRanges),
+      };
+    }
+
+    const scheduleRanges = normalizeScheduleRanges(override.scheduleRanges);
+    return {
+      scheduleRange: scheduleRanges.length ? null : override.scheduleRange ?? null,
+      scheduleRanges,
+    };
+  }
+
+  return {
+    scheduleRange: barber.scheduleRange ?? null,
+    scheduleRanges: normalizeScheduleRanges(barber.scheduleRanges),
+  };
+}
+
+function formatBarberScheduleSummary(barber: Barber, date: Date) {
+  const resolved = resolveBarberScheduleForDate(barber, date);
+  if (resolved.scheduleRanges.length > 0) {
+    return resolved.scheduleRanges
+      .map(range => `${range.start}-${range.end}`)
+      .join(' / ');
+  }
+  return resolved.scheduleRange || 'Sin horario';
+}
+
 function ReservasForm({ navigation }: any) {
   const { theme } = useTheme();
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -132,7 +199,9 @@ function ReservasForm({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
-  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
+  const [bookedSlots, setBookedSlots] = useState<Set<string>>(() => new Set());
+  const [selectedBarberSchedule, setSelectedBarberSchedule] =
+    useState<ResolvedBarberSchedule | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -182,7 +251,7 @@ function ReservasForm({ navigation }: any) {
           selectedDate.getMonth() + 1,
         ).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
         const res = await fetchBarberAppointments(selectedBarber!, dateStr);
-        const blocked: string[] = [];
+        const blocked = new Set<string>();
         const blockStep = 30; // bloquear en intervalos de 30 min para todos los turnos
         res.appointments.forEach(a => {
           const label = formatTimeInShopTZ(a.startTime);
@@ -191,7 +260,7 @@ function ReservasForm({ navigation }: any) {
           const occupiedDuration = a.durationMinutes || 30;
           for (let offset = 0; offset < occupiedDuration; offset += blockStep) {
             const blockMin = startMin + offset;
-            blocked.push(
+            blocked.add(
               `${String(Math.floor(blockMin / 60)).padStart(2, '0')}:${String(
                 blockMin % 60,
               ).padStart(2, '0')}`,
@@ -199,12 +268,28 @@ function ReservasForm({ navigation }: any) {
           }
         });
         setBookedSlots(blocked);
+        if (res.resolvedSchedule) {
+          setSelectedBarberSchedule({
+            scheduleRange: res.resolvedSchedule.scheduleRange ?? null,
+            scheduleRanges: normalizeScheduleRanges(
+              res.resolvedSchedule.scheduleRanges,
+            ),
+          });
+        } else {
+          setSelectedBarberSchedule(null);
+        }
       } catch (e) {
         console.error(e);
       }
     }
     loadBooked();
-  }, [selectedBarber, selectedDate, selectedService]);
+  }, [selectedBarber, selectedDate]);
+
+  useEffect(() => {
+    if (!selectedBarber) {
+      setSelectedBarberSchedule(null);
+    }
+  }, [selectedBarber]);
 
   const selectedBarberData = useMemo(
     () => barbers.find(b => b._id === selectedBarber) || null,
@@ -221,6 +306,13 @@ function ReservasForm({ navigation }: any) {
     const dayOfWeek = selectedDate.getDay();
     return selectedBarberData.workDays.map(Number).includes(dayOfWeek);
   }, [selectedBarberData, selectedDate]);
+
+  const resolvedBarberSchedule = useMemo(
+    () =>
+      selectedBarberSchedule ||
+      resolveBarberScheduleForDate(selectedBarberData, selectedDate),
+    [selectedBarberData, selectedDate, selectedBarberSchedule],
+  );
 
   // Genera grupos de slots — soporta horario corrido y turno cortado
   const horarioGroups = useMemo((): SlotGroup[] => {
@@ -247,7 +339,7 @@ function ReservasForm({ navigation }: any) {
     };
 
     // Turno cortado
-    const ranges = selectedBarberData.scheduleRanges;
+    const ranges = resolvedBarberSchedule.scheduleRanges;
     if (ranges && ranges.length > 0) {
       return ranges.map(r => ({
         label: r.label,
@@ -256,11 +348,11 @@ function ReservasForm({ navigation }: any) {
     }
 
     // Horario corrido
-    const range = selectedBarberData.scheduleRange || '09:00 - 18:00';
+    const range = resolvedBarberSchedule.scheduleRange || '09:00 - 18:00';
     const parts = range.split('-');
     if (parts.length < 2) return [];
     return [{ label: '', slots: buildSlots(parts[0], parts[1]) }];
-  }, [isWorkDay, selectedBarberData, selectedService]);
+  }, [isWorkDay, selectedBarberData, selectedService, resolvedBarberSchedule]);
 
   // Lista plana para validaciones
   const allSlots = useMemo(
@@ -280,7 +372,7 @@ function ReservasForm({ navigation }: any) {
 
   const isSlotUnavailable = useCallback(
     (label: string) => {
-      if (bookedSlots.includes(label)) return true;
+      if (bookedSlots.has(label)) return true;
       if (!isTodayInShop) return false;
       return labelToMinutes(label) <= currentMinutesInShop;
     },
@@ -624,14 +716,7 @@ function ReservasForm({ navigation }: any) {
                       {b.fullName.split(' ')[0]}
                     </Text>
                     <Text style={styles.barberSchedule}>
-                      {' '}
-                      {b.scheduleRanges && b.scheduleRanges.length > 0
-                        ? `${b.scheduleRanges[0].start}-${
-                            b.scheduleRanges[0].end
-                          } / ${b.scheduleRanges[1]?.start ?? ''}-${
-                            b.scheduleRanges[1]?.end ?? ''
-                          }`
-                        : b.scheduleRange || 'Sin horario'}
+                      {formatBarberScheduleSummary(b, selectedDate)}
                     </Text>
                   </Pressable>
                 ))}
@@ -835,7 +920,7 @@ const createStyles = (theme: Theme) =>
       fontSize: 12,
       lineHeight: 18,
     },
-    barberCard: { alignItems: 'center', marginRight: 20, width: 85 },
+    barberCard: { alignItems: 'center', marginRight: 10, width: 85 },
     avatar: {
       width: 64,
       height: 64,

@@ -45,6 +45,27 @@ const barberSchema = new mongoose.Schema(
       ],
       default: [],
     },
+    dayScheduleOverrides: {
+      type: [
+        {
+          day: { type: Number, min: 0, max: 6 },
+          validFrom: { type: String, default: null },
+          useBase: { type: Boolean, default: false },
+          scheduleRange: { type: String, default: null },
+          scheduleRanges: {
+            type: [
+              {
+                label: { type: String },
+                start: { type: String },
+                end: { type: String },
+              },
+            ],
+            default: [],
+          },
+        },
+      ],
+      default: [],
+    },
     shift: {
       type: String,
       trim: true,

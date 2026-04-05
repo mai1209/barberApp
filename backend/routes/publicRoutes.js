@@ -1,14 +1,18 @@
 import { Router } from "express";
 import {
   publicBarberAppointments,
+  publicCreateSubscriptionCheckout,
   publicCreateAppointment,
   publicListBarbers,
+  publicGetPlanPricing,
   publicGetShop,
   publicListServices,
 } from "../api/publicController.js";
 
 const router = Router();
 
+router.get("/plans", publicGetPlanPricing);
+router.post("/subscriptions/checkout", publicCreateSubscriptionCheckout);
 router.get("/shops/:shopSlug", publicGetShop);
 router.get("/shops/:shopSlug/barbers", publicListBarbers);
 router.get("/shops/:shopSlug/barbers/:barberId/appointments", publicBarberAppointments);

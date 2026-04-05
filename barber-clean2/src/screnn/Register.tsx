@@ -18,6 +18,7 @@ import {
 import { registerUser } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
+import { saveToken, saveUserProfile } from '../services/authStorage';
 
 const AUTH_THEME = {
   primary: "#FF1493",
@@ -27,7 +28,7 @@ const AUTH_THEME = {
 } as const;
 
 function Register({ navigation }: any) {
-  const { } = useTheme(); // se mantiene el hook por consistencia, pero usamos tema fijo para auth
+  const { applyUserTheme } = useTheme();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -59,11 +60,15 @@ function Register({ navigation }: any) {
       setLoading(true);
       setError('');
 
-      await registerUser({ fullName, email, password });
-
-      Alert.alert('¡Éxito!', 'Cuenta creada correctamente.', [
-        { text: 'Ir al login', onPress: () => navigation.navigate('Login') },
-      ]);
+      const response = await registerUser({ fullName, email, password });
+      if (response?.token) {
+        await saveToken(response.token);
+      }
+      if (response?.user) {
+        await saveUserProfile(response.user);
+        applyUserTheme(response.user);
+      }
+      navigation.replace('Plans', { fromRegistration: true });
     } catch (err: any) {
       setError(err.message || 'Error al registrarse');
     } finally {

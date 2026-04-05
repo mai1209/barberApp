@@ -9,11 +9,37 @@ import {
 } from "../services/mailer.js";
 import {
   buildMercadoPagoOAuthUrl,
+  buildMercadoPagoSubscriptionReturnUrls,
+  buildMercadoPagoSubscriptionWebhookUrl,
+  createMercadoPagoSystemPreference,
   exchangeMercadoPagoCode,
   getMercadoPagoConfig,
 } from "../services/mercadoPago.js";
+import {
+  isSubscriptionLifecycleAuthorized,
+  processSubscriptionLifecycle,
+} from "../services/subscriptionLifecycleService.js";
+import {
+  getOrCreatePlanPricing,
+  serializePlanPricing,
+} from "../services/planPricingService.js";
 
 const PASSWORD_RESET_EXPIRY_MS = 15 * 60 * 1000;
+const SUBSCRIPTION_CURRENCY_ID = String(
+  process.env.SUBSCRIPTIONS_CURRENCY_ID || "USD",
+).trim().toUpperCase();
+const SUBSCRIPTION_PLAN_CONFIG = {
+  basic: {
+    title: "Suscripción BarberApp Básico",
+    description: "Plan mensual BarberApp Básico",
+    billingCycle: "monthly",
+  },
+  pro: {
+    title: "Suscripción BarberApp Pro",
+    description: "Plan mensual BarberApp Pro",
+    billingCycle: "monthly",
+  },
+};
 
 function sanitizeEmail(email) {
   return String(email ?? "").trim().toLowerCase();
@@ -310,6 +336,170 @@ function sanitizePaymentSettingsInput(input) {
   return { updates, hasAnyField };
 }
 
+function sanitizeSubscriptionInput(input) {
+  if (!input || typeof input !== "object") {
+    return { updates: {}, hasAnyField: false };
+  }
+
+  const updates = {};
+  let hasAnyField = false;
+
+  if (Object.prototype.hasOwnProperty.call(input, "plan")) {
+    const plan = String(input.plan ?? "").trim();
+    if (!["basic", "pro", "custom"].includes(plan)) {
+      throw new Error("El plan no es válido.");
+    }
+    updates.plan = plan;
+    hasAnyField = true;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "status")) {
+    const status = String(input.status ?? "").trim();
+    if (!["trial", "active", "past_due", "cancelled"].includes(status)) {
+      throw new Error("El estado no es válido.");
+    }
+    updates.status = status;
+    hasAnyField = true;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "billingCycle")) {
+    const rawCycle = input.billingCycle;
+    const cycle =
+      rawCycle == null || String(rawCycle).trim() === ""
+        ? null
+        : String(rawCycle).trim();
+    if (cycle !== null && !["monthly", "yearly", "custom"].includes(cycle)) {
+      throw new Error("El ciclo de facturación no es válido.");
+    }
+    updates.billingCycle = cycle;
+    hasAnyField = true;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "renewalMode")) {
+    const renewalMode = String(input.renewalMode ?? "").trim();
+    if (!["manual", "automatic"].includes(renewalMode)) {
+      throw new Error("El modo de renovación no es válido.");
+    }
+    updates.renewalMode = renewalMode;
+    hasAnyField = true;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "customPriceArs")) {
+    hasAnyField = true;
+    const raw = input.customPriceArs;
+    if (raw == null || String(raw).trim() === "") {
+      updates.customPriceArs = null;
+    } else {
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        throw new Error("El precio especial en ARS no es válido.");
+      }
+      updates.customPriceArs = parsed;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "customPriceUsdReference")) {
+    hasAnyField = true;
+    const raw = input.customPriceUsdReference;
+    if (raw == null || String(raw).trim() === "") {
+      updates.customPriceUsdReference = null;
+    } else {
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        throw new Error("La referencia especial en USD no es válida.");
+      }
+      updates.customPriceUsdReference = parsed;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "startedAt")) {
+    hasAnyField = true;
+    if (!input.startedAt) {
+      updates.startedAt = null;
+    } else {
+      const parsed = new Date(input.startedAt);
+      if (Number.isNaN(parsed.getTime())) {
+        throw new Error("La fecha de inicio no es válida.");
+      }
+      updates.startedAt = parsed;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "expiresAt")) {
+    hasAnyField = true;
+    if (!input.expiresAt) {
+      updates.expiresAt = null;
+    } else {
+      const parsed = new Date(input.expiresAt);
+      if (Number.isNaN(parsed.getTime())) {
+        throw new Error("La fecha de vencimiento no es válida.");
+      }
+      updates.expiresAt = parsed;
+    }
+  }
+
+  return { updates, hasAnyField };
+}
+
+function sanitizePlanPricingInput(input) {
+  if (!input || typeof input !== "object") {
+    return { updates: {}, hasAnyField: false };
+  }
+
+  const updates = {};
+  let hasAnyField = false;
+
+  const fields = [
+    ["basicPriceArs", "El precio ARS del plan Básico no es válido."],
+    ["basicPriceUsdReference", "La referencia USD del plan Básico no es válida."],
+    ["proPriceArs", "El precio ARS del plan Pro no es válido."],
+    ["proPriceUsdReference", "La referencia USD del plan Pro no es válida."],
+  ];
+
+  for (const [field, message] of fields) {
+    if (!Object.prototype.hasOwnProperty.call(input, field)) continue;
+    const parsed = Number(input[field]);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      throw new Error(message);
+    }
+    updates[field] = parsed;
+    hasAnyField = true;
+  }
+
+  return { updates, hasAnyField };
+}
+
+function sanitizeNotificationSettingsInput(input) {
+  if (!input || typeof input !== "object") {
+    return { updates: {}, hasAnyField: false };
+  }
+
+  const updates = {};
+  let hasAnyField = false;
+  const allowedReminderMinutes = new Set([15, 30, 60, 120, 180, 1440]);
+
+  if (Object.prototype.hasOwnProperty.call(input, "barberReminderEnabled")) {
+    hasAnyField = true;
+    updates.barberReminderEnabled = Boolean(input.barberReminderEnabled);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "barberReminderMinutesBefore")) {
+    hasAnyField = true;
+    const parsed = Number(input.barberReminderMinutesBefore);
+    if (!allowedReminderMinutes.has(parsed)) {
+      throw new Error("El tiempo del recordatorio debe ser 15, 30, 60, 120, 180 o 1440 minutos.");
+    }
+    updates.barberReminderMinutesBefore = parsed;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "customerSameDayEmailEnabled")) {
+    hasAnyField = true;
+    updates.customerSameDayEmailEnabled = Boolean(input.customerSameDayEmailEnabled);
+  }
+
+  return { updates, hasAnyField };
+}
+
 async function buildAvailableSlug(baseValue) {
   const base = baseValue || "barberia";
   let candidate = base;
@@ -362,12 +552,111 @@ export async function registerUser(req, res, next) {
       shopSlug,
       email,
       passwordHash,
+      subscription: {
+        plan: "basic",
+        status: "trial",
+        billingCycle: "monthly",
+        startedAt: new Date(),
+      },
       // no aceptar role desde el cliente
+    });
+
+    const token = signAccessToken({
+      sub: userDoc._id.toString(),
+      email: userDoc.email,
+      role: userDoc.role,
     });
 
     return res.status(201).json({
       message: "Usuario registrado correctamente",
+      token,
       user: userDoc.toJSON(),
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function createSubscriptionCheckout(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    const plan = String(req.body?.plan ?? "").trim();
+    const planConfig = SUBSCRIPTION_PLAN_CONFIG[plan];
+    if (!planConfig) {
+      return res.status(400).json({ error: "El plan seleccionado no es válido." });
+    }
+
+    const userDoc = await UserModel.findById(userId);
+    if (!userDoc || userDoc.isActive === false) {
+      return res.status(404).json({ error: "No encontramos la cuenta." });
+    }
+
+    const pricingDoc = await getOrCreatePlanPricing();
+    const pricing = serializePlanPricing(pricingDoc);
+    const baseAmount =
+      SUBSCRIPTION_CURRENCY_ID === "USD"
+        ? Number(pricing[plan]?.usdReference || 0)
+        : Number(pricing[plan]?.ars || 0);
+    const discountedAmount =
+      SUBSCRIPTION_CURRENCY_ID === "USD"
+        ? Number(userDoc.subscription?.customPriceUsdReference ?? 0)
+        : Number(userDoc.subscription?.customPriceArs ?? 0);
+    const amount = discountedAmount > 0 ? discountedAmount : baseAmount;
+
+    if (!(amount > 0)) {
+      return res.status(400).json({ error: "El plan no tiene un precio configurado." });
+    }
+
+    const externalReference = `subscription:${userDoc._id.toString()}:${plan}:${Date.now()}`;
+    const returnUrls = buildMercadoPagoSubscriptionReturnUrls();
+    const preference = await createMercadoPagoSystemPreference({
+      payload: {
+        items: [
+          {
+            id: `${plan}-monthly`,
+            title: planConfig.title,
+            description: planConfig.description,
+            quantity: 1,
+            currency_id: SUBSCRIPTION_CURRENCY_ID,
+            unit_price: amount,
+          },
+        ],
+        payer: userDoc.email
+          ? {
+              email: userDoc.email,
+              name: userDoc.fullName,
+            }
+          : undefined,
+        external_reference: externalReference,
+        notification_url: `${buildMercadoPagoSubscriptionWebhookUrl()}?userId=${userDoc._id.toString()}`,
+        back_urls: returnUrls,
+        auto_return: "approved",
+        metadata: {
+          user_id: userDoc._id.toString(),
+          plan,
+          billing_cycle: planConfig.billingCycle,
+          subscription_type: "barberapp_plan",
+        },
+      },
+    });
+
+    userDoc.subscription = {
+      ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
+      pendingPlan: plan,
+      mercadoPagoPreferenceId: preference.id || null,
+    };
+    await userDoc.save();
+
+    return res.json({
+      checkoutUrl: preference.init_point || null,
+      sandboxCheckoutUrl: preference.sandbox_init_point || null,
+      preferenceId: preference.id || null,
+      amount,
+      currencyId: SUBSCRIPTION_CURRENCY_ID,
     });
   } catch (err) {
     return next(err);
@@ -682,6 +971,212 @@ export async function updatePaymentSettings(req, res, next) {
     if (err instanceof Error) {
       return res.status(400).json({ error: err.message });
     }
+    return next(err);
+  }
+}
+
+export async function updateNotificationSettings(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    const userDoc = await UserModel.findById(userId);
+    if (!userDoc || userDoc.isActive === false) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    const { updates, hasAnyField } = sanitizeNotificationSettingsInput(req.body ?? {});
+    if (!hasAnyField) {
+      return res.status(400).json({ error: "No llegaron cambios de notificaciones para guardar." });
+    }
+
+    userDoc.notificationSettings = {
+      ...(userDoc.notificationSettings?.toObject?.() ?? userDoc.notificationSettings ?? {}),
+      ...updates,
+    };
+
+    await userDoc.save();
+
+    return res.json({
+      message: "Notificaciones guardadas correctamente",
+      user: userDoc.toJSON(),
+    });
+  } catch (err) {
+    if (err instanceof Error) {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
+}
+
+export async function updateOwnSubscriptionSettings(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    const userDoc = await UserModel.findById(userId);
+    if (!userDoc || userDoc.isActive === false) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    const { updates, hasAnyField } = sanitizeSubscriptionInput(req.body ?? {});
+    if (!hasAnyField) {
+      return res.status(400).json({ error: "No llegaron cambios de suscripción para guardar." });
+    }
+
+    userDoc.subscription = {
+      ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
+      ...updates,
+    };
+
+    await userDoc.save();
+
+    return res.json({
+      message: "Configuración de suscripción guardada correctamente.",
+      user: userDoc.toJSON(),
+    });
+  } catch (err) {
+    if (err instanceof Error) {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
+}
+
+export async function getPlanPricingAdmin(req, res, next) {
+  try {
+    const pricingDoc = await getOrCreatePlanPricing();
+    return res.json({ pricing: serializePlanPricing(pricingDoc) });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function updatePlanPricingAdmin(req, res, next) {
+  try {
+    const { updates, hasAnyField } = sanitizePlanPricingInput(req.body ?? {});
+    if (!hasAnyField) {
+      return res.status(400).json({ error: "No llegaron cambios de precios para guardar." });
+    }
+
+    const pricingDoc = await getOrCreatePlanPricing();
+    Object.assign(pricingDoc, updates);
+    await pricingDoc.save();
+
+    return res.json({
+      message: "Precios actualizados correctamente.",
+      pricing: serializePlanPricing(pricingDoc),
+    });
+  } catch (err) {
+    if (err instanceof Error) {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
+}
+
+export async function listSubscriptionUsers(req, res, next) {
+  try {
+    const search = String(req.query?.search ?? "").trim().toLowerCase();
+
+    const users = await UserModel.find({})
+      .sort({ createdAt: -1 })
+      .select({
+        fullName: 1,
+        email: 1,
+        shopSlug: 1,
+        role: 1,
+        isActive: 1,
+        createdAt: 1,
+        subscription: 1,
+      })
+      .lean();
+
+    const filtered = users.filter((user) => {
+      if (!search) return true;
+      return [user.fullName, user.email, user.shopSlug]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(search));
+    });
+
+    return res.json({
+      users: filtered.map((user) => ({
+        _id: String(user._id),
+        fullName: user.fullName,
+        email: user.email,
+        shopSlug: user.shopSlug,
+        role: user.role,
+        isActive: Boolean(user.isActive),
+        createdAt: user.createdAt,
+        subscription: user.subscription ?? {
+          plan: "basic",
+          status: "trial",
+          billingCycle: "monthly",
+          startedAt: null,
+          expiresAt: null,
+        },
+      })),
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function updateSubscriptionUser(req, res, next) {
+  try {
+    const userId = String(req.params?.userId ?? "").trim();
+    if (!userId) {
+      return res.status(400).json({ error: "Falta el usuario a actualizar." });
+    }
+
+    const { updates, hasAnyField } = sanitizeSubscriptionInput(req.body ?? {});
+    if (!hasAnyField) {
+      return res.status(400).json({ error: "No llegaron cambios de suscripción para guardar." });
+    }
+
+    const userDoc = await UserModel.findById(userId);
+    if (!userDoc) {
+      return res.status(404).json({ error: "No encontramos esa cuenta." });
+    }
+
+    userDoc.subscription = {
+      ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
+      ...updates,
+    };
+
+    await userDoc.save();
+
+    return res.json({
+      message: "Suscripción actualizada correctamente.",
+      user: {
+        _id: String(userDoc._id),
+        fullName: userDoc.fullName,
+        email: userDoc.email,
+        shopSlug: userDoc.shopSlug,
+        subscription: userDoc.subscription,
+      },
+    });
+  } catch (err) {
+    if (err instanceof Error) {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
+}
+
+export async function runSubscriptionLifecycle(req, res, next) {
+  try {
+    if (!isSubscriptionLifecycleAuthorized(req)) {
+      return res.status(401).json({ error: "No autorizado para correr el cron de suscripciones." });
+    }
+
+    const result = await processSubscriptionLifecycle({ now: new Date() });
+    return res.json(result);
+  } catch (err) {
     return next(err);
   }
 }

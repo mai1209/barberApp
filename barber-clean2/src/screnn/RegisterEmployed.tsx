@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -15,8 +15,9 @@ import {
   Modal,
   Image,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { Barber, createBarber, updateBarber } from '../services/api';
+import { Barber, createBarber, fetchBarbers, updateBarber } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
 
@@ -48,6 +49,44 @@ const DAYS_OF_WEEK = [
   { id: 6, label: 'S' },
 ];
 
+const DAY_NAMES = [
+  'Domingo',
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+];
+
+const SHOP_TZ = 'America/Argentina/Cordoba';
+
+const getTodayDateLabel = () => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: SHOP_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const year = parts.find(part => part.type === 'year')?.value ?? '0000';
+  const month = parts.find(part => part.type === 'month')?.value ?? '00';
+  const day = parts.find(part => part.type === 'day')?.value ?? '00';
+  return `${year}-${month}-${day}`;
+};
+
+const normalizeOverrideValidFrom = (value?: string | null) => {
+  const text = String(value ?? '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '1970-01-01';
+};
+
+type DayScheduleOverride = {
+  day: number;
+  validFrom?: string | null;
+  useBase?: boolean;
+  scheduleRange?: string | null;
+  scheduleRanges?: { label: string; start: string; end: string }[];
+};
+
 type ActivePicker =
   | 'start'
   | 'end'
@@ -55,11 +94,36 @@ type ActivePicker =
   | 'morningEnd'
   | 'afternoonStart'
   | 'afternoonEnd'
+  | 'overrideStart'
+  | 'overrideEnd'
+  | 'overrideMorningStart'
+  | 'overrideMorningEnd'
+  | 'overrideAfternoonStart'
+  | 'overrideAfternoonEnd'
   | null;
+
+function resolveActiveDayOverride(
+  overrides: DayScheduleOverride[],
+  day: number | null,
+  targetDate: string,
+) {
+  if (day == null) return null;
+  return (
+    overrides
+      .filter(item => Number(item.day) === day)
+      .map(item => ({
+        ...item,
+        validFrom: normalizeOverrideValidFrom(item.validFrom),
+        useBase: Boolean(item.useBase),
+      }))
+      .sort((a, b) => b.validFrom!.localeCompare(a.validFrom!))[0] || null
+  );
+}
 
 function RegisterEmployed({ navigation, route }: Props) {
   const { theme } = useTheme();
-  const barberToEdit = route?.params?.barber ?? null;
+  const routeBarber = route?.params?.barber ?? null;
+  const [barberToEdit, setBarberToEdit] = useState<Barber | null>(routeBarber);
   const isEditing = Boolean(barberToEdit?._id);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -81,6 +145,13 @@ function RegisterEmployed({ navigation, route }: Props) {
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [dayScheduleOverrides, setDayScheduleOverrides] = useState<DayScheduleOverride[]>([]);
+  const [selectedOverrideDay, setSelectedOverrideDay] = useState<number | null>(null);
+  const [multiEditMode, setMultiEditMode] = useState(false);
+  const [multiEditDays, setMultiEditDays] = useState<number[]>([]);
+  const todayDateLabel = useMemo(() => getTodayDateLabel(), []);
+  const selectedDaysRef = useRef<number[]>([]);
+  const dayScheduleOverridesRef = useRef<DayScheduleOverride[]>([]);
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   useEffect(() => {
@@ -91,6 +162,9 @@ function RegisterEmployed({ navigation, route }: Props) {
     setPhone(barberToEdit.phone ?? '');
     setPhotoUrl(barberToEdit.photoUrl ?? '');
     setSelectedDays((barberToEdit.workDays || []).map(Number));
+    selectedDaysRef.current = (barberToEdit.workDays || []).map(Number);
+    setDayScheduleOverrides(barberToEdit.dayScheduleOverrides || []);
+    dayScheduleOverridesRef.current = barberToEdit.dayScheduleOverrides || [];
 
     const hasSplitShift =
       Array.isArray(barberToEdit.scheduleRanges) && barberToEdit.scheduleRanges.length > 0;
@@ -115,9 +189,58 @@ function RegisterEmployed({ navigation, route }: Props) {
     }
   }, [barberToEdit]);
 
+  const syncLatestBarber = useCallback(async () => {
+    if (!routeBarber?._id) return;
+    try {
+      const res = await fetchBarbers();
+      const latest =
+        res.barbers?.find(item => item._id === routeBarber._id) ?? null;
+      if (latest) {
+        setBarberToEdit(latest);
+      }
+    } catch (_err) {
+    }
+  }, [routeBarber?._id]);
+
+  useEffect(() => {
+    setBarberToEdit(routeBarber);
+  }, [routeBarber]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      syncLatestBarber();
+    }, [syncLatestBarber]),
+  );
+
+  useEffect(() => {
+    selectedDaysRef.current = selectedDays;
+    setDayScheduleOverrides(prev => {
+      const next = prev.filter(item => selectedDays.includes(Number(item.day)));
+      dayScheduleOverridesRef.current = next;
+      return next;
+    });
+
+    if (!selectedDays.length) {
+      setSelectedOverrideDay(null);
+      return;
+    }
+
+    setSelectedOverrideDay(prev =>
+      prev != null && selectedDays.includes(prev) ? prev : selectedDays[0],
+    );
+  }, [selectedDays]);
+
+  useEffect(() => {
+    setMultiEditDays(prev => prev.filter(day => selectedDays.includes(day)));
+  }, [selectedDays]);
+
   const toggleDay = (id: number) => {
     setSelectedDays(prev =>
-      prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id],
+      {
+        const next = prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id];
+        selectedDaysRef.current = next;
+        return next;
+      },
     );
   };
 
@@ -125,6 +248,103 @@ function RegisterEmployed({ navigation, route }: Props) {
     () => `${formatMinutes(startMinutes)} - ${formatMinutes(endMinutes)}`,
     [startMinutes, endMinutes],
   );
+
+  const previewOverrideDay = useMemo(() => {
+    if (multiEditMode && multiEditDays.length > 0) return multiEditDays[0];
+    return selectedOverrideDay;
+  }, [multiEditDays, multiEditMode, selectedOverrideDay]);
+
+  const editingOverrideDays = useMemo(() => {
+    if (multiEditMode) return multiEditDays;
+    return selectedOverrideDay != null ? [selectedOverrideDay] : [];
+  }, [multiEditDays, multiEditMode, selectedOverrideDay]);
+
+  const editingOverrideDaysLabel = useMemo(() => {
+    if (!editingOverrideDays.length) return '';
+    return editingOverrideDays.map(day => DAY_NAMES[day]).join(', ');
+  }, [editingOverrideDays]);
+
+  const baseDayOverride = useMemo<DayScheduleOverride>(
+    () =>
+      splitShift
+        ? {
+            day: previewOverrideDay ?? 0,
+            scheduleRange: null,
+            scheduleRanges: [
+              {
+                label: 'mañana',
+                start: formatMinutes(morningStart),
+                end: formatMinutes(morningEnd),
+              },
+              {
+                label: 'tarde',
+                start: formatMinutes(afternoonStart),
+                end: formatMinutes(afternoonEnd),
+              },
+            ],
+          }
+        : {
+            day: previewOverrideDay ?? 0,
+            scheduleRange: formattedRange,
+            scheduleRanges: [],
+          },
+    [
+      previewOverrideDay,
+      splitShift,
+      formattedRange,
+      morningStart,
+      morningEnd,
+      afternoonStart,
+      afternoonEnd,
+    ],
+  );
+
+  const selectedOverrideConfig = useMemo(() => {
+    return resolveActiveDayOverride(
+      dayScheduleOverrides,
+      previewOverrideDay,
+      todayDateLabel,
+    );
+  }, [dayScheduleOverrides, previewOverrideDay, todayDateLabel]);
+
+  const selectedOverrideIsSplit = useMemo(
+    () =>
+      Boolean(
+        !selectedOverrideConfig?.useBase &&
+          selectedOverrideConfig?.scheduleRanges?.length,
+      ),
+    [selectedOverrideConfig],
+  );
+
+  const selectedOverrideHasCustomSchedule = Boolean(
+    selectedOverrideConfig && !selectedOverrideConfig.useBase,
+  );
+
+  const overrideSingleRange = useMemo(() => {
+    const fallback = parseScheduleRange(baseDayOverride.scheduleRange, startMinutes, endMinutes);
+    if (!selectedOverrideConfig?.scheduleRange) return fallback;
+    return parseScheduleRange(selectedOverrideConfig.scheduleRange, fallback[0], fallback[1]);
+  }, [selectedOverrideConfig, baseDayOverride, startMinutes, endMinutes]);
+
+  const overrideMorningRange = useMemo(() => {
+    const fallbackStart = morningStart;
+    const fallbackEnd = morningEnd;
+    const range = selectedOverrideConfig?.scheduleRanges?.[0];
+    return [
+      parseTimeToMinutes(range?.start, fallbackStart),
+      parseTimeToMinutes(range?.end, fallbackEnd),
+    ] as const;
+  }, [selectedOverrideConfig, morningStart, morningEnd]);
+
+  const overrideAfternoonRange = useMemo(() => {
+    const fallbackStart = afternoonStart;
+    const fallbackEnd = afternoonEnd;
+    const range = selectedOverrideConfig?.scheduleRanges?.[1];
+    return [
+      parseTimeToMinutes(range?.start, fallbackStart),
+      parseTimeToMinutes(range?.end, fallbackEnd),
+    ] as const;
+  }, [selectedOverrideConfig, afternoonStart, afternoonEnd]);
 
   // Título dinámico del picker
   const pickerTitle = useMemo(() => {
@@ -141,6 +361,18 @@ function RegisterEmployed({ navigation, route }: Props) {
         return 'Tarde — Inicio';
       case 'afternoonEnd':
         return 'Tarde — Fin';
+      case 'overrideStart':
+        return 'Día especial — Inicio';
+      case 'overrideEnd':
+        return 'Día especial — Fin';
+      case 'overrideMorningStart':
+        return 'Día especial — Mañana inicio';
+      case 'overrideMorningEnd':
+        return 'Día especial — Mañana fin';
+      case 'overrideAfternoonStart':
+        return 'Día especial — Tarde inicio';
+      case 'overrideAfternoonEnd':
+        return 'Día especial — Tarde fin';
       default:
         return '';
     }
@@ -161,6 +393,18 @@ function RegisterEmployed({ navigation, route }: Props) {
         return afternoonStart;
       case 'afternoonEnd':
         return afternoonEnd;
+      case 'overrideStart':
+        return overrideSingleRange[0];
+      case 'overrideEnd':
+        return overrideSingleRange[1];
+      case 'overrideMorningStart':
+        return overrideMorningRange[0];
+      case 'overrideMorningEnd':
+        return overrideMorningRange[1];
+      case 'overrideAfternoonStart':
+        return overrideAfternoonRange[0];
+      case 'overrideAfternoonEnd':
+        return overrideAfternoonRange[1];
       default:
         return 0;
     }
@@ -172,7 +416,169 @@ function RegisterEmployed({ navigation, route }: Props) {
     morningEnd,
     afternoonStart,
     afternoonEnd,
+    overrideSingleRange,
+    overrideMorningRange,
+    overrideAfternoonRange,
   ]);
+
+  const buildDayOverrideEntry = (
+    day: number,
+    next: Omit<DayScheduleOverride, 'day'>,
+  ): DayScheduleOverride => {
+    const validFrom = todayDateLabel;
+    return {
+      day,
+      validFrom,
+      useBase: Boolean(next.useBase),
+      scheduleRange: next.useBase
+        ? null
+        : next.scheduleRanges?.length
+          ? null
+          : next.scheduleRange ?? null,
+      scheduleRanges: next.useBase ? [] : next.scheduleRanges ?? [],
+    };
+  };
+
+  const upsertDayOverride = (
+    day: number,
+    next: Omit<DayScheduleOverride, 'day'>,
+  ) => {
+    setDayScheduleOverrides(prev => {
+      const normalized = buildDayOverrideEntry(day, next);
+
+      const index = prev.findIndex(item => Number(item.day) === day);
+      if (index === -1) {
+        const nextState = [...prev, normalized].sort(
+          (a, b) =>
+            a.day - b.day ||
+            normalizeOverrideValidFrom(a.validFrom).localeCompare(
+              normalizeOverrideValidFrom(b.validFrom),
+            ),
+        );
+        dayScheduleOverridesRef.current = nextState;
+        return nextState;
+      }
+
+      const updated = [...prev];
+      updated[index] = normalized;
+      dayScheduleOverridesRef.current = updated;
+      return updated;
+    });
+  };
+
+  const upsertMultipleDayOverrides = (
+    days: number[],
+    next: Omit<DayScheduleOverride, 'day'>,
+  ) => {
+    const uniqueDays = Array.from(new Set(days.map(Number))).filter(day =>
+      selectedDaysRef.current.includes(day),
+    );
+    if (!uniqueDays.length) return;
+
+    setDayScheduleOverrides(prev => {
+      let nextState = [...prev];
+
+      uniqueDays.forEach(day => {
+        const normalized = buildDayOverrideEntry(day, next);
+        const index = nextState.findIndex(item => Number(item.day) === day);
+
+        if (index === -1) {
+          nextState.push(normalized);
+        } else {
+          nextState[index] = normalized;
+        }
+      });
+
+      nextState = nextState.sort(
+        (a, b) =>
+          a.day - b.day ||
+          normalizeOverrideValidFrom(a.validFrom).localeCompare(
+            normalizeOverrideValidFrom(b.validFrom),
+          ),
+      );
+
+      dayScheduleOverridesRef.current = nextState;
+      return nextState;
+    });
+  };
+
+  const removeDayOverride = (day: number) => {
+    setDayScheduleOverrides(prev => {
+      const nextState = prev.filter(item => Number(item.day) !== day);
+      dayScheduleOverridesRef.current = nextState;
+      return nextState;
+    });
+  };
+
+  const toggleMultiEditDay = (day: number) => {
+    setMultiEditDays(prev =>
+      prev.includes(day) ? prev.filter(item => item !== day) : [...prev, day],
+    );
+  };
+
+  const applyOverrideToEditingDays = (
+    next: Omit<DayScheduleOverride, 'day'>,
+  ) => {
+    if (!editingOverrideDays.length) return;
+    if (editingOverrideDays.length === 1) {
+      upsertDayOverride(editingOverrideDays[0], next);
+      return;
+    }
+    upsertMultipleDayOverrides(editingOverrideDays, next);
+  };
+
+  const removeOverridesFromEditingDays = () => {
+    if (!editingOverrideDays.length) return;
+    setDayScheduleOverrides(prev => {
+      const nextState = prev.filter(
+        item => !editingOverrideDays.includes(Number(item.day)),
+      );
+      dayScheduleOverridesRef.current = nextState;
+      return nextState;
+    });
+  };
+
+  const enableSelectedDayOverride = () => {
+    if (!editingOverrideDays.length) return;
+    applyOverrideToEditingDays({
+      scheduleRange: baseDayOverride.scheduleRange ?? null,
+      scheduleRanges: baseDayOverride.scheduleRanges ?? [],
+    });
+  };
+
+  const toggleSelectedDayOverrideMode = () => {
+    if (!editingOverrideDays.length) return;
+    if (!selectedOverrideHasCustomSchedule) {
+      enableSelectedDayOverride();
+      return;
+    }
+
+    if (selectedOverrideIsSplit) {
+      applyOverrideToEditingDays({
+        scheduleRange: `${formatMinutes(overrideMorningRange[0])} - ${formatMinutes(
+          overrideAfternoonRange[1],
+        )}`,
+        scheduleRanges: [],
+      });
+      return;
+    }
+
+    applyOverrideToEditingDays({
+      scheduleRange: null,
+      scheduleRanges: [
+        {
+          label: 'mañana',
+          start: formatMinutes(morningStart),
+          end: formatMinutes(morningEnd),
+        },
+        {
+          label: 'tarde',
+          start: formatMinutes(afternoonStart),
+          end: formatMinutes(afternoonEnd),
+        },
+      ],
+    });
+  };
 
   const handlePickerConfirm = (minutes: number) => {
     switch (activePicker) {
@@ -194,6 +600,102 @@ function RegisterEmployed({ navigation, route }: Props) {
       case 'afternoonEnd':
         setAfternoonEnd(minutes);
         break;
+      case 'overrideStart':
+        if (editingOverrideDays.length) {
+          applyOverrideToEditingDays({
+            scheduleRange: `${formatMinutes(minutes)} - ${formatMinutes(
+              overrideSingleRange[1],
+            )}`,
+            scheduleRanges: [],
+          });
+        }
+        break;
+      case 'overrideEnd':
+        if (editingOverrideDays.length) {
+          applyOverrideToEditingDays({
+            scheduleRange: `${formatMinutes(overrideSingleRange[0])} - ${formatMinutes(
+              minutes,
+            )}`,
+            scheduleRanges: [],
+          });
+        }
+        break;
+      case 'overrideMorningStart':
+        if (editingOverrideDays.length) {
+          applyOverrideToEditingDays({
+            scheduleRange: null,
+            scheduleRanges: [
+              {
+                label: 'mañana',
+                start: formatMinutes(minutes),
+                end: formatMinutes(overrideMorningRange[1]),
+              },
+              {
+                label: 'tarde',
+                start: formatMinutes(overrideAfternoonRange[0]),
+                end: formatMinutes(overrideAfternoonRange[1]),
+              },
+            ],
+          });
+        }
+        break;
+      case 'overrideMorningEnd':
+        if (editingOverrideDays.length) {
+          applyOverrideToEditingDays({
+            scheduleRange: null,
+            scheduleRanges: [
+              {
+                label: 'mañana',
+                start: formatMinutes(overrideMorningRange[0]),
+                end: formatMinutes(minutes),
+              },
+              {
+                label: 'tarde',
+                start: formatMinutes(overrideAfternoonRange[0]),
+                end: formatMinutes(overrideAfternoonRange[1]),
+              },
+            ],
+          });
+        }
+        break;
+      case 'overrideAfternoonStart':
+        if (editingOverrideDays.length) {
+          applyOverrideToEditingDays({
+            scheduleRange: null,
+            scheduleRanges: [
+              {
+                label: 'mañana',
+                start: formatMinutes(overrideMorningRange[0]),
+                end: formatMinutes(overrideMorningRange[1]),
+              },
+              {
+                label: 'tarde',
+                start: formatMinutes(minutes),
+                end: formatMinutes(overrideAfternoonRange[1]),
+              },
+            ],
+          });
+        }
+        break;
+      case 'overrideAfternoonEnd':
+        if (editingOverrideDays.length) {
+          applyOverrideToEditingDays({
+            scheduleRange: null,
+            scheduleRanges: [
+              {
+                label: 'mañana',
+                start: formatMinutes(overrideMorningRange[0]),
+                end: formatMinutes(overrideMorningRange[1]),
+              },
+              {
+                label: 'tarde',
+                start: formatMinutes(overrideAfternoonRange[0]),
+                end: formatMinutes(minutes),
+              },
+            ],
+          });
+        }
+        break;
     }
     setActivePicker(null);
   };
@@ -210,7 +712,23 @@ function RegisterEmployed({ navigation, route }: Props) {
 
     try {
       setLoading(true);
-      const cleanDays = Array.from(new Set(selectedDays)).sort((a, b) => a - b);
+      const cleanDays = Array.from(new Set(selectedDaysRef.current)).sort((a, b) => a - b);
+      const cleanOverrides = dayScheduleOverridesRef.current
+        .filter(item => cleanDays.includes(Number(item.day)))
+        .map(item => ({
+          day: Number(item.day),
+          validFrom: item.validFrom ?? todayDateLabel,
+          useBase: Boolean(item.useBase),
+          scheduleRange: item.scheduleRange ?? null,
+          scheduleRanges: item.scheduleRanges ?? [],
+        }))
+        .sort(
+          (a, b) =>
+            a.day - b.day ||
+            normalizeOverrideValidFrom(a.validFrom).localeCompare(
+              normalizeOverrideValidFrom(b.validFrom),
+            ),
+        );
 
       const payload = {
         fullName: fullName.trim(),
@@ -232,6 +750,7 @@ function RegisterEmployed({ navigation, route }: Props) {
               },
             ]
           : [],
+        dayScheduleOverrides: cleanOverrides,
         workDays: cleanDays,
         isActive: true,
       };
@@ -438,7 +957,7 @@ function RegisterEmployed({ navigation, route }: Props) {
                         splitShift && styles.splitToggleTextActive,
                       ]}
                     >
-                      ✂️ Doble Jornada
+                       Doble Jornada
                     </Text>
                   </Pressable>
                 </View>
@@ -518,6 +1037,279 @@ function RegisterEmployed({ navigation, route }: Props) {
                       </View>
                     </View>
                   </>
+                )}
+              </View>
+
+              <View style={styles.section}>
+                <View style={styles.overrideHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.sectionLabel}>Horario especial por día</Text>
+                    <Text style={styles.overrideHeaderText}>
+                      Si un día trabaja distinto, podés personalizarlo sin tocar el horario base.
+                    </Text>
+                    <Text style={styles.overrideHeaderSubtext}>
+                      Los cambios nuevos se aplican desde hoy y no modifican fechas anteriores.
+                    </Text>
+                  </View>
+                </View>
+
+                {selectedDays.length ? (
+                  <>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.overrideDaysRow}
+                    >
+                      {selectedDays.map(day => {
+                        const active = multiEditMode
+                          ? multiEditDays.includes(day)
+                          : selectedOverrideDay === day;
+                        const activeOverride = resolveActiveDayOverride(
+                          dayScheduleOverrides,
+                          day,
+                          todayDateLabel,
+                        );
+                        const hasCustom = Boolean(
+                          activeOverride && !activeOverride.useBase,
+                        );
+                        return (
+                          <Pressable
+                            key={day}
+                            onPress={() =>
+                              multiEditMode
+                                ? toggleMultiEditDay(day)
+                                : setSelectedOverrideDay(day)
+                            }
+                            style={[
+                              styles.overrideDayChip,
+                              active && styles.overrideDayChipActive,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.overrideDayChipText,
+                                active && styles.overrideDayChipTextActive,
+                              ]}
+                            >
+                              {DAY_NAMES[day]}
+                            </Text>
+                            {hasCustom ? (
+                              <Text style={styles.overrideDayChipMeta}>Personalizado</Text>
+                            ) : (
+                              <Text style={styles.overrideDayChipMeta}>Base</Text>
+                            )}
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+
+                    <View style={styles.bulkApplyCard}>
+                      <View style={styles.bulkApplyHeader}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.bulkApplyTitle}>
+                            {multiEditMode ? 'Editando varios días' : 'Editar un solo día'}
+                          </Text>
+                          <Text style={styles.bulkApplyHint}>
+                            {multiEditMode
+                              ? 'Marcá los días y cualquier cambio se aplica a todos juntos.'
+                              : 'Tocá un día para editarlo solo, o activá edición múltiple.'}
+                          </Text>
+                        </View>
+                        <Pressable
+                          style={[
+                            styles.bulkApplyToggle,
+                            multiEditMode && styles.bulkApplyToggleActive,
+                          ]}
+                          onPress={() => {
+                            setMultiEditMode(prev => {
+                              const next = !prev;
+                              if (next) {
+                                setMultiEditDays(
+                                  selectedOverrideDay != null ? [selectedOverrideDay] : [],
+                                );
+                              } else {
+                                setMultiEditDays([]);
+                              }
+                              return next;
+                            });
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.bulkApplyToggleText,
+                              multiEditMode && styles.bulkApplyToggleTextActive,
+                            ]}
+                          >
+                            {multiEditMode ? 'Editar uno' : 'Editar varios'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    </View>
+
+                    {previewOverrideDay != null ? (
+                      <View style={styles.overrideCard}>
+                        <View style={styles.overrideSelectionSummary}>
+                          <Text style={styles.overrideSelectionSummaryLabel}>
+                            {multiEditMode ? 'Días editando' : 'Día editando'}
+                          </Text>
+                          <Text style={styles.overrideSelectionSummaryValue}>
+                            {editingOverrideDaysLabel}
+                          </Text>
+                        </View>
+                        <View style={styles.overrideCardTop}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.overrideCardTitle}>
+                              {multiEditMode
+                                ? `${multiEditDays.length} día(s) seleccionados`
+                                : DAY_NAMES[previewOverrideDay]}
+                            </Text>
+                            <Text style={styles.overrideCardHint}>
+                              {multiEditMode
+                                ? 'Los cambios que hagas acá se aplican a todos los días marcados.'
+                                : selectedOverrideHasCustomSchedule
+                                  ? 'Este día usa un horario distinto al base.'
+                                  : 'Este día usa el horario base actual.'}
+                            </Text>
+                          </View>
+                          <Pressable
+                            style={[
+                              styles.overrideToggle,
+                              selectedOverrideHasCustomSchedule &&
+                                styles.overrideToggleActive,
+                            ]}
+                            onPress={() =>
+                              selectedOverrideHasCustomSchedule
+                                ? removeOverridesFromEditingDays()
+                                : enableSelectedDayOverride()
+                            }
+                          >
+                            <Text
+                              style={[
+                                styles.overrideToggleText,
+                                selectedOverrideHasCustomSchedule &&
+                                  styles.overrideToggleTextActive,
+                              ]}
+                            >
+                              {selectedOverrideHasCustomSchedule
+                                ? 'Usando horario especial'
+                                : 'Usar horario especial'}
+                            </Text>
+                          </Pressable>
+                        </View>
+
+                        {selectedOverrideHasCustomSchedule ? (
+                          <>
+                            <Pressable
+                              style={[
+                                styles.splitToggle,
+                                selectedOverrideIsSplit && styles.splitToggleActive,
+                              ]}
+                              onPress={toggleSelectedDayOverrideMode}
+                            >
+                              <Text
+                                style={[
+                                  styles.splitToggleText,
+                                  selectedOverrideIsSplit &&
+                                    styles.splitToggleTextActive,
+                                ]}
+                              >
+                                {selectedOverrideIsSplit
+                                  ? 'Usando horario cortado'
+                                  : 'Usar horario cortado'}
+                              </Text>
+                            </Pressable>
+
+                            {!selectedOverrideIsSplit ? (
+                              <View style={[styles.timeRow, { marginTop: 12 }]}>
+                                <Pressable
+                                  style={styles.timeCard}
+                                  onPress={() => setActivePicker('overrideStart')}
+                                >
+                                  <Text style={styles.timeLabel}>Inicio</Text>
+                                  <Text style={styles.timeValue}>
+                                    {formatMinutesAmPm(overrideSingleRange[0])}
+                                  </Text>
+                                </Pressable>
+                                <Pressable
+                                  style={styles.timeCard}
+                                  onPress={() => setActivePicker('overrideEnd')}
+                                >
+                                  <Text style={styles.timeLabel}>Fin</Text>
+                                  <Text style={styles.timeValue}>
+                                    {formatMinutesAmPm(overrideSingleRange[1])}
+                                  </Text>
+                                </Pressable>
+                              </View>
+                            ) : (
+                              <>
+                                <View style={[styles.shiftBlock, { marginTop: 12 }]}>
+                                  <Text style={styles.shiftLabel}>☀️ Mañana</Text>
+                                  <View style={styles.timeRow}>
+                                    <Pressable
+                                      style={styles.timeCard}
+                                      onPress={() =>
+                                        setActivePicker('overrideMorningStart')
+                                      }
+                                    >
+                                      <Text style={styles.timeLabel}>Inicio</Text>
+                                      <Text style={styles.timeValue}>
+                                        {formatMinutesAmPm(overrideMorningRange[0])}
+                                      </Text>
+                                    </Pressable>
+                                    <Pressable
+                                      style={styles.timeCard}
+                                      onPress={() =>
+                                        setActivePicker('overrideMorningEnd')
+                                      }
+                                    >
+                                      <Text style={styles.timeLabel}>Fin</Text>
+                                      <Text style={styles.timeValue}>
+                                        {formatMinutesAmPm(overrideMorningRange[1])}
+                                      </Text>
+                                    </Pressable>
+                                  </View>
+                                </View>
+
+                                <View style={styles.shiftDivider} />
+
+                                <View style={styles.shiftBlock}>
+                                  <Text style={styles.shiftLabel}>🌙 Tarde</Text>
+                                  <View style={styles.timeRow}>
+                                    <Pressable
+                                      style={styles.timeCard}
+                                      onPress={() =>
+                                        setActivePicker('overrideAfternoonStart')
+                                      }
+                                    >
+                                      <Text style={styles.timeLabel}>Inicio</Text>
+                                      <Text style={styles.timeValue}>
+                                        {formatMinutesAmPm(overrideAfternoonRange[0])}
+                                      </Text>
+                                    </Pressable>
+                                    <Pressable
+                                      style={styles.timeCard}
+                                      onPress={() =>
+                                        setActivePicker('overrideAfternoonEnd')
+                                      }
+                                    >
+                                      <Text style={styles.timeLabel}>Fin</Text>
+                                      <Text style={styles.timeValue}>
+                                        {formatMinutesAmPm(overrideAfternoonRange[1])}
+                                      </Text>
+                                    </Pressable>
+                                  </View>
+                                </View>
+                              </>
+                            )}
+                          </>
+                        ) : null}
+                      </View>
+                    ) : null}
+                  </>
+                ) : (
+                  <Text style={styles.overrideEmptyText}>
+                    Primero elegí al menos un día de atención para habilitar horarios especiales.
+                  </Text>
                 )}
               </View>
 
@@ -875,19 +1667,26 @@ const createStyles = (theme: Theme) =>
       alignItems: 'center',
     },
     splitToggle: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 12,
-      backgroundColor: '#252525',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderRadius: 14,
+      backgroundColor: '#24242D',
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: '#373742',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     splitToggleActive: {
-      backgroundColor: hexToRgba(theme.primary, 0.15),
+      backgroundColor: theme.primary,
       borderColor: theme.primary,
     },
-    splitToggleText: { color: '#666', fontSize: 12, fontWeight: '700' },
-    splitToggleTextActive: { color: theme.primary },
+    splitToggleText: {
+      color: '#F4F4F7',
+      fontSize: 13,
+      fontWeight: '800',
+      textAlign: 'center',
+    },
+    splitToggleTextActive: { color: '#FFFFFF' },
     shiftBlock: { gap: 8 },
     shiftLabel: {
       color: theme.primary,
@@ -897,6 +1696,215 @@ const createStyles = (theme: Theme) =>
       letterSpacing: 1,
     },
     shiftDivider: { height: 1, backgroundColor: '#252525', marginVertical: 4 },
+    overrideHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    overrideHeaderText: {
+      color: '#7C7C7C',
+      fontSize: 12,
+      lineHeight: 18,
+      marginTop: 4,
+      marginLeft: 4,
+    },
+    overrideHeaderSubtext: {
+      color: '#6E6E6E',
+      fontSize: 11,
+      lineHeight: 16,
+      marginTop: 6,
+      marginLeft: 4,
+    },
+    overrideDaysRow: {
+      gap: 10,
+      paddingRight: 6,
+    },
+    overrideDayChip: {
+      minWidth: 110,
+      borderRadius: 18,
+      backgroundColor: '#252525',
+      borderWidth: 1,
+      borderColor: '#333',
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      gap: 4,
+    },
+    overrideDayChipActive: {
+      backgroundColor: hexToRgba(theme.primary, 0.16),
+      borderColor: theme.primary,
+    },
+    overrideDayChipText: {
+      color: '#F5F5F5',
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    overrideDayChipTextActive: {
+      color: theme.primary,
+    },
+    overrideDayChipMeta: {
+      color: '#8D8D8D',
+      fontSize: 11,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+    },
+    overrideCard: {
+      backgroundColor: '#202020',
+      borderRadius: 20,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: '#2D2D2D',
+      gap: 12,
+    },
+    overrideSelectionSummary: {
+      borderRadius: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      backgroundColor: hexToRgba(theme.primary, 0.12),
+      borderWidth: 1,
+      borderColor: hexToRgba(theme.primary, 0.24),
+      gap: 2,
+    },
+    overrideSelectionSummaryLabel: {
+      color: '#D7C38A',
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
+    },
+    overrideSelectionSummaryValue: {
+      color: '#FFF',
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    bulkApplyCard: {
+      borderRadius: 18,
+      padding: 14,
+      backgroundColor: '#18181F',
+      borderWidth: 1,
+      borderColor: '#2A2A34',
+      gap: 12,
+    },
+    bulkApplyHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+    },
+    bulkApplyTitle: {
+      color: '#F4F4F7',
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    bulkApplyHint: {
+      color: '#8C8C95',
+      fontSize: 12,
+      lineHeight: 17,
+      marginTop: 4,
+    },
+    bulkApplyToggle: {
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      borderRadius: 14,
+      backgroundColor: '#25252D',
+      borderWidth: 1,
+      borderColor: '#333340',
+    },
+    bulkApplyToggleActive: {
+      backgroundColor: hexToRgba(theme.primary, 0.16),
+      borderColor: theme.primary,
+    },
+    bulkApplyToggleText: {
+      color: '#B4B4BE',
+      fontSize: 12,
+      fontWeight: '800',
+    },
+    bulkApplyToggleTextActive: {
+      color: theme.primary,
+    },
+    bulkApplyDaysRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    bulkApplyDayChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 14,
+      backgroundColor: '#25252D',
+      borderWidth: 1,
+      borderColor: '#333340',
+    },
+    bulkApplyDayChipActive: {
+      backgroundColor: hexToRgba(theme.primary, 0.16),
+      borderColor: theme.primary,
+    },
+    bulkApplyDayChipText: {
+      color: '#D4D4DB',
+      fontSize: 12,
+      fontWeight: '800',
+    },
+    bulkApplyDayChipTextActive: {
+      color: theme.primary,
+    },
+    bulkApplyAction: {
+      borderRadius: 16,
+      backgroundColor: theme.primary,
+      paddingVertical: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    bulkApplyActionDisabled: {
+      opacity: 0.45,
+    },
+    bulkApplyActionText: {
+      color: '#fff',
+      fontSize: 13,
+      fontWeight: '900',
+    },
+    overrideCardTop: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+    },
+    overrideCardTitle: {
+      color: '#fff',
+      fontSize: 18,
+      fontWeight: '800',
+    },
+    overrideCardHint: {
+      color: '#8A8A8A',
+      fontSize: 12,
+      lineHeight:17,
+      marginTop: 4,
+    },
+    overrideToggle: {
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 14,
+      backgroundColor: '#252525',
+      borderWidth: 1,
+      borderColor: '#333',
+      alignSelf: 'flex-start',
+    },
+    overrideToggleActive: {
+      backgroundColor: hexToRgba(theme.primary, 0.18),
+      borderColor: theme.primary,
+    },
+    overrideToggleText: {
+      color: '#A0A0A0',
+      fontSize: 12,
+      fontWeight: '800',
+    },
+    overrideToggleTextActive: {
+      color: theme.primary,
+    },
+    overrideEmptyText: {
+      color: '#757575',
+      fontSize: 13,
+      lineHeight: 20,
+      marginLeft: 4,
+    },
 
     submitBtn: {
       backgroundColor: theme.primary,

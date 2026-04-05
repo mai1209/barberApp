@@ -7,6 +7,16 @@ import { BarberModel } from "../models/Barber.js";
 import { sendAppMail } from "../services/mailer.js";
 import { createAppointmentMercadoPagoPreference } from "./paymentController.js";
 import { getTimeZoneDayRange, getTimeZoneWeekday } from "../utils/timezone.js";
+import { resolveBarberScheduleForWeekday } from "../utils/barberSchedule.js";
+import {
+  buildMercadoPagoSubscriptionReturnUrls,
+  buildMercadoPagoSubscriptionWebhookUrl,
+  createMercadoPagoSystemPreference,
+} from "../services/mercadoPago.js";
+import {
+  getOrCreatePlanPricing,
+  serializePlanPricing,
+} from "../services/planPricingService.js";
 
 function buildDayRange(dateParam) {
   return getTimeZoneDayRange(dateParam);
@@ -38,7 +48,13 @@ function sanitizeBarber(barber) {
     shift: barber.shift,
     scheduleRange: barber.scheduleRange || null,
     scheduleRanges: barber.scheduleRanges || [],
-
+    dayScheduleOverrides: (barber.dayScheduleOverrides || []).map((item) => ({
+      day: Number(item?.day),
+      validFrom: item?.validFrom || null,
+      useBase: Boolean(item?.useBase),
+      scheduleRange: item?.scheduleRange || null,
+      scheduleRanges: item?.scheduleRanges || [],
+    })),
     workDays: barber.workDays || [],
   };
 }
@@ -55,10 +71,16 @@ function sanitizeAppointment(app) {
 function sanitizeShop(shop) {
   if (!shop) return null;
   const paymentSettings = shop.paymentSettings || {};
+  const themeConfig = shop.themeConfig || {};
   return {
     _id: shop._id.toString(),
     name: shop.fullName,
     slug: shop.shopSlug,
+    themeConfig: {
+      primary: themeConfig.primary || null,
+      secondary: themeConfig.secondary || null,
+      logoDataUrl: themeConfig.logoDataUrl || null,
+    },
     paymentSettings: {
       cashEnabled: paymentSettings.cashEnabled !== false,
       advancePaymentEnabled: Boolean(paymentSettings.advancePaymentEnabled),
@@ -84,6 +106,11 @@ function sanitizeService(service) {
 
 function normalizePaymentMethod(value) {
   return value === "transfer" ? "transfer" : "cash";
+}
+
+function normalizePublicPlan(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return ["basic", "pro"].includes(normalized) ? normalized : null;
 }
 
 function validatePublicPaymentSelection(shop, paymentMethod) {
@@ -139,6 +166,97 @@ export async function publicGetShop(req, res, next) {
   }
 }
 
+export async function publicGetPlanPricing(req, res, next) {
+  try {
+    const pricingDoc = await getOrCreatePlanPricing();
+    return res.json({ pricing: serializePlanPricing(pricingDoc) });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function publicCreateSubscriptionCheckout(req, res, next) {
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const plan = normalizePublicPlan(req.body?.plan);
+
+    if (!email || !plan) {
+      return res.status(400).json({
+        error: "Necesitamos el email de la cuenta y un plan válido para generar el pago.",
+      });
+    }
+
+    const userDoc = await UserModel.findOne({ email, isActive: true });
+    if (!userDoc) {
+      return res.status(404).json({
+        error: "No encontramos una cuenta activa con ese email.",
+      });
+    }
+
+    const pricingDoc = await getOrCreatePlanPricing();
+    const pricing = serializePlanPricing(pricingDoc);
+    const baseAmount = Number(pricing[plan]?.ars || 0);
+    const discountedAmount = Number(userDoc.subscription?.customPriceArs ?? 0);
+    const amount = discountedAmount > 0 ? discountedAmount : baseAmount;
+
+    if (!(amount > 0)) {
+      return res.status(400).json({
+        error: "El plan no tiene un precio configurado.",
+      });
+    }
+
+    const externalReference = `subscription:${userDoc._id.toString()}:${plan}:${Date.now()}`;
+    const preference = await createMercadoPagoSystemPreference({
+      payload: {
+        items: [
+          {
+            id: `${plan}-monthly`,
+            title: `Suscripción BarberApp ${plan === "basic" ? "Básico" : "Pro"}`,
+            description: `Plan mensual BarberApp ${plan === "basic" ? "Básico" : "Pro"}`,
+            quantity: 1,
+            currency_id: "ARS",
+            unit_price: amount,
+          },
+        ],
+        payer: {
+          email: userDoc.email,
+          name: userDoc.fullName,
+        },
+        external_reference: externalReference,
+        notification_url: `${buildMercadoPagoSubscriptionWebhookUrl()}?userId=${userDoc._id.toString()}`,
+        back_urls: buildMercadoPagoSubscriptionReturnUrls(),
+        auto_return: "approved",
+        metadata: {
+          user_id: userDoc._id.toString(),
+          plan,
+          billing_cycle: "monthly",
+          subscription_type: "barberapp_plan",
+        },
+      },
+    });
+
+    userDoc.subscription = {
+      ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
+      pendingPlan: plan,
+      billingCycle: userDoc.subscription?.billingCycle || "monthly",
+      mercadoPagoPreferenceId: preference.id || null,
+    };
+    await userDoc.save();
+
+    return res.json({
+      checkoutUrl: preference.init_point || null,
+      sandboxCheckoutUrl: preference.sandbox_init_point || null,
+      preferenceId: preference.id || null,
+      amount,
+      currencyId: "ARS",
+      discountApplied: discountedAmount > 0 && discountedAmount < baseAmount,
+      baseAmount,
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 export async function publicListBarbers(req, res, next) {
   try {
     const shop = await findActiveShop(req.params.shopSlug);
@@ -178,6 +296,11 @@ export async function publicListServices(req, res, next) {
 export async function publicBarberAppointments(req, res, next) {
   try {
     const { barberId, shopSlug } = req.params;
+    const { date } = req.query;
+    const effectiveDate =
+      typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)
+        ? date
+        : undefined;
     const { startOfDay, endOfDay } = buildDayRange(req.query.date);
     const shop = await findActiveShop(shopSlug);
     if (!shop) return res.status(404).json({ error: "Barbería no encontrada" });
@@ -196,9 +319,18 @@ export async function publicBarberAppointments(req, res, next) {
     })
       .sort({ startTime: 1 })
       .lean();
+    const weekday = getTimeZoneWeekday(
+      effectiveDate ? `${effectiveDate}T12:00:00` : new Date(),
+    );
+    const resolvedSchedule = resolveBarberScheduleForWeekday(
+      barber,
+      weekday,
+      effectiveDate,
+    );
     return res.json({
       shop: sanitizeShop(shop),
       barber: sanitizeBarber(barber),
+      resolvedSchedule,
       appointments: appointments.map(sanitizeAppointment),
     });
   } catch (err) {

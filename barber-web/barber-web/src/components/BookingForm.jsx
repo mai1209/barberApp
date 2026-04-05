@@ -36,8 +36,6 @@ function formatTimeInShopTZ(value) {
   const mm = parts.find((part) => part.type === "minute")?.value ?? "00";
   return `${hh}:${mm}`;
 }
-const DEFAULT_WORKING_RANGE = { start: 8 * 60, end: 22 * 60 };
-const DEFAULT_RANGE_LABEL = `${minutesToLabel(DEFAULT_WORKING_RANGE.start)} - ${minutesToLabel(DEFAULT_WORKING_RANGE.end)}`;
 const formatPrice = (value) =>
   new Intl.NumberFormat("es-AR", {
     style: "currency",
@@ -61,7 +59,8 @@ const getPublicPaymentOptions = (shopInfo) => {
     options.push({
       value: "cash",
       label: "Efectivo / transferencia en el local",
-      helper: "Reservás ahora y pagás presencialmente en la barbería cuando llegás a tu turno.",
+      helper:
+        "Reservás ahora y pagás presencialmente en la barbería cuando llegás a tu turno.",
     });
   }
 
@@ -123,6 +122,61 @@ const parseScheduleRangeLabel = (range) => {
   return { start, end };
 };
 
+const normalizeScheduleRanges = (input) => {
+  if (!Array.isArray(input)) return [];
+  return input.filter((item) => item?.start?.trim() && item?.end?.trim());
+};
+
+const normalizeOverrideValidFrom = (value) => {
+  const text = String(value ?? "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "1970-01-01";
+};
+
+const resolveBarberScheduleForDate = (barber, date) => {
+  if (!barber) return { scheduleRange: null, scheduleRanges: [] };
+
+  const weekday = date.getDay();
+  const override =
+    barber.dayScheduleOverrides
+      ?.filter((item) => Number(item.day) === weekday)
+      .map((item) => ({
+        ...item,
+        validFrom: normalizeOverrideValidFrom(item.validFrom),
+        useBase: Boolean(item.useBase),
+      }))
+      .sort((a, b) => b.validFrom.localeCompare(a.validFrom))[0] ?? null;
+
+  if (override) {
+    if (override.useBase) {
+      return {
+        scheduleRange: barber.scheduleRange ?? null,
+        scheduleRanges: normalizeScheduleRanges(barber.scheduleRanges),
+      };
+    }
+
+    const scheduleRanges = normalizeScheduleRanges(override.scheduleRanges);
+    return {
+      scheduleRange: scheduleRanges.length ? null : override.scheduleRange ?? null,
+      scheduleRanges,
+    };
+  }
+
+  return {
+    scheduleRange: barber.scheduleRange ?? null,
+    scheduleRanges: normalizeScheduleRanges(barber.scheduleRanges),
+  };
+};
+
+const formatBarberScheduleSummary = (barber, date) => {
+  const resolved = resolveBarberScheduleForDate(barber, date);
+  if (resolved.scheduleRanges.length > 0) {
+    return resolved.scheduleRanges
+      .map((range) => `${range.start}-${range.end}`)
+      .join(" / ");
+  }
+  return resolved.scheduleRange || "Sin horario configurado";
+};
+
 function BookingForm({ shopSlug }) {
   // 1. TODOS LOS USESTATE PRIMERO
   const [slugReady] = useState(() => {
@@ -145,13 +199,11 @@ function BookingForm({ shopSlug }) {
   const [shopLoading, setShopLoading] = useState(true);
   const [services, setServices] = useState([]);
   const [selectedService, setSelectedService] = useState(null);
-  const [servicesLoading, setServicesLoading] = useState(true);
-  const [servicesError, setServicesError] = useState("");
   const [servicePickerOpen, setServicePickerOpen] = useState(false);
-  const [focusedField, setFocusedField] = useState(null);
   const [email, setEmail] = useState(""); // <-- AGREGAR ESTO
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [selectedBarberSchedule, setSelectedBarberSchedule] = useState(null);
   const [paymentResultMessage, setPaymentResultMessage] = useState("");
 
   const currentDuration =
@@ -168,17 +220,16 @@ function BookingForm({ shopSlug }) {
     [shopInfo],
   );
 
-  const workingWindow = useMemo(() => {
-    const range =
-      selectedBarberData?.scheduleRange || selectedBarberData?.schedule;
-    if (!range) return DEFAULT_WORKING_RANGE;
-    return parseScheduleRangeLabel(range) ?? DEFAULT_WORKING_RANGE;
-  }, [selectedBarberData]);
+  const resolvedBarberSchedule = useMemo(
+    () =>
+      selectedBarberSchedule ||
+      resolveBarberScheduleForDate(selectedBarberData, selectedDate),
+    [selectedBarberData, selectedDate, selectedBarberSchedule],
+  );
 
-  // Reemplazá el useMemo de horarios por este:
   const horarioGroups = useMemo(() => {
     const workDays = selectedBarberData?.workDays || [0, 1, 2, 3, 4, 5, 6];
-    const currentDayOfWeek = selectedDate.getUTCDay();
+    const currentDayOfWeek = selectedDate.getDay();
     if (!workDays.includes(currentDayOfWeek)) return [];
 
     const step = currentDuration;
@@ -199,7 +250,7 @@ function BookingForm({ shopSlug }) {
     };
 
     // Turno cortado
-    const ranges = selectedBarberData?.scheduleRanges;
+    const ranges = resolvedBarberSchedule.scheduleRanges;
     if (ranges && ranges.length > 0) {
       return ranges.map((r) => ({
         label: r.label,
@@ -208,7 +259,7 @@ function BookingForm({ shopSlug }) {
     }
 
     // Horario corrido
-    const range = selectedBarberData?.scheduleRange;
+    const range = resolvedBarberSchedule.scheduleRange;
     if (!range) return [{ label: "", slots: [] }];
     const parsed = parseScheduleRangeLabel(range);
     if (!parsed) return [];
@@ -221,7 +272,7 @@ function BookingForm({ shopSlug }) {
         ),
       },
     ];
-  }, [currentDuration, selectedBarberData, selectedDate]);
+  }, [currentDuration, resolvedBarberSchedule, selectedBarberData, selectedDate]);
 
   // Lista plana para isSlotDisabled
   const allSlots = useMemo(
@@ -243,9 +294,13 @@ function BookingForm({ shopSlug }) {
     if (paymentResult === "success") {
       setPaymentResultMessage("Pago aprobado. Tu turno ya quedó reservado.");
     } else if (paymentResult === "pending") {
-      setPaymentResultMessage("Tu pago quedó pendiente. Apenas se confirme, tu reserva se actualizará.");
+      setPaymentResultMessage(
+        "Tu pago quedó pendiente. Apenas se confirme, tu reserva se actualizará.",
+      );
     } else if (paymentResult === "failure") {
-      setPaymentResultMessage("El pago no se completó. Si querés, podés intentar otra vez.");
+      setPaymentResultMessage(
+        "El pago no se completó. Si querés, podés intentar otra vez.",
+      );
     }
 
     params.delete("payment_result");
@@ -262,7 +317,9 @@ function BookingForm({ shopSlug }) {
 
   useEffect(() => {
     if (!paymentOptions.length) return;
-    const currentOption = paymentOptions.find((item) => item.value === paymentMethod);
+    const currentOption = paymentOptions.find(
+      (item) => item.value === paymentMethod,
+    );
     if (!currentOption) {
       setPaymentMethod(paymentOptions[0].value);
     }
@@ -290,10 +347,7 @@ function BookingForm({ shopSlug }) {
         const list = res?.services ?? [];
         setServices(list);
         setSelectedService(list[0] ?? null);
-      } catch (err) {
-        setServicesError("Error al cargar servicios");
       } finally {
-        setServicesLoading(false);
       }
     })();
   }, [slugReady]);
@@ -303,7 +357,6 @@ function BookingForm({ shopSlug }) {
     (async () => {
       try {
         const res = await fetchBarbers();
-        console.log("RES BARBEROS:", JSON.stringify(res));
         const list = res.barbers || [];
         setBarbers(list);
         if (list.length > 0) setSelectedBarber(list[0]._id);
@@ -330,14 +383,21 @@ function BookingForm({ shopSlug }) {
           const startLabel = formatTimeInShopTZ(app.startTime);
           const [baseHour, baseMinute] = startLabel.split(":").map(Number);
           const startMinutes = baseHour * 60 + baseMinute;
-          const occupiedDuration =
-            app.durationMinutes ?? SLOT_INTERVAL_MINUTES;
+          const occupiedDuration = app.durationMinutes ?? SLOT_INTERVAL_MINUTES;
           for (let o = 0; o < occupiedDuration; o += SLOT_INTERVAL_MINUTES) {
-            busy.add(
-              minutesToLabel(startMinutes + o),
-            );
+            busy.add(minutesToLabel(startMinutes + o));
           }
         });
+      }
+      if (res?.resolvedSchedule) {
+        setSelectedBarberSchedule({
+          scheduleRange: res.resolvedSchedule.scheduleRange ?? null,
+          scheduleRanges: normalizeScheduleRanges(
+            res.resolvedSchedule.scheduleRanges,
+          ),
+        });
+      } else {
+        setSelectedBarberSchedule(null);
       }
       setOccupiedSlots(busy);
     } catch (err) {
@@ -345,7 +405,13 @@ function BookingForm({ shopSlug }) {
     } finally {
       setLoadingSlots(false);
     }
-  }, [selectedBarber, selectedDate, selectedService, slugReady]);
+  }, [selectedBarber, selectedDate, slugReady]);
+
+  useEffect(() => {
+    if (!selectedBarber) {
+      setSelectedBarberSchedule(null);
+    }
+  }, [selectedBarber]);
 
   useEffect(() => {
     let active = true;
@@ -396,10 +462,10 @@ function BookingForm({ shopSlug }) {
     [currentDuration, occupiedSlots, selectedDate],
   );
 
-const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const serviceName = selectedService?.name || "Servicio";
-    
+
     // Detectamos si estamos en localhost
     const isDev = window.location.hostname === "localhost";
 
@@ -429,7 +495,10 @@ const handleSubmit = async (e) => {
         paymentMethod,
       });
 
-      if (response?.payment?.requiresRedirect && response?.payment?.checkoutUrl) {
+      if (
+        response?.payment?.requiresRedirect &&
+        response?.payment?.checkoutUrl
+      ) {
         window.location.assign(response.payment.checkoutUrl);
         return;
       }
@@ -442,9 +511,13 @@ const handleSubmit = async (e) => {
 
       // --- MENSAJE PERSONALIZADO ---
       if (isDev) {
-        alert("🛠️ [TEST EXITOSO]: Turno creado en Localhost. No te preocupes por el mail real ahora.");
+        alert(
+          "🛠️ [TEST EXITOSO]: Turno creado en Localhost. No te preocupes por el mail real ahora.",
+        );
       } else {
-        alert("¡Listo! Tu turno fue reservado. Revisá tu email para ver los detalles de la confirmación.");
+        alert(
+          "¡Listo! Tu turno fue reservado. Revisá tu email para ver los detalles de la confirmación.",
+        );
       }
       // -----------------------------
 
@@ -455,7 +528,7 @@ const handleSubmit = async (e) => {
     } finally {
       setSaving(false);
     }
-};
+  };
 
   // 5. LOADING STATE
   if (!slugReady || loadingBarbers) {
@@ -529,7 +602,8 @@ const handleSubmit = async (e) => {
                       {service.name}
                     </span>
                     <span className={styles.serviceItemMeta}>
-                      {service.durationMinutes} min · {formatPrice(service.price)}
+                      {service.durationMinutes} min ·{" "}
+                      {formatPrice(service.price)}
                     </span>
                   </div>
                 </button>
@@ -540,17 +614,33 @@ const handleSubmit = async (e) => {
       )}
 
       <header className={styles.header}>
+        <div className={styles.shopHero}>
+          <div className={styles.shopHeroLogoWrap}>
+            <img
+              className={styles.shopHeroLogo}
+              src={shopInfo?.themeConfig?.logoDataUrl || "/logo.png"}
+              alt={
+                shopLoading
+                  ? "Logo barbería"
+                  : `Logo ${shopInfo?.name || "barbería"}`
+              }
+            />
+          </div>
+          <div className={styles.shopHeroText}>
+            <p className={styles.shopHeroEyebrow}>Reservá tu turno en</p>
+            <h2 className={styles.shopHeroName}>
+              {shopLoading
+                ? "Cargando barbería..."
+                : shopInfo?.name || "Barbería"}
+            </h2>
+          </div>
+        </div>
         <p className={styles.textCodex}>
           <img className={styles.logo} src="/logo.png" alt="logo" /> BarberApp
           by CODEX®
         </p>
         <h1 className={styles.title}>Nueva Cita</h1>
-        <div className={styles.containerTurno}>
-          <p className={styles.labelHighlight}>RESERVA TU LUGAR EN: </p>
-          <p className={styles.shopBadge}>
-            {shopLoading ? "..." : shopInfo?.name || "Barbería"}
-          </p>
-        </div>
+    
       </header>
 
       <form className={styles.card} onSubmit={handleSubmit}>
@@ -558,7 +648,7 @@ const handleSubmit = async (e) => {
           <label className={styles.label}>Servicio deseado</label>
           <button
             type="button"
-            className={`${styles.selector} ${focusedField === "service" ? styles.selectorFocused : ""}`}
+            className={styles.selector}
             onClick={() => setServicePickerOpen(true)}
           >
             <div>
@@ -566,7 +656,8 @@ const handleSubmit = async (e) => {
                 {selectedService?.name || "Seleccionar servicio"}
               </span>
               <span className={styles.selectorSubText}>
-                {currentDuration} minutos · {selectedService ? formatPrice(selectedService.price) : "..."}
+                {currentDuration} minutos ·{" "}
+                {selectedService ? formatPrice(selectedService.price) : "..."}
               </span>
             </div>
             <span className={styles.arrowIcon}>▼</span>
@@ -586,14 +677,16 @@ const handleSubmit = async (e) => {
           </div>
           <div className={styles.fieldGroup}>
             <label className={styles.label}>WhatsApp</label>
-      <input
-  className={styles.input}
-  placeholder="Ej: +54 9 342 000-0000"
-  type="tel"
-  value={phone}
-  onChange={(e) => setPhone(e.target.value.replace(/[^0-9+\s\-]/g, ''))}
-  required
-/>
+            <input
+              className={styles.input}
+              placeholder="Ej: +54 9 342 000-0000"
+              type="tel"
+              value={phone}
+              onChange={(e) =>
+                setPhone(e.target.value.replace(/[^0-9+\s-]/g, ""))
+              }
+              required
+            />
           </div>
         </div>
         {/* NUEVO CAMPO DE EMAIL */}
@@ -620,8 +713,12 @@ const handleSubmit = async (e) => {
                   className={`${styles.paymentMethodChip} ${paymentMethod === option.value ? styles.paymentMethodChipActive : ""}`}
                   onClick={() => setPaymentMethod(option.value)}
                 >
-                  <span className={styles.paymentMethodChipTitle}>{option.label}</span>
-                  <span className={styles.paymentMethodChipHelper}>{option.helper}</span>
+                  <span className={styles.paymentMethodChipTitle}>
+                    {option.label}
+                  </span>
+                  <span className={styles.paymentMethodChipHelper}>
+                    {option.helper}
+                  </span>
                 </button>
               ))}
             </div>
@@ -662,9 +759,7 @@ const handleSubmit = async (e) => {
                       {b.fullName.split(" ")[0]}
                     </span>
                     <span className={styles.barberSchedule}>
-                      {b.scheduleRanges && b.scheduleRanges.length > 0
-                        ? `${b.scheduleRanges[0].start}-${b.scheduleRanges[0].end} / ${b.scheduleRanges[1]?.start}-${b.scheduleRanges[1]?.end}`
-                        : b.scheduleRange || "Sin horario configurado"}{" "}
+                      {formatBarberScheduleSummary(b, selectedDate)}
                     </span>
                   </div>
                 </button>
@@ -684,9 +779,7 @@ const handleSubmit = async (e) => {
               >
                 ‹
               </button>
-              <span className={styles.dateText}>
-                {formattedDate}
-              </span>
+              <span className={styles.dateText}>{formattedDate}</span>
               <button
                 type="button"
                 onClick={() => handleDateShift(1)}
@@ -755,7 +848,8 @@ const handleSubmit = async (e) => {
         </button>
         {paymentMethod === "transfer" ? (
           <p className={styles.submitHint}>
-            Al confirmar te vamos a redirigir a Mercado Pago para completar el pago.
+            Al confirmar te vamos a redirigir a Mercado Pago para completar el
+            pago.
           </p>
         ) : null}
       </form>

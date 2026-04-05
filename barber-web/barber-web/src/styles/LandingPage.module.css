@@ -254,6 +254,138 @@
   transition-delay: var(--delay, 0s);
 }
 
+.plansSection {
+  position: relative;
+  z-index: 1;
+  padding: 100px 24px 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.plansGrid {
+  margin-top: 36px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.planCard {
+  background: linear-gradient(180deg, rgba(22,22,22,0.95) 0%, rgba(12,12,12,0.98) 100%);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.28);
+}
+
+.planBadge {
+  align-self: flex-start;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--pink-border);
+  background: var(--pink-dim);
+  color: var(--pink-light);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.planBadgeGreen {
+  border-color: rgba(46, 204, 113, 0.3);
+  background: rgba(46, 204, 113, 0.12);
+  color: #63e29d;
+}
+
+.planBadgeGold {
+  border-color: rgba(245, 196, 81, 0.3);
+  background: rgba(245, 196, 81, 0.12);
+  color: #ffd56a;
+}
+
+.planTitle {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.65rem;
+  line-height: 1.1;
+  letter-spacing: -1px;
+}
+
+.planDescription {
+  color: #b6b6bf;
+  line-height: 1.6;
+  font-size: 0.98rem;
+}
+
+.planPriceRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.planPrice {
+  font-family: 'Syne', sans-serif;
+  font-size: 2rem;
+  line-height: 1;
+  letter-spacing: -1px;
+  color: #fff;
+}
+
+.planPriceLabel {
+  color: #9d9daa;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.planList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: #d2d2d2;
+  line-height: 1.55;
+}
+
+.planList li {
+  position: relative;
+  padding-left: 18px;
+}
+
+.planList li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--pink);
+}
+
+.planButton {
+  margin-top: auto;
+  text-decoration: none;
+  text-align: center;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--pink), #ff69b4);
+  color: #fff;
+  font-weight: 800;
+}
+
+.planButtonGreen {
+  background: linear-gradient(135deg, #21c063, #5ddf95);
+}
+
+.planButtonGhost {
+  background: transparent;
+  border: 1px solid rgba(245, 196, 81, 0.35);
+  color: #ffd56a;
+}
+
 /* ========================
    BOTONES
 ======================== */
@@ -706,6 +838,7 @@ a{
 @media (max-width: 768px) {
   .nav { padding: 16px 20px; }
   .featuresGrid { grid-template-columns: 1fr; }
+  .plansGrid { grid-template-columns: 1fr; }
   .statsInner { flex-direction: column; }
   .statItem { border-right: none; border-bottom: 1px solid var(--border); }
   .statItem:last-child { border-bottom: none; }
@@ -716,4 +849,7 @@ a{
   .heroCtagroup { flex-direction: column; align-items: center; }
   .btnPrimary, .btnSecondary { width: 100%; max-width: 300px; justify-content: center; }
   .featuresGrid { grid-template-columns: 1fr; }
+  .plansSection { padding: 88px 18px 24px; }
+  .planCard { padding: 20px; border-radius: 22px; }
+  .planTitle { font-size: 1.45rem; }
 }

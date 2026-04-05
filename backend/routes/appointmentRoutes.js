@@ -3,6 +3,7 @@ import { requireAuth } from "../middlewares/authMiddlewares.js";
 import {
   createAppointment,
   listAppointments,
+  runAppointmentReminders,
   updateAppointmentStatus,
   listServices,
   createService,
@@ -15,6 +16,9 @@ import {
 } from "../api/appointmentController.js";
 
 const router = Router();
+
+router.get("/reminders/run", runAppointmentReminders);
+router.post("/reminders/run", runAppointmentReminders);
 
 router.use(requireAuth);
 

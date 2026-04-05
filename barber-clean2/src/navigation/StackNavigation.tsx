@@ -17,9 +17,12 @@ import CustomerHistoryScreen from '../screnn/CustomerHistoryScreen';
 import AppearanceSettingsScreen from '../screnn/AppearanceSettingsScreen';
 import ServiceSettingsScreen from '../screnn/ServiceSettingsScreen';
 import PaymentSettingsScreen from '../screnn/PaymentSettingsScreen';
+import NotificationSettingsScreen from '../screnn/NotificationSettingsScreen';
 import ChangePasswordScreen from '../screnn/ChangePasswordScreen';
 import RecoverPasswordScreen from '../screnn/RecoverPasswordScreen';
 import SettingsScreen from '../screnn/SettingsScreen';
+import PlansScreen from '../screnn/PlansScreen';
+import SubscriptionSettingsScreen from '../screnn/SubscriptionSettingsScreen';
 import ScreenGradient from '../components/ScreenGradient';
 import { navigationRef } from '../../App';
 
@@ -49,6 +52,13 @@ export type RootStackParamList = {
   'Appearance-Settings': undefined;
   'Service-Settings': undefined;
   'Payment-Settings': undefined;
+  'Notification-Settings': undefined;
+  'Subscription-Settings': undefined;
+  Plans:
+    | {
+        fromRegistration?: boolean;
+      }
+    | undefined;
   'Change-Password': undefined;
   'Recover-Password': undefined;
 };
@@ -57,10 +67,15 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 type Props = {
   currentRouteName?: string;
-  initialRouteName?: 'Login' | 'Home';
+  initialRouteName?: 'Login' | 'Home' | 'Subscription-Settings';
+  isSubscriptionLocked?: boolean;
 };
 
-export default function StackNavigator({ currentRouteName, initialRouteName = 'Login' }: Props) {
+export default function StackNavigator({
+  currentRouteName,
+  initialRouteName = 'Login',
+  isSubscriptionLocked = false,
+}: Props) {
   return (
     <View style={styles.container}>
       <ScreenGradient />
@@ -75,26 +90,35 @@ export default function StackNavigator({ currentRouteName, initialRouteName = 'L
         >
           <Stack.Screen name="Login" component={Login} />
           <Stack.Screen name="Register" component={Register} />
-          <Stack.Screen name="Home" component={Home} />
-          <Stack.Screen name="Reservas" component={ReservasForm} />
-          <Stack.Screen name="Register-Employed" component={RegisterEmployed} />
-          <Stack.Screen name="List-Barber" component={ListBarber} />
-          <Stack.Screen name="Barber-Home" component={BarberDashboard} />
-          <Stack.Screen name="Metrics" component={MetricsScreen} />
-          <Stack.Screen name="Owner-Metrics" component={OwnerMetricsScreen} />
-          <Stack.Screen name="Customer-History" component={CustomerHistoryScreen} />
-          <Stack.Screen name="Settings" component={SettingsScreen} />
-          <Stack.Screen name="Appearance-Settings" component={AppearanceSettingsScreen} />
-          <Stack.Screen name="Service-Settings" component={ServiceSettingsScreen} />
-          <Stack.Screen name="Payment-Settings" component={PaymentSettingsScreen} />
+          <Stack.Screen name="Subscription-Settings" component={SubscriptionSettingsScreen} />
+          <Stack.Screen name="Plans" component={PlansScreen} />
           <Stack.Screen name="Change-Password" component={ChangePasswordScreen} />
           <Stack.Screen name="Recover-Password" component={RecoverPasswordScreen} />
+          {!isSubscriptionLocked ? (
+            <>
+              <Stack.Screen name="Home" component={Home} />
+              <Stack.Screen name="Reservas" component={ReservasForm} />
+              <Stack.Screen name="Register-Employed" component={RegisterEmployed} />
+              <Stack.Screen name="List-Barber" component={ListBarber} />
+              <Stack.Screen name="Barber-Home" component={BarberDashboard} />
+              <Stack.Screen name="Metrics" component={MetricsScreen} />
+              <Stack.Screen name="Owner-Metrics" component={OwnerMetricsScreen} />
+              <Stack.Screen name="Customer-History" component={CustomerHistoryScreen} />
+              <Stack.Screen name="Settings" component={SettingsScreen} />
+              <Stack.Screen name="Appearance-Settings" component={AppearanceSettingsScreen} />
+              <Stack.Screen name="Service-Settings" component={ServiceSettingsScreen} />
+              <Stack.Screen name="Payment-Settings" component={PaymentSettingsScreen} />
+              <Stack.Screen name="Notification-Settings" component={NotificationSettingsScreen} />
+            </>
+          ) : null}
         </Stack.Navigator>
       </View>
 
-      <Nav currentRouteName={currentRouteName} onNavigate={routeName => {
-        navigationRef.navigate(routeName as never);
-      }} />
+      {!isSubscriptionLocked ? (
+        <Nav currentRouteName={currentRouteName} onNavigate={routeName => {
+          navigationRef.navigate(routeName as never);
+        }} />
+      ) : null}
     </View>
   );
 }
