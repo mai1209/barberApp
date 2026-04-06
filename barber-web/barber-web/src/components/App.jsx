@@ -4,6 +4,7 @@ import styles from '../styles/App.module.css';
 import { setShopSlug as registerShopSlug } from '../services/api';
 import LandingPage from './LandingPage';
 import SubscriptionAdmin from './SubscriptionAdmin';
+import SubscriptionCouponsPage from './SubscriptionCouponsPage';
 import SubscriptionCheckoutPage from './SubscriptionCheckoutPage';
 import NotFoundPage from './NotFoundPage';
 //import landingStyles from '../styles/LandingPage.module.css';
@@ -44,6 +45,10 @@ function resolveInternalPage() {
     return 'subscription-admin';
   }
 
+  if (pathname === 'admin/subscription-coupons') {
+    return 'subscription-coupons';
+  }
+
   if (pathname === 'planes' || pathname === 'suscripcion') {
     return 'subscription-checkout';
   }
@@ -67,6 +72,10 @@ function App() {
 
   if (internalPage === 'subscription-admin') {
     return <SubscriptionAdmin />;
+  }
+
+  if (internalPage === 'subscription-coupons') {
+    return <SubscriptionCouponsPage />;
   }
 
   if (internalPage === 'subscription-checkout') {
