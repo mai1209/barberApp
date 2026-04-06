@@ -124,7 +124,7 @@ export default function SubscriptionCheckoutPage() {
 
       if (response.activatedDirectly) {
         setMessage(
-          response.message ||
+          (response.message ||
             `Se aplicó el cupón ${response.couponApplied || ''} y el plan quedó activo gratis hasta ${new Intl.DateTimeFormat(
               'es-AR',
               {
@@ -132,7 +132,8 @@ export default function SubscriptionCheckoutPage() {
                 month: '2-digit',
                 year: 'numeric',
               },
-            ).format(new Date(response.expiresAt))}.`,
+            ).format(new Date(response.expiresAt))}.`) +
+            ' Ahora abrí la app e iniciá sesión con esta misma cuenta para empezar a usarla.',
         );
         return;
       }

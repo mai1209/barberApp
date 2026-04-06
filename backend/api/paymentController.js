@@ -57,21 +57,25 @@ function buildSubscriptionPaymentReturnHtml({ result }) {
       accent: "#34C759",
       title: "Pago recibido",
       message: "Tu pago fue aprobado. En unos segundos tu plan debería quedar activo.",
+      helper: "Abrí la app e iniciá sesión con tu cuenta para empezar a usar el panel.",
     },
     pending: {
       accent: "#F5C451",
       title: "Pago pendiente",
       message: "Mercado Pago todavía está procesando el cobro. Volvé a revisar en unos minutos.",
+      helper: "Después podés volver a la app e iniciar sesión para revisar el estado de tu plan.",
     },
     failure: {
       accent: "#FF5A5F",
       title: "Pago no completado",
-      message: "El cobro no se pudo completar. Podés volver a intentar desde la app o el panel.",
+      message: "El cobro no se pudo completar. Podés volver a intentar desde la web de planes.",
+      helper: "Si ya tenés cuenta, abrí la app e iniciá sesión para ver el estado comercial.",
     },
   }[result] || {
     accent: "#8E8E98",
     title: "Estado del pago",
     message: "Podés volver a la app y revisar el estado de tu plan.",
+    helper: "Entrá con tu cuenta desde la app para empezar a usar el panel cuando esté activa.",
   };
 
   return `<!doctype html>
@@ -88,7 +92,10 @@ function buildSubscriptionPaymentReturnHtml({ result }) {
         </div>
         <h1 style="margin:0 0 12px;font-size:24px;">${config.title}</h1>
         <p style="margin:0 0 18px;color:#B7BECC;line-height:1.5;">${config.message}</p>
-        <p style="margin:0;color:#7C8596;font-size:13px;">Ya podés volver a la app o al panel de suscripción.</p>
+        <p style="margin:0 0 18px;color:#7C8596;font-size:13px;line-height:1.5;">${config.helper}</p>
+        <a href="https://barberappbycodex.com/planes" style="display:inline-block;background:${config.accent};color:#111;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:800;">
+          Volver al sitio de planes
+        </a>
       </div>
     </body>
   </html>`;

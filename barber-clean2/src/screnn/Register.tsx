@@ -68,7 +68,7 @@ function Register({ navigation }: any) {
         await saveUserProfile(response.user);
         applyUserTheme(response.user);
       }
-      navigation.replace('Plans', { fromRegistration: true });
+      navigation.replace('Plans', { fromRegistration: true, email });
     } catch (err: any) {
       setError(err.message || 'Error al registrarse');
     } finally {

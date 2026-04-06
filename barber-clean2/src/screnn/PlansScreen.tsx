@@ -100,6 +100,7 @@ function PlansScreen({ navigation, route }: any) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const fromRegistration = Boolean(route?.params?.fromRegistration);
+  const registeredEmail = String(route?.params?.email || '').trim().toLowerCase();
   const [pricing, setPricing] = useState(DEFAULT_PRICING);
 
   useEffect(() => {
@@ -155,16 +156,26 @@ function PlansScreen({ navigation, route }: any) {
     [pricing],
   );
 
+  const buildPlanUrl = (url: string) => {
+    if (!registeredEmail) return url;
+
+    try {
+      const parsed = new URL(url);
+      parsed.searchParams.set('email', registeredEmail);
+      return parsed.toString();
+    } catch (_error) {
+      return url;
+    }
+  };
+
   const handleOpen = async (url: string) => {
     try {
-      const supported = await Linking.canOpenURL(url);
-      if (!supported) {
-        Alert.alert('No disponible', 'No se pudo abrir el enlace de este plan.');
-        return;
-      }
-      await Linking.openURL(url);
+      await Linking.openURL(buildPlanUrl(url));
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'No se pudo abrir el enlace.');
+      Alert.alert(
+        'No disponible',
+        error?.message || 'No se pudo abrir el enlace de este plan.',
+      );
     }
   };
 

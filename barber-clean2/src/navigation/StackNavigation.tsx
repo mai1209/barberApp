@@ -57,6 +57,7 @@ export type RootStackParamList = {
   Plans:
     | {
         fromRegistration?: boolean;
+        email?: string;
       }
     | undefined;
   'Change-Password': undefined;
