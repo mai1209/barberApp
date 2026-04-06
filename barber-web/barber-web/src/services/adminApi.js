@@ -1,8 +1,25 @@
 const rawBaseUrl = process.env.REACT_APP_API_BASE_URL;
 
+function normalizeLocalDevBaseUrl(value) {
+  if (!value || typeof window === 'undefined') return value;
+  if (window.location.hostname !== 'localhost') return value;
+
+  try {
+    const parsed = new URL(value);
+    if (parsed.hostname !== 'localhost') {
+      parsed.hostname = 'localhost';
+      return parsed.toString().replace(/\/+$/, '');
+    }
+  } catch (_error) {
+    return value;
+  }
+
+  return value;
+}
+
 function resolveAdminBaseUrl() {
   const fallback = '/api/auth';
-  const trimmed = (rawBaseUrl || fallback).replace(/\/+$/, '');
+  const trimmed = normalizeLocalDevBaseUrl(rawBaseUrl || fallback).replace(/\/+$/, '');
 
   if (trimmed.endsWith('/api/public')) return trimmed.replace(/\/public$/, '');
   if (trimmed.endsWith('/api')) return `${trimmed}/auth`;
@@ -60,6 +77,26 @@ export function fetchPlanPricing({ secret }) {
 export function updatePlanPricing({ secret, payload }) {
   return request('/admin/plan-pricing', {
     method: 'PUT',
+    secret,
+    body: payload,
+  });
+}
+
+export function fetchSubscriptionCoupons({ secret }) {
+  return request('/admin/subscription-coupons', { secret });
+}
+
+export function createSubscriptionCoupon({ secret, payload }) {
+  return request('/admin/subscription-coupons', {
+    method: 'POST',
+    secret,
+    body: payload,
+  });
+}
+
+export function updateSubscriptionCoupon({ couponId, secret, payload }) {
+  return request(`/admin/subscription-coupons/${couponId}`, {
+    method: 'PATCH',
     secret,
     body: payload,
   });

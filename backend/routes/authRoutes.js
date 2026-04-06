@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   confirmPasswordRecovery,
   createSubscriptionCheckout,
+  createSubscriptionCouponAdmin,
   disconnectMercadoPago,
   getMailDebug,
   getPlanPricingAdmin,
@@ -10,6 +11,7 @@ import {
   getMercadoPagoConnectUrl,
   handleMercadoPagoOAuthCallback,
   loginUser,
+  listSubscriptionCouponsAdmin,
   requestPasswordRecovery,
   registerUser,
   runSubscriptionLifecycle,
@@ -20,6 +22,7 @@ import {
   updateNotificationSettings,
   updatePlanPricingAdmin,
   updateOwnSubscriptionSettings,
+  updateSubscriptionCouponAdmin,
   updateSubscriptionUser,
   updateThemeConfig,
 } from "../api/authController.js";
@@ -55,4 +58,7 @@ router.get("/admin/subscriptions", requireAdminPanelSecret, listSubscriptionUser
 router.patch("/admin/subscriptions/:userId", requireAdminPanelSecret, updateSubscriptionUser);
 router.get("/admin/plan-pricing", requireAdminPanelSecret, getPlanPricingAdmin);
 router.put("/admin/plan-pricing", requireAdminPanelSecret, updatePlanPricingAdmin);
+router.get("/admin/subscription-coupons", requireAdminPanelSecret, listSubscriptionCouponsAdmin);
+router.post("/admin/subscription-coupons", requireAdminPanelSecret, createSubscriptionCouponAdmin);
+router.patch("/admin/subscription-coupons/:couponId", requireAdminPanelSecret, updateSubscriptionCouponAdmin);
 export default router;

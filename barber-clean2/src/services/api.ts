@@ -385,7 +385,7 @@ export type Appointment = {
   amountTotal?: number;
   amountPaid?: number;
   amountPending?: number;
-  status: string;
+  status: "awaiting_payment" | "pending" | "completed" | "cancelled" | string;
   notes?: string;
   email: string;
 };

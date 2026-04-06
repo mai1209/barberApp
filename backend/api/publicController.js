@@ -1,11 +1,16 @@
 import mongoose from "mongoose";
 import { AppointmentModel } from "../models/Appointment.js";
+import { SubscriptionCouponModel } from "../models/SubscriptionCoupon.js";
 import { ServiceModel } from "../models/Services.js";
 import { UserModel } from "../models/User.js";
 import admin from "../firebase.js";
 import { BarberModel } from "../models/Barber.js";
 import { sendAppMail } from "../services/mailer.js";
-import { createAppointmentMercadoPagoPreference } from "./paymentController.js";
+import {
+  applyPendingCouponToSubscription,
+  calculateSubscriptionExpiry,
+  createAppointmentMercadoPagoPreference,
+} from "./paymentController.js";
 import { getTimeZoneDayRange, getTimeZoneWeekday } from "../utils/timezone.js";
 import { resolveBarberScheduleForWeekday } from "../utils/barberSchedule.js";
 import {
@@ -18,6 +23,11 @@ import {
   getOrCreatePlanPricing,
   serializePlanPricing,
 } from "../services/planPricingService.js";
+import {
+  normalizeCouponCode,
+  resolvePlanPricingForSubscription,
+} from "../services/subscriptionPricingService.js";
+import { notifySubscriptionActivated } from "../services/subscriptionLifecycleService.js";
 
 function buildDayRange(dateParam) {
   return getTimeZoneDayRange(dateParam);
@@ -116,6 +126,125 @@ function normalizePublicPlan(value) {
   return ["basic", "pro"].includes(normalized) ? normalized : null;
 }
 
+async function findValidSubscriptionCoupon({ couponCode, plan }) {
+  const normalizedCode = normalizeCouponCode(couponCode);
+  if (!normalizedCode) return null;
+
+  const coupon = await SubscriptionCouponModel.findOne({
+    code: normalizedCode,
+    isActive: true,
+  }).lean();
+
+  if (!coupon) {
+    const error = new Error("El cupón ingresado no existe o no está activo.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (coupon.plan && coupon.plan !== plan) {
+    const error = new Error("Ese cupón no aplica al plan seleccionado.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (coupon.expiresAt && new Date(coupon.expiresAt).getTime() < Date.now()) {
+    const error = new Error("Ese cupón ya venció.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (
+    Number.isFinite(Number(coupon.maxRedemptions)) &&
+    Number(coupon.maxRedemptions) > 0 &&
+    Number(coupon.redemptionCount || 0) >= Number(coupon.maxRedemptions)
+  ) {
+    const error = new Error("Ese cupón ya alcanzó el máximo de usos.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return coupon;
+}
+
+async function activateFreeSubscriptionCoupon({
+  userDoc,
+  plan,
+  coupon,
+  pricing,
+}) {
+  const activatedAt = new Date();
+
+  userDoc.subscription = {
+    ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
+    pendingPlan: plan,
+    billingCycle: "monthly",
+    renewalMode: "manual",
+    pendingCouponCode: coupon ? coupon.code : null,
+    pendingCouponDiscountPercent: coupon ? Number(coupon.discountPercent || 0) : null,
+    pendingCouponBenefitDurationType: coupon ? coupon.benefitDurationType || "forever" : null,
+    pendingCouponBenefitDurationValue: coupon ? coupon.benefitDurationValue ?? null : null,
+  };
+
+  const resolvedCouponPricing = await applyPendingCouponToSubscription({
+    userDoc,
+    plan,
+    pricing,
+  });
+
+  const expiresAt = calculateSubscriptionExpiry({
+    billingCycle: "monthly",
+    paidAt: activatedAt,
+  });
+
+  userDoc.subscription = {
+    ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
+    plan,
+    status: "active",
+    billingCycle: "monthly",
+    renewalMode: "manual",
+    startedAt: activatedAt,
+    expiresAt,
+    nextBillingAt: expiresAt,
+    pendingPlan: null,
+    mercadoPagoPreferenceId: null,
+    mercadoPagoPreapprovalId: null,
+    mercadoPagoPreapprovalStatus: null,
+    mercadoPagoPaymentId: null,
+    lastPaymentAt: activatedAt,
+    renewalReminder7dAt: null,
+    renewalReminder3dAt: null,
+    renewalReminder1dAt: null,
+    pastDueAt: null,
+    pastDueReminderSentAt: null,
+    graceUntil: null,
+    cancelledAt: null,
+  };
+
+  await userDoc.save();
+
+  try {
+    await notifySubscriptionActivated({
+      userDoc,
+      plan,
+      amountArs: 0,
+      expiresAt,
+      renewalMode: "manual",
+      activationReason: "free_coupon",
+    });
+  } catch (error) {
+    console.error(
+      "Error notificando activación gratis por cupón:",
+      error?.message || error,
+    );
+  }
+
+  return {
+    activatedAt,
+    expiresAt,
+    resolvedCouponPricing,
+  };
+}
+
 function validatePublicPaymentSelection(shop, paymentMethod) {
   const settings = shop?.paymentSettings || {};
   const normalized = normalizePaymentMethod(paymentMethod);
@@ -182,6 +311,7 @@ export async function publicCreateSubscriptionCheckout(req, res, next) {
   try {
     const email = String(req.body?.email || "").trim().toLowerCase();
     const plan = normalizePublicPlan(req.body?.plan);
+    const couponCode = String(req.body?.couponCode || "").trim();
 
     if (!email || !plan) {
       return res.status(400).json({
@@ -198,9 +328,47 @@ export async function publicCreateSubscriptionCheckout(req, res, next) {
 
     const pricingDoc = await getOrCreatePlanPricing();
     const pricing = serializePlanPricing(pricingDoc);
-    const baseAmount = Number(pricing[plan]?.ars || 0);
-    const discountedAmount = Number(userDoc.subscription?.customPriceArs ?? 0);
-    const amount = discountedAmount > 0 ? discountedAmount : baseAmount;
+    const coupon = couponCode
+      ? await findValidSubscriptionCoupon({ couponCode, plan })
+      : null;
+    const resolvedPricing = resolvePlanPricingForSubscription({
+      plan,
+      pricing,
+      subscription: userDoc.subscription,
+      couponDiscountPercent: Number(coupon?.discountPercent || 0),
+    });
+    const amount = Number(resolvedPricing.effectiveArs || 0);
+
+    const canActivateForFree =
+      Boolean(coupon) &&
+      Number(coupon?.discountPercent || 0) >= 100 &&
+      Number(resolvedPricing.baseArs || 0) > 0;
+
+    if (!(amount > 0) && canActivateForFree) {
+      const activation = await activateFreeSubscriptionCoupon({
+        userDoc,
+        plan,
+        coupon,
+        pricing,
+      });
+
+      return res.json({
+        activatedDirectly: true,
+        activationReason: "free_coupon",
+        amount: 0,
+        currencyId: "ARS",
+        discountApplied: true,
+        baseAmount: resolvedPricing.baseArs,
+        couponApplied: coupon.code,
+        couponBenefitDurationType: coupon.benefitDurationType || "forever",
+        couponBenefitDurationValue: coupon.benefitDurationValue ?? null,
+        renewalMode: "manual",
+        startedAt: activation.activatedAt,
+        expiresAt: activation.expiresAt,
+        message:
+          "El cupón dejó el plan bonificado y activamos la cuenta sin pasar por Mercado Pago.",
+      });
+    }
 
     if (!(amount > 0)) {
       return res.status(400).json({
@@ -243,6 +411,10 @@ export async function publicCreateSubscriptionCheckout(req, res, next) {
       pendingPlan: plan,
       billingCycle: userDoc.subscription?.billingCycle || "monthly",
       mercadoPagoPreferenceId: preference.id || null,
+      pendingCouponCode: coupon ? coupon.code : null,
+      pendingCouponDiscountPercent: coupon ? Number(coupon.discountPercent || 0) : null,
+      pendingCouponBenefitDurationType: coupon ? coupon.benefitDurationType || "forever" : null,
+      pendingCouponBenefitDurationValue: coupon ? coupon.benefitDurationValue ?? null : null,
     };
     await userDoc.save();
 
@@ -252,8 +424,11 @@ export async function publicCreateSubscriptionCheckout(req, res, next) {
       preferenceId: preference.id || null,
       amount,
       currencyId: "ARS",
-      discountApplied: discountedAmount > 0 && discountedAmount < baseAmount,
-      baseAmount,
+      discountApplied: resolvedPricing.discountApplied,
+      baseAmount: resolvedPricing.baseArs,
+      couponApplied: coupon ? coupon.code : null,
+      couponBenefitDurationType: coupon ? coupon.benefitDurationType || "forever" : null,
+      couponBenefitDurationValue: coupon ? coupon.benefitDurationValue ?? null : null,
     });
   } catch (err) {
     return next(err);
@@ -264,6 +439,7 @@ export async function publicCreateRecurringSubscriptionCheckout(req, res, next) 
   try {
     const email = String(req.body?.email || "").trim().toLowerCase();
     const plan = normalizePublicPlan(req.body?.plan);
+    const couponCode = String(req.body?.couponCode || "").trim();
 
     if (!email || !plan) {
       return res.status(400).json({
@@ -280,9 +456,47 @@ export async function publicCreateRecurringSubscriptionCheckout(req, res, next) 
 
     const pricingDoc = await getOrCreatePlanPricing();
     const pricing = serializePlanPricing(pricingDoc);
-    const baseAmount = Number(pricing[plan]?.ars || 0);
-    const discountedAmount = Number(userDoc.subscription?.customPriceArs ?? 0);
-    const amount = discountedAmount > 0 ? discountedAmount : baseAmount;
+    const coupon = couponCode
+      ? await findValidSubscriptionCoupon({ couponCode, plan })
+      : null;
+    const resolvedPricing = resolvePlanPricingForSubscription({
+      plan,
+      pricing,
+      subscription: userDoc.subscription,
+      couponDiscountPercent: Number(coupon?.discountPercent || 0),
+    });
+    const amount = Number(resolvedPricing.effectiveArs || 0);
+
+    const canActivateForFree =
+      Boolean(coupon) &&
+      Number(coupon?.discountPercent || 0) >= 100 &&
+      Number(resolvedPricing.baseArs || 0) > 0;
+
+    if (!(amount > 0) && canActivateForFree) {
+      const activation = await activateFreeSubscriptionCoupon({
+        userDoc,
+        plan,
+        coupon,
+        pricing,
+      });
+
+      return res.json({
+        activatedDirectly: true,
+        activationReason: "free_coupon",
+        amount: 0,
+        currencyId: "ARS",
+        discountApplied: true,
+        baseAmount: resolvedPricing.baseArs,
+        couponApplied: coupon.code,
+        couponBenefitDurationType: coupon.benefitDurationType || "forever",
+        couponBenefitDurationValue: coupon.benefitDurationValue ?? null,
+        renewalMode: "manual",
+        startedAt: activation.activatedAt,
+        expiresAt: activation.expiresAt,
+        message:
+          "El cupón dejó el plan bonificado y activamos la cuenta sin pasar por Mercado Pago. La renovación automática no se configuró en este paso.",
+      });
+    }
 
     if (!(amount > 0)) {
       return res.status(400).json({
@@ -316,6 +530,10 @@ export async function publicCreateRecurringSubscriptionCheckout(req, res, next) 
       renewalMode: "automatic",
       mercadoPagoPreapprovalId: preapproval.id || null,
       mercadoPagoPreapprovalStatus: preapproval.status || "pending",
+      pendingCouponCode: coupon ? coupon.code : null,
+      pendingCouponDiscountPercent: coupon ? Number(coupon.discountPercent || 0) : null,
+      pendingCouponBenefitDurationType: coupon ? coupon.benefitDurationType || "forever" : null,
+      pendingCouponBenefitDurationValue: coupon ? coupon.benefitDurationValue ?? null : null,
     };
     await userDoc.save();
 
@@ -325,8 +543,11 @@ export async function publicCreateRecurringSubscriptionCheckout(req, res, next) 
       preapprovalId: preapproval.id || null,
       amount,
       currencyId: "ARS",
-      discountApplied: discountedAmount > 0 && discountedAmount < baseAmount,
-      baseAmount,
+      discountApplied: resolvedPricing.discountApplied,
+      baseAmount: resolvedPricing.baseArs,
+      couponApplied: coupon ? coupon.code : null,
+      couponBenefitDurationType: coupon ? coupon.benefitDurationType || "forever" : null,
+      couponBenefitDurationValue: coupon ? coupon.benefitDurationValue ?? null : null,
       renewalMode: "automatic",
     });
   } catch (err) {
@@ -392,6 +613,7 @@ export async function publicBarberAppointments(req, res, next) {
     const appointments = await AppointmentModel.find({
       owner: ownerId,
       barber: barberId,
+      status: { $in: ["pending", "completed"] },
       startTime: { $gte: startOfDay, $lte: endOfDay },
     })
       .sort({ startTime: 1 })
@@ -459,7 +681,7 @@ export async function publicCreateAppointment(req, res, next) {
     const overlappingCandidates = await AppointmentModel.find({
       owner: ownerId,
       barber: barberId,
-      status: { $ne: "cancelled" },
+      status: { $in: ["pending", "completed"] },
       startTime: { $lt: endTime },
     })
       .select({ startTime: 1, durationMinutes: 1 })
@@ -506,7 +728,11 @@ export async function publicCreateAppointment(req, res, next) {
       paymentMethod: normalizedPaymentMethod,
       paymentMethodCollected: null,
       paymentStatus: "unpaid",
-      status: "pending",
+      paymentDeadlineAt:
+        normalizedPaymentMethod === "transfer"
+          ? new Date(Date.now() + 15 * 60 * 1000)
+          : null,
+      status: normalizedPaymentMethod === "transfer" ? "awaiting_payment" : "pending",
       // Si querés guardar el email en la DB, podés agregarlo al modelo y ponerlo acá
     });
 
@@ -521,11 +747,23 @@ export async function publicCreateAppointment(req, res, next) {
           hour12: false,
           timeZone: "America/Argentina/Cordoba",
         });
+        const dateLabel = appointmentDate.toLocaleDateString("es-AR", {
+          weekday: "short",
+          day: "2-digit",
+          month: "2-digit",
+          timeZone: "America/Argentina/Cordoba",
+        });
         const payload = {
           token: targetToken,
           notification: {
-            title: "💈¡Nuevo Turno (Web)!",
-            body: `${customerName} reservó ${service} a las ${timeLabel}`,
+            title:
+              normalizedPaymentMethod === "transfer"
+                ? "💈Pago online iniciado"
+                : "💈¡Nuevo Turno (Web)!",
+            body:
+              normalizedPaymentMethod === "transfer"
+                ? `${customerName} inició ${service} con ${barber.fullName} el ${dateLabel} a las ${timeLabel} desde la web. Esperando pago.`
+                : `${customerName} reservó ${service} con ${barber.fullName} el ${dateLabel} a las ${timeLabel} desde la web.`,
           },
           android: { priority: "high" },
         };

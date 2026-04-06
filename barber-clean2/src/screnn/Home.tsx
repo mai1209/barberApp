@@ -92,6 +92,13 @@ function getPaymentSnapshot(appointment: Appointment) {
     return { label: 'Cobrado en efectivo', tone: 'cash' as const };
   }
 
+  if (appointment.status === 'awaiting_payment') {
+    return {
+      label: 'Pago online iniciado / esperando confirmación',
+      tone: 'neutral' as const,
+    };
+  }
+
   if (appointment.paymentMethod === 'transfer') {
     return {
       label: 'Reserva con adelanto / transferencia',
@@ -100,7 +107,7 @@ function getPaymentSnapshot(appointment: Appointment) {
   }
 
   return {
-    label: 'Reserva para cobrar en efectivo',
+    label: 'Reserva para cobrar en efectivo / transferencia en local',
     tone: 'cash' as const,
   };
 }

@@ -11,6 +11,35 @@ import paymentRoutes from "./routes/paymentRoutes.js";
 
 const app = express();
 
+function isPrivateDevOrigin(origin) {
+  if (!origin) return true;
+
+  try {
+    const parsed = new URL(origin);
+    const hostname = parsed.hostname;
+
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return true;
+    }
+
+    if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
+      return true;
+    }
+
+    if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
+      return true;
+    }
+
+    if (/^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
+      return true;
+    }
+  } catch (_error) {
+    return false;
+  }
+
+  return false;
+}
+
 // --- CONFIGURACIÓN DE CORS ---
 // Esto permite que tu Frontend en Vercel pueda hablar con este Backend
 app.use(cors({
@@ -20,10 +49,9 @@ app.use(cors({
       "https://barberappbycodex.com",
       "https://www.barberappbycodex.com", 
       "https://barber-app-evf4.vercel.app",
-      
     ];
     // Si el origin está en la lista O si no hay origin (App móvil), permitimos
-    if (!origin || whitelist.indexOf(origin) !== -1) {
+    if (!origin || whitelist.indexOf(origin) !== -1 || (process.env.NODE_ENV !== "production" && isPrivateDevOrigin(origin))) {
       callback(null, true);
     } else {
       callback(new Error('No permitido por CORS'));

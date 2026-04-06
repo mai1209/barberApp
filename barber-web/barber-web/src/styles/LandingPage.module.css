@@ -321,6 +321,7 @@
 .planPriceRow {
   display: flex;
   align-items: baseline;
+  justify-content: space-between;
   gap: 8px;
 }
 
@@ -329,12 +330,12 @@
   font-size: 2rem;
   line-height: 1;
   letter-spacing: -1px;
-  color: #fff;
+  color: #b51b7a;
 }
 
 .planPriceLabel {
   color: #9d9daa;
-  font-size: 0.88rem;
+  font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -836,7 +837,7 @@ a{
    RESPONSIVE
 ======================== */
 @media (max-width: 768px) {
-  .nav { padding: 16px 20px; }
+  .nav { padding: 16px 10px; }
   .featuresGrid { grid-template-columns: 1fr; }
   .plansGrid { grid-template-columns: 1fr; }
   .statsInner { flex-direction: column; }
@@ -852,4 +853,5 @@ a{
   .plansSection { padding: 88px 18px 24px; }
   .planCard { padding: 20px; border-radius: 22px; }
   .planTitle { font-size: 1.45rem; }
+  .navLogoText { font-size: 0.9rem; }
 }

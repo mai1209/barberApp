@@ -27,6 +27,11 @@ type SubscriptionState = {
   renewalMode?: 'manual' | 'automatic';
   customPriceArs?: number | null;
   customPriceUsdReference?: number | null;
+  couponCode?: string | null;
+  couponDiscountPercent?: number | null;
+  couponBenefitDurationType?: 'forever' | 'one_time' | 'months' | null;
+  couponBenefitDurationValue?: number | null;
+  couponValidUntil?: string | null;
   startedAt?: string | null;
   expiresAt?: string | null;
   mercadoPagoPreapprovalId?: string | null;
@@ -176,11 +181,25 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
         : 0;
   const effectiveArs =
     planKey === 'basic' || planKey === 'pro'
-      ? Number(subscription?.customPriceArs ?? basePriceArs)
+      ? Number(
+          subscription?.customPriceArs ??
+            (Number(subscription?.couponDiscountPercent || 0) > 0 &&
+            (!subscription?.couponValidUntil ||
+              new Date(subscription.couponValidUntil).getTime() >= Date.now())
+              ? basePriceArs * (1 - Number(subscription?.couponDiscountPercent || 0) / 100)
+              : basePriceArs),
+        )
       : null;
   const effectiveUsdReference =
     planKey === 'basic' || planKey === 'pro'
-      ? Number(subscription?.customPriceUsdReference ?? baseUsdReference)
+      ? Number(
+          subscription?.customPriceUsdReference ??
+            (Number(subscription?.couponDiscountPercent || 0) > 0 &&
+            (!subscription?.couponValidUntil ||
+              new Date(subscription.couponValidUntil).getTime() >= Date.now())
+              ? baseUsdReference * (1 - Number(subscription?.couponDiscountPercent || 0) / 100)
+              : baseUsdReference),
+        )
       : null;
   const effectivePlanPrice =
     planKey === 'basic' || planKey === 'pro'
@@ -330,7 +349,15 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
               <View style={styles.discountCard}>
                 <Text style={styles.discountTitle}>Descuento aplicado</Text>
                 <Text style={styles.discountText}>
-                  Se te aplicó un descuento de ARS {discountArs.toLocaleString('es-AR')} sobre el valor del plan.
+                  Se te aplicó un descuento de ARS {discountArs.toLocaleString('es-AR')} sobre el valor del plan
+                  {subscription?.couponCode ? ` con el cupón ${subscription.couponCode}` : ''}
+                  {subscription?.couponBenefitDurationType === 'forever'
+                    ? '.'
+                    : subscription?.couponBenefitDurationType === 'one_time'
+                      ? ' solo en el primer pago.'
+                      : subscription?.couponValidUntil
+                        ? ` durante ${subscription.couponBenefitDurationValue || 0} mes${Number(subscription?.couponBenefitDurationValue || 0) === 1 ? '' : 'es'}, hasta ${formatDateLabel(subscription.couponValidUntil)}.`
+                        : '.'}
                 </Text>
               </View>
             ) : null}

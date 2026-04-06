@@ -160,14 +160,20 @@ export async function processAppointmentReminders({ now = new Date() } = {}) {
       hour12: false,
       timeZone: SHOP_TIME_ZONE,
     });
+    const dateLabel = appointmentDate.toLocaleDateString("es-AR", {
+      weekday: "short",
+      day: "2-digit",
+      month: "2-digit",
+      timeZone: SHOP_TIME_ZONE,
+    });
 
     if (canSendBarberReminder({ appointment, settings, userDoc, now })) {
       try {
         await admin.messaging().send({
           token: userDoc.pushToken,
           notification: {
-            title: "Recordatorio de turno",
-            body: `${appointment.customerName} tiene ${appointment.service} a las ${timeLabel}.`,
+            title: "💈Recordatorio de turno",
+            body: `${appointment.customerName} tiene ${appointment.service} con ${barberDoc?.fullName || "su barbero"} el ${dateLabel} a las ${timeLabel}.`,
           },
           android: {
             priority: "high",

@@ -110,6 +110,54 @@ const subscriptionSchema = new mongoose.Schema(
       default: null,
       min: 0,
     },
+    couponCode: {
+      type: String,
+      default: null,
+    },
+    couponDiscountPercent: {
+      type: Number,
+      default: null,
+      min: 0,
+      max: 100,
+    },
+    couponBenefitDurationType: {
+      type: String,
+      enum: ["forever", "one_time", "months", null],
+      default: null,
+    },
+    couponBenefitDurationValue: {
+      type: Number,
+      default: null,
+      min: 1,
+    },
+    couponAppliedAt: {
+      type: Date,
+      default: null,
+    },
+    couponValidUntil: {
+      type: Date,
+      default: null,
+    },
+    pendingCouponCode: {
+      type: String,
+      default: null,
+    },
+    pendingCouponDiscountPercent: {
+      type: Number,
+      default: null,
+      min: 0,
+      max: 100,
+    },
+    pendingCouponBenefitDurationType: {
+      type: String,
+      enum: ["forever", "one_time", "months", null],
+      default: null,
+    },
+    pendingCouponBenefitDurationValue: {
+      type: Number,
+      default: null,
+      min: 1,
+    },
     internalNotes: {
       type: String,
       trim: true,

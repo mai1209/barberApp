@@ -98,9 +98,13 @@ const appointmentSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    paymentDeadlineAt: {
+      type: Date,
+      default: null,
+    },
     status: {
       type: String,
-      enum: ["pending", "completed", "cancelled"],
+      enum: ["awaiting_payment", "pending", "completed", "cancelled"],
       default: "pending",
     },
     barberReminderSentAt: {

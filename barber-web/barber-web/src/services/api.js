@@ -1,8 +1,25 @@
 const rawBaseUrl = process.env.REACT_APP_API_BASE_URL;
 
+function normalizeLocalDevBaseUrl(value) {
+  if (!value || typeof window === 'undefined') return value;
+  if (window.location.hostname !== 'localhost') return value;
+
+  try {
+    const parsed = new URL(value);
+    if (parsed.hostname !== 'localhost') {
+      parsed.hostname = 'localhost';
+      return parsed.toString().replace(/\/+$/, '');
+    }
+  } catch (_error) {
+    return value;
+  }
+
+  return value;
+}
+
 function resolveBaseUrl() {
   const fallback = '/api/public';
-  const trimmed = (rawBaseUrl || fallback).replace(/\/+$/, '');
+  const trimmed = normalizeLocalDevBaseUrl(rawBaseUrl || fallback).replace(/\/+$/, '');
 
   // Si el usuario configuró solo el dominio (ej: https://mi-backend.com)
   // agregamos automáticamente el segmento /api/public que exige el backend.

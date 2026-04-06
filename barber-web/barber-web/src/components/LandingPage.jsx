@@ -14,7 +14,7 @@ function LandingPage() {
       badge: "Básico",
       title: "Todo lo necesario para vender turnos online",
       price: `ARS ${pricing.basic.ars.toLocaleString("es-AR")}`,
-      billingLabel: `por mes · ref. USD ${pricing.basic.usdReference}`,
+      billingLabel: `por mes · USD ${pricing.basic.usdReference}`,
       description:
         "Ideal para barberías que quieren ordenar la agenda, automatizar turnos y empezar a cobrar online sin complejidad.",
       features: [
@@ -37,7 +37,7 @@ function LandingPage() {
       badge: "Pro",
       title: "Métricas, historial y control más profundo",
       price: `ARS ${pricing.pro.ars.toLocaleString("es-AR")}`,
-      billingLabel: `por mes · ref. USD ${pricing.pro.usdReference}`,
+      billingLabel: `por mes · USD ${pricing.pro.usdReference}`,
       description:
         "Ideal para barberías que ya trabajan con más volumen y necesitan medir mejor el negocio.",
       features: [

@@ -471,6 +471,13 @@
   letter-spacing: 0.4px;
 }
 
+.accountCouponWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .cardMeta,
 .cardDates {
   color: #b0b0bc;
@@ -544,6 +551,85 @@
   border-color: rgba(255, 20, 147, 0.26);
 }
 
+.couponCreateGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.couponNoteField {
+  grid-column: 1 / -1;
+}
+
+.couponList {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.couponCard {
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  background: rgba(11, 11, 18, 0.76);
+  padding: 18px;
+}
+
+.couponCardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.couponHeaderRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.couponCode {
+  display: inline-flex;
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+}
+
+.couponDurationBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.couponBadgeForever {
+  background: rgba(40, 167, 69, 0.18);
+  color: #8ee2a4;
+  border-color: rgba(40, 167, 69, 0.28);
+}
+
+.couponBadgeOneTime {
+  background: rgba(255, 194, 74, 0.16);
+  color: #ffd978;
+  border-color: rgba(255, 194, 74, 0.3);
+}
+
+.couponBadgeMonths {
+  background: rgba(90, 140, 255, 0.16);
+  color: #a8c2ff;
+  border-color: rgba(90, 140, 255, 0.28);
+}
+
+.couponMeta {
+  margin: 6px 0 0;
+  color: #9ea4b5;
+  font-size: 0.9rem;
+}
+
 @media (max-width: 900px) {
   .toolbar {
     grid-template-columns: 1fr;
@@ -551,7 +637,8 @@
 
   .pricingGrid,
   .summaryGrid,
-  .controls {
+  .controls,
+  .couponCreateGrid {
     grid-template-columns: 1fr;
   }
 

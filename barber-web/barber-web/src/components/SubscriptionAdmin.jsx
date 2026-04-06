@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  createSubscriptionCoupon,
   fetchPlanPricing,
+  fetchSubscriptionCoupons,
   fetchSubscriptions,
   updatePlanPricing,
+  updateSubscriptionCoupon,
   updateSubscription,
 } from '../services/adminApi';
 import styles from '../styles/SubscriptionAdmin.module.css';
@@ -94,6 +97,27 @@ function resolveRenewalModeLabel(value) {
   return value === 'automatic' ? 'Automática' : 'Manual';
 }
 
+function getCouponDurationBadge(coupon) {
+  if (coupon?.benefitDurationType === 'one_time') {
+    return {
+      label: 'Primer pago',
+      className: styles.couponBadgeOneTime,
+    };
+  }
+
+  if (coupon?.benefitDurationType === 'months') {
+    return {
+      label: `${coupon?.benefitDurationValue || 0} meses`,
+      className: styles.couponBadgeMonths,
+    };
+  }
+
+  return {
+    label: 'Permanente',
+    className: styles.couponBadgeForever,
+  };
+}
+
 function buildRenewalUrl({ email, plan, renewalMode }) {
   const params = new URLSearchParams();
   if (email) params.set('email', String(email));
@@ -146,6 +170,11 @@ function getBasePlanValues(plan, pricingDraft) {
 function calculateDiscountPercent({ plan, subscription, pricingDraft }) {
   const base = getBasePlanValues(plan, pricingDraft);
   const customArs = Number(subscription?.customPriceArs ?? 0);
+  const couponPercent = Number(subscription?.couponDiscountPercent ?? 0);
+
+  if (couponPercent > 0) {
+    return Number(couponPercent.toFixed(2));
+  }
 
   if (!(base.ars > 0) || !(customArs >= 0) || customArs === 0 || customArs >= base.ars) {
     return '';
@@ -200,12 +229,34 @@ export default function SubscriptionAdmin() {
   const [selectedDiscountFilter, setSelectedDiscountFilter] = useState('all');
   const [selectedRenewalFilter, setSelectedRenewalFilter] = useState('all');
   const [selectedDueFilter, setSelectedDueFilter] = useState('all');
+  const [coupons, setCoupons] = useState([]);
+  const [savingCouponId, setSavingCouponId] = useState(null);
+  const [creatingCoupon, setCreatingCoupon] = useState(false);
+  const [couponDraft, setCouponDraft] = useState({
+    code: '',
+    plan: '',
+    discountPercent: '',
+    benefitDurationType: 'forever',
+    benefitDurationValue: '',
+    maxRedemptions: '',
+    expiresAt: '',
+    internalNote: '',
+    isActive: true,
+  });
 
   const hasUsers = users.length > 0;
 
   const getPlanAmount = useCallback(
     (plan, userSubscription = {}) => {
       if (plan === 'basic') {
+        if (Number(userSubscription?.couponDiscountPercent || 0) > 0) {
+          return Number(
+            (
+              Number(pricingDraft.basicPriceArs || 0) *
+              (1 - Number(userSubscription.couponDiscountPercent) / 100)
+            ).toFixed(2),
+          );
+        }
         return Number(
           userSubscription?.customPriceArs != null && userSubscription?.customPriceArs !== ''
             ? userSubscription.customPriceArs
@@ -213,6 +264,14 @@ export default function SubscriptionAdmin() {
         );
       }
       if (plan === 'pro') {
+        if (Number(userSubscription?.couponDiscountPercent || 0) > 0) {
+          return Number(
+            (
+              Number(pricingDraft.proPriceArs || 0) *
+              (1 - Number(userSubscription.couponDiscountPercent) / 100)
+            ).toFixed(2),
+          );
+        }
         return Number(
           userSubscription?.customPriceArs != null && userSubscription?.customPriceArs !== ''
             ? userSubscription.customPriceArs
@@ -236,7 +295,10 @@ export default function SubscriptionAdmin() {
     setSuccess('');
 
     try {
-      const [subscriptionsResponse, pricingResponse] = await Promise.all([
+      const [couponsResponse, subscriptionsResponse, pricingResponse] = await Promise.all([
+        fetchSubscriptionCoupons({
+          secret: secret.trim(),
+        }),
         fetchSubscriptions({
           secret: secret.trim(),
           search: search.trim(),
@@ -245,6 +307,7 @@ export default function SubscriptionAdmin() {
           secret: secret.trim(),
         }),
       ]);
+      const nextCoupons = couponsResponse.coupons || [];
       const nextUsers = subscriptionsResponse.users || [];
       const nextPricingDraft = {
         basicPriceArs: Number(pricingResponse.pricing?.basic?.ars || 25000),
@@ -252,6 +315,7 @@ export default function SubscriptionAdmin() {
         proPriceArs: Number(pricingResponse.pricing?.pro?.ars || 35000),
         proPriceUsdReference: Number(pricingResponse.pricing?.pro?.usdReference || 35),
       };
+      setCoupons(nextCoupons);
       setUsers(nextUsers);
       setPricingDraft(nextPricingDraft);
       setDrafts(buildDrafts(nextUsers, nextPricingDraft));
@@ -371,6 +435,85 @@ export default function SubscriptionAdmin() {
       setError(err.message || 'No pudimos guardar los precios.');
     } finally {
       setSavingPricing(false);
+    }
+  };
+
+  const handleCouponDraftChange = (field, value) => {
+    setCouponDraft((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const handleCreateCoupon = async () => {
+    if (!secret.trim()) {
+      setError('Ingresá el secret de administración para guardar cupones.');
+      setSuccess('');
+      return;
+    }
+
+    setCreatingCoupon(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await createSubscriptionCoupon({
+        secret: secret.trim(),
+        payload: {
+          code: couponDraft.code,
+          plan: couponDraft.plan || null,
+          discountPercent: couponDraft.discountPercent,
+          benefitDurationType: couponDraft.benefitDurationType,
+          benefitDurationValue: couponDraft.benefitDurationValue,
+          maxRedemptions: couponDraft.maxRedemptions,
+          expiresAt: couponDraft.expiresAt || null,
+          internalNote: couponDraft.internalNote,
+          isActive: couponDraft.isActive,
+        },
+      });
+
+      setCoupons((current) => [response.coupon, ...current]);
+      setCouponDraft({
+        code: '',
+        plan: '',
+        discountPercent: '',
+        benefitDurationType: 'forever',
+        benefitDurationValue: '',
+        maxRedemptions: '',
+        expiresAt: '',
+        internalNote: '',
+        isActive: true,
+      });
+      setSuccess('Cupón creado correctamente.');
+    } catch (err) {
+      setError(err.message || 'No pudimos crear el cupón.');
+    } finally {
+      setCreatingCoupon(false);
+    }
+  };
+
+  const handleSaveCoupon = async (couponId, payload) => {
+    if (!secret.trim()) return;
+
+    setSavingCouponId(couponId);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await updateSubscriptionCoupon({
+        couponId,
+        secret: secret.trim(),
+        payload,
+      });
+
+      setCoupons((current) =>
+        current.map((coupon) => (coupon._id === couponId ? response.coupon : coupon)),
+      );
+      setSuccess('Cupón actualizado correctamente.');
+    } catch (err) {
+      setError(err.message || 'No pudimos actualizar el cupón.');
+    } finally {
+      setSavingCouponId(null);
     }
   };
 
@@ -511,7 +654,8 @@ export default function SubscriptionAdmin() {
             : subscriptionStatus === 'past_due' || subscriptionStatus === 'cancelled';
       const hasDiscount =
         user.subscription?.customPriceArs != null ||
-        user.subscription?.customPriceUsdReference != null;
+        user.subscription?.customPriceUsdReference != null ||
+        Number(user.subscription?.couponDiscountPercent || 0) > 0;
       const discountMatches =
         selectedDiscountFilter === 'all'
           ? true
@@ -723,6 +867,180 @@ export default function SubscriptionAdmin() {
               >
                 {savingPricing ? 'Guardando precios...' : 'Guardar precios'}
               </button>
+            </div>
+          </section>
+
+          <section className={styles.pricingSection}>
+            <div className={styles.sectionHeadingRow}>
+              <div>
+                <p className={styles.sectionEyebrow}>CUPONES</p>
+                <h2 className={styles.sectionTitle}>Descuentos automáticos por código</h2>
+                <p className={styles.sectionMeta}>
+                  Creás el cupón una vez y el cliente lo aplica solo desde la web de planes.
+                </p>
+              </div>
+            </div>
+
+            <div className={styles.couponCreateGrid}>
+              <label className={styles.priceField}>
+                <span>Código</span>
+                <input
+                  type="text"
+                  value={couponDraft.code}
+                  onChange={(e) => handleCouponDraftChange('code', e.target.value.toUpperCase())}
+                  className={styles.priceInput}
+                  placeholder="PROMO5"
+                />
+              </label>
+              <label className={styles.priceField}>
+                <span>Plan</span>
+                <select
+                  value={couponDraft.plan}
+                  onChange={(e) => handleCouponDraftChange('plan', e.target.value)}
+                  className={styles.priceInput}
+                >
+                  <option value="">Todos</option>
+                  <option value="basic">Básico</option>
+                  <option value="pro">Pro</option>
+                </select>
+              </label>
+              <label className={styles.priceField}>
+                <span>Descuento %</span>
+                <input
+                  type="number"
+                  value={couponDraft.discountPercent}
+                  onChange={(e) => handleCouponDraftChange('discountPercent', e.target.value)}
+                  className={styles.priceInput}
+                  placeholder="5"
+                />
+                <small className={styles.fieldHint}>
+                  Si deja el plan en ARS 0, se activa directo sin checkout y el próximo cobro vuelve al flujo normal.
+                </small>
+              </label>
+              <label className={styles.priceField}>
+                <span>El descuento dura</span>
+                <select
+                  value={couponDraft.benefitDurationType}
+                  onChange={(e) => handleCouponDraftChange('benefitDurationType', e.target.value)}
+                  className={styles.priceInput}
+                >
+                  <option value="forever">Permanente</option>
+                  <option value="one_time">Solo primer pago</option>
+                  <option value="months">Durante X meses</option>
+                </select>
+              </label>
+              {couponDraft.benefitDurationType === 'months' ? (
+                <label className={styles.priceField}>
+                  <span>Cuántos meses</span>
+                  <input
+                    type="number"
+                    value={couponDraft.benefitDurationValue}
+                    onChange={(e) => handleCouponDraftChange('benefitDurationValue', e.target.value)}
+                    className={styles.priceInput}
+                    placeholder="12"
+                  />
+                </label>
+              ) : null}
+              <label className={styles.priceField}>
+                <span>Máx. usos</span>
+                <input
+                  type="number"
+                  value={couponDraft.maxRedemptions}
+                  onChange={(e) => handleCouponDraftChange('maxRedemptions', e.target.value)}
+                  className={styles.priceInput}
+                  placeholder="Opcional"
+                />
+              </label>
+              <label className={styles.priceField}>
+                <span>Válido hasta</span>
+                <input
+                  type="date"
+                  value={couponDraft.expiresAt}
+                  onChange={(e) => handleCouponDraftChange('expiresAt', e.target.value)}
+                  className={styles.priceInput}
+                />
+              </label>
+              <label className={styles.priceField}>
+                <span>Activo</span>
+                <select
+                  value={couponDraft.isActive ? 'true' : 'false'}
+                  onChange={(e) => handleCouponDraftChange('isActive', e.target.value === 'true')}
+                  className={styles.priceInput}
+                >
+                  <option value="true">Sí</option>
+                  <option value="false">No</option>
+                </select>
+              </label>
+              <label className={`${styles.priceField} ${styles.couponNoteField}`}>
+                <span>Nota interna</span>
+                <input
+                  type="text"
+                  value={couponDraft.internalNote}
+                  onChange={(e) => handleCouponDraftChange('internalNote', e.target.value)}
+                  className={styles.priceInput}
+                  placeholder="Promo lanzamiento, cliente referido, etc."
+                />
+              </label>
+            </div>
+
+            <div className={styles.pricingActions}>
+              <button
+                type="button"
+                className={styles.saveButton}
+                onClick={handleCreateCoupon}
+                disabled={creatingCoupon}
+              >
+                {creatingCoupon ? 'Creando cupón...' : 'Crear cupón'}
+              </button>
+            </div>
+
+            <div className={styles.couponList}>
+              {coupons.map((coupon) => {
+                const durationBadge = getCouponDurationBadge(coupon);
+
+                return (
+                <article key={coupon._id} className={styles.couponCard}>
+                  <div className={styles.couponCardTop}>
+                    <div>
+                      <div className={styles.couponHeaderRow}>
+                        <strong className={styles.couponCode}>{coupon.code}</strong>
+                        <span className={`${styles.couponDurationBadge} ${durationBadge.className}`}>
+                          {durationBadge.label}
+                        </span>
+                      </div>
+                      <p className={styles.couponMeta}>
+                        {coupon.plan ? `Plan ${coupon.plan}` : 'Todos los planes'} · {coupon.discountPercent}% OFF
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.secondaryInlineButton}
+                      onClick={() =>
+                        handleSaveCoupon(coupon._id, {
+                          isActive: !coupon.isActive,
+                        })
+                      }
+                      disabled={savingCouponId === coupon._id}
+                    >
+                      {coupon.isActive ? 'Desactivar' : 'Activar'}
+                    </button>
+                  </div>
+                  <p className={styles.couponMeta}>
+                    Usos: {coupon.redemptionCount}
+                    {coupon.maxRedemptions ? ` / ${coupon.maxRedemptions}` : ''} · Duración:{' '}
+                    {coupon.benefitDurationType === 'forever'
+                      ? 'permanente'
+                      : coupon.benefitDurationType === 'one_time'
+                        ? 'solo primer pago'
+                        : `durante ${coupon.benefitDurationValue || 0} meses`} · Válido hasta:{' '}
+                    {formatDate(coupon.expiresAt)} · {coupon.isActive ? 'Activo' : 'Inactivo'}
+                  </p>
+                  {coupon.internalNote ? (
+                    <p className={styles.couponMeta}>{coupon.internalNote}</p>
+                  ) : null}
+                </article>
+                );
+              })}
             </div>
           </section>
 
@@ -982,7 +1300,14 @@ export default function SubscriptionAdmin() {
                   const draft = drafts[user._id] || {};
                   const hasDiscount =
                     user.subscription?.customPriceArs != null ||
-                    user.subscription?.customPriceUsdReference != null;
+                    user.subscription?.customPriceUsdReference != null ||
+                    Number(user.subscription?.couponDiscountPercent || 0) > 0;
+                  const activeCouponDurationBadge = user.subscription?.couponCode
+                    ? getCouponDurationBadge({
+                        benefitDurationType: user.subscription?.couponBenefitDurationType,
+                        benefitDurationValue: user.subscription?.couponBenefitDurationValue,
+                      })
+                    : null;
                   return (
                     <article key={user._id} className={styles.card}>
                       <div className={styles.cardTop}>
@@ -993,6 +1318,18 @@ export default function SubscriptionAdmin() {
                           </p>
                           {hasDiscount ? (
                             <span className={styles.discountBadge}>Plan diferenciado activo</span>
+                          ) : null}
+                          {user.subscription?.couponCode ? (
+                            <span className={styles.accountCouponWrap}>
+                              <span className={styles.discountBadge}>Cupón: {user.subscription.couponCode}</span>
+                              {activeCouponDurationBadge ? (
+                                <span
+                                  className={`${styles.couponDurationBadge} ${activeCouponDurationBadge.className}`}
+                                >
+                                  {activeCouponDurationBadge.label}
+                                </span>
+                              ) : null}
+                            </span>
                           ) : null}
                         </div>
                         <div className={styles.cardDates}>
@@ -1146,6 +1483,13 @@ export default function SubscriptionAdmin() {
                             Renovación: {resolveRenewalModeLabel(user.subscription?.renewalMode)} · Próximo cobro:{' '}
                             {formatDate(resolveNextDueDate(user.subscription))}
                           </span>
+                          {user.subscription?.couponCode ? (
+                            <span className={styles.currentMeta}>
+                              Beneficio activo: cupón {user.subscription.couponCode} · {Number(
+                                user.subscription?.couponDiscountPercent || 0,
+                              )}% OFF
+                            </span>
+                          ) : null}
                         </div>
                         <div className={styles.inlineActions}>
                           <button

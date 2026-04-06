@@ -177,34 +177,46 @@ export async function notifySubscriptionActivated({
   amountArs,
   expiresAt,
   renewalMode = "manual",
+  activationReason = "payment",
 }) {
   if (!userDoc) return false;
 
   const planLabel = getPlanLabel(plan);
   const formattedAmount = formatCurrencyArs(amountArs);
   const expiryLabel = formatDateLabel(expiresAt);
+  const isFreeCouponActivation = activationReason === "free_coupon";
+  const title = isFreeCouponActivation ? `Plan ${planLabel} activado` : `Plan ${planLabel} activo`;
+  const intro = isFreeCouponActivation
+    ? "Activamos tu plan con un cupón bonificado sin pasar por el checkout."
+    : renewalMode === "automatic"
+      ? "Ya habilitamos tu plan y la renovación automática quedó configurada."
+      : "Ya habilitamos tu plan después de confirmar el pago.";
+  const note = isFreeCouponActivation
+    ? "Cuando llegue el vencimiento vas a poder renovarlo desde la web con el valor que corresponda en ese momento."
+    : renewalMode === "automatic"
+      ? "Los próximos cobros se intentarán procesar automáticamente desde Mercado Pago."
+      : "Cuando se acerque el vencimiento te vamos a avisar para renovar desde la web.";
+  const pushBody = isFreeCouponActivation
+    ? "Tu plan quedó activo con un mes bonificado. Cuando venza, vas a poder renovarlo desde la web."
+    : renewalMode === "automatic"
+      ? "Tu plan quedó activo y la renovación automática ya está habilitada."
+      : "Tu plan quedó activo después de confirmar el pago.";
 
   try {
     if (userDoc.email) {
       await sendAppMail({
         to: userDoc.email,
-        subject: `Plan ${planLabel} activo`,
+        subject: title,
         html: buildSubscriptionEventMailHtml({
-          title: `Plan ${planLabel} activo`,
-          intro:
-            renewalMode === "automatic"
-              ? "Ya habilitamos tu plan y la renovación automática quedó configurada."
-              : "Ya habilitamos tu plan después de confirmar el pago.",
+          title,
+          intro,
           accentColor: "#34C759",
           lines: [
             { label: "Plan", value: planLabel },
-            { label: "Monto", value: formattedAmount || "A confirmar" },
+            { label: "Monto", value: formattedAmount || "Bonificado" },
             { label: "Vence", value: expiryLabel },
           ],
-          note:
-            renewalMode === "automatic"
-              ? "Los próximos cobros se intentarán procesar automáticamente desde Mercado Pago."
-              : "Cuando se acerque el vencimiento te vamos a avisar para renovar desde la web.",
+          note,
           ctaLabel: "Ver sitio de planes",
           ctaUrl: String(process.env.PUBLIC_BOOKING_BASE_URL || "https://barberappbycodex.com").replace(/\/+$/, "") + "/planes",
         }),
@@ -217,11 +229,8 @@ export async function notifySubscriptionActivated({
   try {
     await sendSubscriptionPush({
       userDoc,
-      title: `Plan ${planLabel} activo`,
-      body:
-        renewalMode === "automatic"
-          ? "Tu plan quedó activo y la renovación automática ya está habilitada."
-          : "Tu plan quedó activo después de confirmar el pago.",
+      title,
+      body: pushBody,
     });
   } catch (error) {
     console.error("Error enviando push de plan activo:", error?.message || error);

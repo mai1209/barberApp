@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { AppointmentModel } from "../models/Appointment.js";
 import { BarberModel } from "../models/Barber.js";
+import { SubscriptionCouponModel } from "../models/SubscriptionCoupon.js";
 import { UserModel } from "../models/User.js";
 import { sendAppMail } from "../services/mailer.js";
 import {
@@ -17,6 +18,7 @@ import {
   getOrCreatePlanPricing,
   serializePlanPricing,
 } from "../services/planPricingService.js";
+import { resolvePlanPricingForSubscription } from "../services/subscriptionPricingService.js";
 import { notifySubscriptionActivated } from "../services/subscriptionLifecycleService.js";
 
 function normalizePaymentStatus(value) {
@@ -230,7 +232,7 @@ function resolvePreapprovalStatus(value) {
   return "unknown";
 }
 
-function calculateSubscriptionExpiry({ billingCycle, paidAt }) {
+export function calculateSubscriptionExpiry({ billingCycle, paidAt }) {
   if (!billingCycle || billingCycle === "custom") return null;
   const base = new Date(paidAt);
   if (billingCycle === "yearly") {
@@ -239,6 +241,145 @@ function calculateSubscriptionExpiry({ billingCycle, paidAt }) {
   }
   base.setMonth(base.getMonth() + 1);
   return base;
+}
+
+async function appointmentHasConfirmedOverlap(appointment) {
+  const startTime = new Date(appointment.startTime);
+  const durationMinutes = Number(appointment.durationMinutes || 30);
+  const endTime = new Date(startTime.getTime() + durationMinutes * 60000);
+
+  const overlappingCandidates = await AppointmentModel.find({
+    owner: appointment.owner,
+    barber: appointment.barber,
+    _id: { $ne: appointment._id },
+    status: { $in: ["pending", "completed"] },
+    startTime: { $lt: endTime },
+  })
+    .select({ startTime: 1, durationMinutes: 1 })
+    .lean();
+
+  return overlappingCandidates.some((existing) => {
+    const existingStart = new Date(existing.startTime);
+    const existingEnd = new Date(
+      existingStart.getTime() + Number(existing.durationMinutes || 30) * 60000,
+    );
+    return existingEnd > startTime;
+  });
+}
+
+export async function applyPendingCouponToSubscription({ userDoc, plan, pricing }) {
+  const pendingCouponCode = String(userDoc.subscription?.pendingCouponCode || "").trim();
+  const pendingCouponDiscountPercent = Number(
+    userDoc.subscription?.pendingCouponDiscountPercent || 0,
+  );
+  const pendingBenefitDurationType =
+    String(userDoc.subscription?.pendingCouponBenefitDurationType || "").trim() || "forever";
+  const pendingBenefitDurationValue = Number(
+    userDoc.subscription?.pendingCouponBenefitDurationValue || 0,
+  );
+
+  if (!pendingCouponCode || !(pendingCouponDiscountPercent > 0)) {
+    userDoc.subscription = {
+      ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
+      pendingCouponCode: null,
+      pendingCouponDiscountPercent: null,
+      pendingCouponBenefitDurationType: null,
+      pendingCouponBenefitDurationValue: null,
+    };
+    return;
+  }
+
+  const couponDoc = await SubscriptionCouponModel.findOne({
+    code: pendingCouponCode,
+    isActive: true,
+  });
+
+  const resolvedPricing = resolvePlanPricingForSubscription({
+    plan,
+    pricing,
+    subscription: {
+      ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
+      customPriceArs: null,
+      customPriceUsdReference: null,
+    },
+    couponDiscountPercent: pendingCouponDiscountPercent,
+  });
+
+  const couponAppliedAt = new Date();
+  let couponValidUntil = null;
+  if (pendingBenefitDurationType === "months" && pendingBenefitDurationValue > 0) {
+    couponValidUntil = new Date(couponAppliedAt);
+    couponValidUntil.setMonth(couponValidUntil.getMonth() + pendingBenefitDurationValue);
+  } else if (pendingBenefitDurationType === "one_time") {
+    couponValidUntil = couponAppliedAt;
+  }
+
+  userDoc.subscription = {
+    ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
+    couponCode: pendingCouponCode,
+    couponDiscountPercent: pendingCouponDiscountPercent,
+    couponBenefitDurationType: pendingBenefitDurationType,
+    couponBenefitDurationValue:
+      pendingBenefitDurationType === "months" && pendingBenefitDurationValue > 0
+        ? pendingBenefitDurationValue
+        : null,
+    couponAppliedAt,
+    couponValidUntil,
+    pendingCouponCode: null,
+    pendingCouponDiscountPercent: null,
+    pendingCouponBenefitDurationType: null,
+    pendingCouponBenefitDurationValue: null,
+    customPriceArs: null,
+    customPriceUsdReference: null,
+  };
+
+  if (couponDoc) {
+    couponDoc.redemptionCount = Number(couponDoc.redemptionCount || 0) + 1;
+    await couponDoc.save();
+  }
+
+  return resolvedPricing;
+}
+
+function clearSubscriptionCouponBenefit(userDoc) {
+  userDoc.subscription = {
+    ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
+    couponCode: null,
+    couponDiscountPercent: null,
+    couponBenefitDurationType: null,
+    couponBenefitDurationValue: null,
+    couponAppliedAt: null,
+    couponValidUntil: null,
+  };
+}
+
+function shouldClearExistingCouponOnApprovedPayment({ userDoc, paidAt }) {
+  const subscription = userDoc?.subscription ?? {};
+  const hasPendingCoupon = Boolean(
+    String(subscription?.pendingCouponCode || "").trim(),
+  );
+  const currentCouponCode = String(subscription?.couponCode || "").trim();
+  const benefitType = String(subscription?.couponBenefitDurationType || "").trim();
+
+  if (hasPendingCoupon || !currentCouponCode || !benefitType) {
+    return false;
+  }
+
+  if (benefitType === "one_time") {
+    return Boolean(subscription?.lastPaymentAt);
+  }
+
+  if (benefitType === "months") {
+    const validUntil = subscription?.couponValidUntil
+      ? new Date(subscription.couponValidUntil)
+      : null;
+    if (!validUntil || Number.isNaN(validUntil.getTime())) {
+      return false;
+    }
+    return validUntil.getTime() < paidAt.getTime();
+  }
+
+  return false;
 }
 
 async function syncAutomaticSubscriptionFromPreapproval(preapproval) {
@@ -265,6 +406,13 @@ async function syncAutomaticSubscriptionFromPreapproval(preapproval) {
 
   if (normalizedStatus === "authorized") {
     const startedAt = preapproval?.date_created ? new Date(preapproval.date_created) : new Date();
+    const pricingDoc = await getOrCreatePlanPricing();
+    const pricing = serializePlanPricing(pricingDoc);
+    const resolvedCouponPricing = await applyPendingCouponToSubscription({
+      userDoc,
+      plan,
+      pricing,
+    });
     userDoc.subscription = {
       ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
       plan,
@@ -295,7 +443,7 @@ async function syncAutomaticSubscriptionFromPreapproval(preapproval) {
         const amountArs =
           Number(userDoc.subscription?.customPriceArs || 0) > 0
             ? Number(userDoc.subscription.customPriceArs)
-            : Number(pricing[plan]?.ars || 0);
+            : resolvedCouponPricing?.effectiveArs || Number(pricing[plan]?.ars || 0);
         await notifySubscriptionActivated({
           userDoc,
           plan,
@@ -516,6 +664,17 @@ export async function handleMercadoPagoWebhook(req, res, next) {
       : payment.order?.type || targetAppointment.mercadoPagoMerchantOrderId;
 
     if (normalizedPaymentStatus === "approved") {
+      const hasOverlap = await appointmentHasConfirmedOverlap(targetAppointment);
+      if (hasOverlap) {
+        targetAppointment.status = "cancelled";
+        await targetAppointment.save();
+        return res.status(200).json({
+          received: true,
+          updated: false,
+          reason: "appointment_conflict_after_payment",
+        });
+      }
+
       const paidAmount = Math.max(0, Number(payment.transaction_amount || 0));
       const totalAmount = Math.max(
         0,
@@ -530,6 +689,8 @@ export async function handleMercadoPagoWebhook(req, res, next) {
       );
       targetAppointment.paymentStatus =
         targetAppointment.amountPending > 0 ? "partial" : "paid";
+      targetAppointment.status = "pending";
+      targetAppointment.paymentDeadlineAt = null;
     } else if (normalizedPaymentStatus === "refunded") {
       targetAppointment.paymentStatus = "refunded";
       targetAppointment.amountPaid = 0;
@@ -538,6 +699,10 @@ export async function handleMercadoPagoWebhook(req, res, next) {
         Number(targetAppointment.amountTotal || targetAppointment.servicePrice || 0),
       );
       targetAppointment.paymentMethodCollected = null;
+      if (targetAppointment.status === "awaiting_payment") {
+        targetAppointment.status = "cancelled";
+      }
+      targetAppointment.paymentDeadlineAt = null;
     } else if (normalizedPaymentStatus === "rejected") {
       targetAppointment.paymentStatus = "unpaid";
       targetAppointment.amountPaid = 0;
@@ -546,6 +711,10 @@ export async function handleMercadoPagoWebhook(req, res, next) {
         Number(targetAppointment.amountTotal || targetAppointment.servicePrice || 0),
       );
       targetAppointment.paymentMethodCollected = null;
+      if (targetAppointment.status === "awaiting_payment") {
+        targetAppointment.status = "cancelled";
+      }
+      targetAppointment.paymentDeadlineAt = null;
     }
 
     await targetAppointment.save();
@@ -624,7 +793,22 @@ export async function handleSubscriptionMercadoPagoWebhook(req, res, next) {
       const paidAt = payment.date_approved ? new Date(payment.date_approved) : new Date();
       const previousPaymentId = String(userDoc.subscription?.mercadoPagoPaymentId || "").trim();
       const currentPaymentId = String(payment.id || paymentId).trim();
-      const paidAmount = Math.max(0, Number(payment.transaction_amount || 0));
+      const pricingDoc = await getOrCreatePlanPricing();
+      const pricing = serializePlanPricing(pricingDoc);
+
+      if (shouldClearExistingCouponOnApprovedPayment({ userDoc, paidAt })) {
+        clearSubscriptionCouponBenefit(userDoc);
+      }
+
+      const resolvedCouponPricing = await applyPendingCouponToSubscription({
+        userDoc,
+        plan,
+        pricing,
+      });
+      const paidAmount = Math.max(
+        0,
+        Number(payment.transaction_amount || resolvedCouponPricing?.effectiveArs || 0),
+      );
 
       userDoc.subscription = {
         ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),

@@ -1,4 +1,5 @@
 import { UserModel } from "../models/User.js";
+import { SubscriptionCouponModel } from "../models/SubscriptionCoupon.js";
 import { hashPassword, verifyPassword } from "../token/passwordManager.js";
 import { signAccessToken, verifyAccessToken } from "../token/jwtManager.js";
 import crypto from "crypto";
@@ -25,6 +26,10 @@ import {
   getOrCreatePlanPricing,
   serializePlanPricing,
 } from "../services/planPricingService.js";
+import {
+  normalizeCouponCode,
+  resolvePlanPricingForSubscription,
+} from "../services/subscriptionPricingService.js";
 
 const PASSWORD_RESET_EXPIRY_MS = 15 * 60 * 1000;
 const SUBSCRIPTION_CURRENCY_ID = String(
@@ -486,6 +491,137 @@ function sanitizeSubscriptionInput(input) {
   return { updates, hasAnyField };
 }
 
+function sanitizeSubscriptionCouponInput(input, { partial = false } = {}) {
+  if (!input || typeof input !== "object") {
+    return { updates: {}, hasAnyField: false };
+  }
+
+  const updates = {};
+  let hasAnyField = false;
+
+  if (Object.prototype.hasOwnProperty.call(input, "code")) {
+    hasAnyField = true;
+    const code = normalizeCouponCode(input.code);
+    if (!partial && !code) {
+      throw new Error("El código del cupón es obligatorio.");
+    }
+    if (code) {
+      updates.code = code;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "plan")) {
+    hasAnyField = true;
+    const rawPlan = input.plan == null || String(input.plan).trim() === ""
+      ? null
+      : String(input.plan).trim();
+    if (rawPlan !== null && !["basic", "pro"].includes(rawPlan)) {
+      throw new Error("El plan del cupón no es válido.");
+    }
+    updates.plan = rawPlan;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "discountPercent")) {
+    hasAnyField = true;
+    const discountPercent = Number(input.discountPercent);
+    if (!Number.isFinite(discountPercent) || discountPercent <= 0 || discountPercent > 100) {
+      throw new Error("El descuento del cupón debe estar entre 0 y 100.");
+    }
+    updates.discountPercent = Number(discountPercent.toFixed(2));
+  } else if (!partial) {
+    throw new Error("El descuento del cupón es obligatorio.");
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "benefitDurationType")) {
+    hasAnyField = true;
+    const benefitDurationType = String(input.benefitDurationType ?? "").trim() || "forever";
+    if (!["forever", "one_time", "months"].includes(benefitDurationType)) {
+      throw new Error("La duración del beneficio no es válida.");
+    }
+    updates.benefitDurationType = benefitDurationType;
+  } else if (!partial) {
+    updates.benefitDurationType = "forever";
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "benefitDurationValue")) {
+    hasAnyField = true;
+    const raw = input.benefitDurationValue;
+    if (raw == null || String(raw).trim() === "") {
+      updates.benefitDurationValue = null;
+    } else {
+      const parsed = Number(raw);
+      if (!Number.isInteger(parsed) || parsed < 1) {
+        throw new Error("La duración del beneficio debe ser un entero mayor a cero.");
+      }
+      updates.benefitDurationValue = parsed;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "maxRedemptions")) {
+    hasAnyField = true;
+    const raw = input.maxRedemptions;
+    if (raw == null || String(raw).trim() === "") {
+      updates.maxRedemptions = null;
+    } else {
+      const parsed = Number(raw);
+      if (!Number.isInteger(parsed) || parsed < 1) {
+        throw new Error("El máximo de usos debe ser un entero mayor a cero.");
+      }
+      updates.maxRedemptions = parsed;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "expiresAt")) {
+    hasAnyField = true;
+    if (!input.expiresAt) {
+      updates.expiresAt = null;
+    } else {
+      const parsed = new Date(input.expiresAt);
+      if (Number.isNaN(parsed.getTime())) {
+        throw new Error("La fecha de vencimiento del cupón no es válida.");
+      }
+      updates.expiresAt = parsed;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "internalNote")) {
+    hasAnyField = true;
+    const internalNote = String(input.internalNote ?? "").trim();
+    if (internalNote.length > 300) {
+      throw new Error("La nota interna del cupón no puede superar los 300 caracteres.");
+    }
+    updates.internalNote = internalNote;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "isActive")) {
+    hasAnyField = true;
+    updates.isActive = Boolean(input.isActive);
+  } else if (!partial) {
+    updates.isActive = true;
+  }
+
+  return { updates, hasAnyField };
+}
+
+function serializeSubscriptionCoupon(coupon) {
+  if (!coupon) return null;
+  return {
+    _id: String(coupon._id),
+    code: coupon.code,
+    plan: coupon.plan || null,
+    discountPercent: Number(coupon.discountPercent || 0),
+    benefitDurationType: coupon.benefitDurationType || "forever",
+    benefitDurationValue: coupon.benefitDurationValue ?? null,
+    maxRedemptions: coupon.maxRedemptions ?? null,
+    redemptionCount: Number(coupon.redemptionCount || 0),
+    expiresAt: coupon.expiresAt || null,
+    internalNote: coupon.internalNote || "",
+    isActive: Boolean(coupon.isActive),
+    createdAt: coupon.createdAt,
+    updatedAt: coupon.updatedAt,
+  };
+}
+
 function sanitizePlanPricingInput(input) {
   if (!input || typeof input !== "object") {
     return { updates: {}, hasAnyField: false };
@@ -642,15 +778,15 @@ export async function createSubscriptionCheckout(req, res, next) {
 
     const pricingDoc = await getOrCreatePlanPricing();
     const pricing = serializePlanPricing(pricingDoc);
-    const baseAmount =
+    const resolvedPricing = resolvePlanPricingForSubscription({
+      plan,
+      pricing,
+      subscription: userDoc.subscription,
+    });
+    const amount =
       SUBSCRIPTION_CURRENCY_ID === "USD"
-        ? Number(pricing[plan]?.usdReference || 0)
-        : Number(pricing[plan]?.ars || 0);
-    const discountedAmount =
-      SUBSCRIPTION_CURRENCY_ID === "USD"
-        ? Number(userDoc.subscription?.customPriceUsdReference ?? 0)
-        : Number(userDoc.subscription?.customPriceArs ?? 0);
-    const amount = discountedAmount > 0 ? discountedAmount : baseAmount;
+        ? Number(resolvedPricing.effectiveUsdReference || 0)
+        : Number(resolvedPricing.effectiveArs || 0);
 
     if (!(amount > 0)) {
       return res.status(400).json({ error: "El plan no tiene un precio configurado." });
@@ -702,6 +838,7 @@ export async function createSubscriptionCheckout(req, res, next) {
       preferenceId: preference.id || null,
       amount,
       currencyId: SUBSCRIPTION_CURRENCY_ID,
+      discountApplied: resolvedPricing.discountApplied,
     });
   } catch (err) {
     return next(err);
@@ -1116,6 +1253,89 @@ export async function getPlanPricingAdmin(req, res, next) {
     const pricingDoc = await getOrCreatePlanPricing();
     return res.json({ pricing: serializePlanPricing(pricingDoc) });
   } catch (err) {
+    return next(err);
+  }
+}
+
+export async function listSubscriptionCouponsAdmin(req, res, next) {
+  try {
+    const coupons = await SubscriptionCouponModel.find({})
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.json({
+      coupons: coupons.map(serializeSubscriptionCoupon),
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function createSubscriptionCouponAdmin(req, res, next) {
+  try {
+    const { updates } = sanitizeSubscriptionCouponInput(req.body ?? {});
+
+    const existing = await SubscriptionCouponModel.findOne({ code: updates.code }).lean();
+    if (existing) {
+      return res.status(409).json({ error: "Ya existe un cupón con ese código." });
+    }
+
+    const coupon = await SubscriptionCouponModel.create(updates);
+
+    return res.status(201).json({
+      message: "Cupón creado correctamente.",
+      coupon: serializeSubscriptionCoupon(coupon.toJSON()),
+    });
+  } catch (err) {
+    if (err instanceof Error) {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
+}
+
+export async function updateSubscriptionCouponAdmin(req, res, next) {
+  try {
+    const couponId = String(req.params?.couponId || "").trim();
+    if (!couponId) {
+      return res.status(400).json({ error: "Falta el cupón a actualizar." });
+    }
+
+    const { updates, hasAnyField } = sanitizeSubscriptionCouponInput(req.body ?? {}, {
+      partial: true,
+    });
+    if (!hasAnyField) {
+      return res.status(400).json({ error: "No llegaron cambios del cupón para guardar." });
+    }
+
+    if (updates.code) {
+      const existing = await SubscriptionCouponModel.findOne({
+        code: updates.code,
+        _id: { $ne: couponId },
+      }).lean();
+      if (existing) {
+        return res.status(409).json({ error: "Ya existe otro cupón con ese código." });
+      }
+    }
+
+    const coupon = await SubscriptionCouponModel.findByIdAndUpdate(
+      couponId,
+      updates,
+      { new: true },
+    ).lean();
+
+    if (!coupon) {
+      return res.status(404).json({ error: "Cupón no encontrado." });
+    }
+
+    return res.json({
+      message: "Cupón actualizado correctamente.",
+      coupon: serializeSubscriptionCoupon(coupon),
+    });
+  } catch (err) {
+    if (err instanceof Error) {
+      return res.status(400).json({ error: err.message });
+    }
     return next(err);
   }
 }

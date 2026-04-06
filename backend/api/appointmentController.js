@@ -211,6 +211,7 @@ export async function listAppointments(req, res, next) {
 
     const appointments = await AppointmentModel.find({
       owner: ownerId,
+      status: { $in: ["pending", "completed"] },
       startTime: { $gte: startOfDay, $lte: endOfDay },
     })
       .populate({ path: "barber", select: "fullName" })
@@ -313,11 +314,17 @@ export async function createAppointment(req, res, next) {
           hour12: false,
           timeZone,
         });
+        const dateLabel = startTime.toLocaleDateString("es-AR", {
+          weekday: "short",
+          day: "2-digit",
+          month: "2-digit",
+          timeZone,
+        });
         const payload = {
           token: token,
           notification: {
-            title: "💈¡NUEVO TURNO!",
-            body: `${customerName} reservó ${service} a las ${timeLabel}`,
+            title: "💈Nuevo turno confirmado",
+            body: `${customerName} reservó ${service} con ${barber?.fullName || "tu barbero"} el ${dateLabel} a las ${timeLabel}.`,
           },
           android: {
             priority: "high",
@@ -723,7 +730,7 @@ export async function updateAppointmentStatus(req, res, next) {
       amountPaid,
     } = req.body;
 
-    if (!["pending", "completed", "cancelled"].includes(status)) {
+    if (!["awaiting_payment", "pending", "completed", "cancelled"].includes(status)) {
       return res.status(400).json({ error: "Estado inválido" });
     }
 

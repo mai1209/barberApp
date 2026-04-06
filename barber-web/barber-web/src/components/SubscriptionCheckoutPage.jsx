@@ -43,6 +43,7 @@ export default function SubscriptionCheckoutPage() {
   const [selectedPlan, setSelectedPlan] = useState(getInitialPlan);
   const [paymentMode, setPaymentMode] = useState(getInitialPaymentMode);
   const [email, setEmail] = useState(getInitialEmail);
+  const [couponCode, setCouponCode] = useState('');
   const [pricing, setPricing] = useState({
     basic: { ars: 25000, usdReference: 25 },
     pro: { ars: 35000, usdReference: 35 },
@@ -113,11 +114,28 @@ export default function SubscriptionCheckoutPage() {
           ? await createPublicRecurringSubscription({
               email,
               plan: selectedPlan,
+              couponCode,
             })
           : await createPublicSubscriptionCheckout({
               email,
               plan: selectedPlan,
+              couponCode,
             });
+
+      if (response.activatedDirectly) {
+        setMessage(
+          response.message ||
+            `Se aplicó el cupón ${response.couponApplied || ''} y el plan quedó activo gratis hasta ${new Intl.DateTimeFormat(
+              'es-AR',
+              {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+              },
+            ).format(new Date(response.expiresAt))}.`,
+        );
+        return;
+      }
 
       if (paymentMode === 'automatic') {
         setMessage(
@@ -127,7 +145,7 @@ export default function SubscriptionCheckoutPage() {
         );
       } else if (response.discountApplied) {
         setMessage(
-          `A esta cuenta se le aplicó un precio diferencial. Vas a pagar ARS ${Number(
+          `${response.couponApplied ? `Se aplicó el cupón ${response.couponApplied}. ` : 'A esta cuenta se le aplicó un precio diferencial. '}Vas a pagar ARS ${Number(
             response.amount || 0,
           ).toLocaleString('es-AR')}.`,
         );
@@ -209,6 +227,16 @@ export default function SubscriptionCheckoutPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="tu@barberia.com"
               required
+            />
+          </label>
+
+          <label className={styles.field}>
+            <span>Cupón de descuento</span>
+            <input
+              type="text"
+              value={couponCode}
+              onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+              placeholder="Opcional"
             />
           </label>
 

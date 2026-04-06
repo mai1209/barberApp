@@ -231,7 +231,7 @@ export async function listBarberAppointments(req, res, next) {
       owner: ownerId,
       barber: barberId,
       startTime: { $gte: startOfDay, $lte: endOfDay },
-      status: { $ne: "cancelled" },
+      status: { $in: ["pending", "completed"] },
     }).lean();
 
     const weekday = getTimeZoneWeekday(
