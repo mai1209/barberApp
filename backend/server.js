@@ -40,18 +40,41 @@ function isPrivateDevOrigin(origin) {
   return false;
 }
 
+function isAllowedWebOrigin(origin) {
+  if (!origin) return true;
+
+  try {
+    const parsed = new URL(origin);
+    const { hostname, protocol } = parsed;
+
+    if (protocol === "http:" && (hostname === "localhost" || hostname === "127.0.0.1")) {
+      return true;
+    }
+
+    if (protocol === "https:" && (hostname === "barberappbycodex.com" || hostname === "www.barberappbycodex.com")) {
+      return true;
+    }
+
+    if (protocol === "https:" && hostname.endsWith(".vercel.app")) {
+      return true;
+    }
+
+    if (isPrivateDevOrigin(origin)) {
+      return true;
+    }
+  } catch (_error) {
+    return false;
+  }
+
+  return false;
+}
+
 // --- CONFIGURACIÓN DE CORS ---
 // Esto permite que tu Frontend en Vercel pueda hablar con este Backend
 app.use(cors({
   origin: function (origin, callback) {
-    const whitelist = [
-      "http://localhost:3000",
-      "https://barberappbycodex.com",
-      "https://www.barberappbycodex.com", 
-      "https://barber-app-evf4.vercel.app",
-    ];
-    // Si el origin está en la lista O si no hay origin (App móvil), permitimos
-    if (!origin || whitelist.indexOf(origin) !== -1 || (process.env.NODE_ENV !== "production" && isPrivateDevOrigin(origin))) {
+    // Si el origin está permitido O si no hay origin (App móvil), permitimos
+    if (isAllowedWebOrigin(origin)) {
       callback(null, true);
     } else {
       callback(new Error('No permitido por CORS'));
