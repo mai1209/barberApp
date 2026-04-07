@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import helmet from 'helmet';
 import cors from "cors";
 import { connectMongo } from "./database/connectMongo.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -10,6 +11,9 @@ import publicRoutes from "./routes/publicRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 
 const app = express();
+
+// Activamos todas las protecciones escudo de seguridad
+app.use(helmet());
 
 function isPrivateDevOrigin(origin) {
   if (!origin) return true;
