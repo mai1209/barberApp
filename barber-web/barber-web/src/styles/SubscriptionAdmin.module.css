@@ -471,11 +471,65 @@
   letter-spacing: 0.4px;
 }
 
+.referralBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(33, 192, 99, 0.12);
+  border: 1px solid rgba(33, 192, 99, 0.24);
+  color: #74ec9f;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+
 .accountCouponWrap {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.referralGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.referralCard {
+  border-radius: 22px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(23,23,30,0.95);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.28);
+  padding: 18px;
+}
+
+.referralCardTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.referralOwner {
+  display: block;
+  font-size: 1.08rem;
+  font-weight: 800;
+}
+
+.referralCodeText,
+.referralMeta {
+  margin: 0;
+  color: #b0b0bc;
+  font-size: 0.92rem;
+}
+
+.referralCodeText {
+  margin-top: 4px;
 }
 
 .cardMeta,
@@ -638,7 +692,8 @@
   .pricingGrid,
   .summaryGrid,
   .controls,
-  .couponCreateGrid {
+  .couponCreateGrid,
+  .referralGrid {
     grid-template-columns: 1fr;
   }
 

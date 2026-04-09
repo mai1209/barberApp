@@ -118,6 +118,33 @@ function getCouponDurationBadge(coupon) {
   };
 }
 
+function getCouponDiscountLabel(coupon) {
+  if (coupon?.discountType === 'fixed_usd_reference') {
+    return `USD ${Number(coupon?.discountAmountUsdReference || 0).toLocaleString('es-AR')} OFF`;
+  }
+
+  return `${Number(coupon?.discountPercent || 0).toLocaleString('es-AR')}% OFF`;
+}
+
+function getSubscriptionDiscountLabel(subscription) {
+  if (!subscription?.couponCode) return '';
+
+  if (subscription?.couponDiscountType === 'fixed_usd_reference') {
+    return `USD ${Number(subscription?.couponDiscountAmountUsdReference || 0).toLocaleString('es-AR')} OFF`;
+  }
+
+  return `${Number(subscription?.couponDiscountPercent || 0).toLocaleString('es-AR')}% OFF`;
+}
+
+function hasSubscriptionDiscount(subscription) {
+  return (
+    subscription?.customPriceArs != null ||
+    subscription?.customPriceUsdReference != null ||
+    Number(subscription?.couponDiscountPercent || 0) > 0 ||
+    Number(subscription?.couponDiscountAmountUsdReference || 0) > 0
+  );
+}
+
 function buildRenewalUrl({ email, plan, renewalMode }) {
   const params = new URLSearchParams();
   if (email) params.set('email', String(email));
@@ -229,13 +256,18 @@ export default function SubscriptionAdmin() {
   const [selectedDiscountFilter, setSelectedDiscountFilter] = useState('all');
   const [selectedRenewalFilter, setSelectedRenewalFilter] = useState('all');
   const [selectedDueFilter, setSelectedDueFilter] = useState('all');
+  const [selectedReferralFilter, setSelectedReferralFilter] = useState('all');
   const [coupons, setCoupons] = useState([]);
   const [savingCouponId, setSavingCouponId] = useState(null);
   const [creatingCoupon, setCreatingCoupon] = useState(false);
   const [couponDraft, setCouponDraft] = useState({
     code: '',
     plan: '',
+    couponCategory: 'standard',
+    referralOwnerName: '',
+    discountType: 'percentage',
     discountPercent: '',
+    discountAmountUsdReference: '',
     benefitDurationType: 'forever',
     benefitDurationValue: '',
     maxRedemptions: '',
@@ -249,6 +281,19 @@ export default function SubscriptionAdmin() {
   const getPlanAmount = useCallback(
     (plan, userSubscription = {}) => {
       if (plan === 'basic') {
+        if (
+          String(userSubscription?.couponDiscountType || '') === 'fixed_usd_reference' &&
+          Number(userSubscription?.couponDiscountAmountUsdReference || 0) > 0 &&
+          Number(pricingDraft.basicPriceUsdReference || 0) > 0
+        ) {
+          const arsPerUsd =
+            Number(pricingDraft.basicPriceArs || 0) / Number(pricingDraft.basicPriceUsdReference || 0);
+          const discountArs = arsPerUsd * Number(userSubscription.couponDiscountAmountUsdReference || 0);
+          return Math.max(
+            0,
+            Number((Number(pricingDraft.basicPriceArs || 0) - discountArs).toFixed(2)),
+          );
+        }
         if (Number(userSubscription?.couponDiscountPercent || 0) > 0) {
           return Number(
             (
@@ -264,6 +309,19 @@ export default function SubscriptionAdmin() {
         );
       }
       if (plan === 'pro') {
+        if (
+          String(userSubscription?.couponDiscountType || '') === 'fixed_usd_reference' &&
+          Number(userSubscription?.couponDiscountAmountUsdReference || 0) > 0 &&
+          Number(pricingDraft.proPriceUsdReference || 0) > 0
+        ) {
+          const arsPerUsd =
+            Number(pricingDraft.proPriceArs || 0) / Number(pricingDraft.proPriceUsdReference || 0);
+          const discountArs = arsPerUsd * Number(userSubscription.couponDiscountAmountUsdReference || 0);
+          return Math.max(
+            0,
+            Number((Number(pricingDraft.proPriceArs || 0) - discountArs).toFixed(2)),
+          );
+        }
         if (Number(userSubscription?.couponDiscountPercent || 0) > 0) {
           return Number(
             (
@@ -280,7 +338,12 @@ export default function SubscriptionAdmin() {
       }
       return 0;
     },
-    [pricingDraft.basicPriceArs, pricingDraft.proPriceArs],
+    [
+      pricingDraft.basicPriceArs,
+      pricingDraft.basicPriceUsdReference,
+      pricingDraft.proPriceArs,
+      pricingDraft.proPriceUsdReference,
+    ],
   );
 
   const loadUsers = useCallback(async () => {
@@ -462,7 +525,11 @@ export default function SubscriptionAdmin() {
         payload: {
           code: couponDraft.code,
           plan: couponDraft.plan || null,
+          couponCategory: couponDraft.couponCategory,
+          referralOwnerName: couponDraft.referralOwnerName,
+          discountType: couponDraft.discountType,
           discountPercent: couponDraft.discountPercent,
+          discountAmountUsdReference: couponDraft.discountAmountUsdReference,
           benefitDurationType: couponDraft.benefitDurationType,
           benefitDurationValue: couponDraft.benefitDurationValue,
           maxRedemptions: couponDraft.maxRedemptions,
@@ -476,7 +543,11 @@ export default function SubscriptionAdmin() {
       setCouponDraft({
         code: '',
         plan: '',
+        couponCategory: 'standard',
+        referralOwnerName: '',
+        discountType: 'percentage',
         discountPercent: '',
+        discountAmountUsdReference: '',
         benefitDurationType: 'forever',
         benefitDurationValue: '',
         maxRedemptions: '',
@@ -652,16 +723,20 @@ export default function SubscriptionAdmin() {
           : selectedStatusFilter === 'active'
             ? subscriptionStatus === 'active'
             : subscriptionStatus === 'past_due' || subscriptionStatus === 'cancelled';
-      const hasDiscount =
-        user.subscription?.customPriceArs != null ||
-        user.subscription?.customPriceUsdReference != null ||
-        Number(user.subscription?.couponDiscountPercent || 0) > 0;
+      const hasDiscount = hasSubscriptionDiscount(user.subscription);
       const discountMatches =
         selectedDiscountFilter === 'all'
           ? true
           : selectedDiscountFilter === 'discounted'
             ? hasDiscount
             : !hasDiscount;
+      const hasReferral = Boolean(String(user.subscription?.referralCode || '').trim());
+      const referralMatches =
+        selectedReferralFilter === 'all'
+          ? true
+          : selectedReferralFilter === 'referred'
+            ? hasReferral
+            : !hasReferral;
       const renewalMode = String(user.subscription?.renewalMode || 'manual');
       const renewalMatches =
         selectedRenewalFilter === 'all' ? true : renewalMode === selectedRenewalFilter;
@@ -679,6 +754,7 @@ export default function SubscriptionAdmin() {
         monthMatches &&
         statusMatches &&
         discountMatches &&
+        referralMatches &&
         renewalMatches &&
         dueMatches
       );
@@ -687,6 +763,7 @@ export default function SubscriptionAdmin() {
     selectedDiscountFilter,
     selectedDueFilter,
     selectedMonth,
+    selectedReferralFilter,
     selectedRenewalFilter,
     selectedStatusFilter,
     selectedYear,
@@ -748,6 +825,43 @@ export default function SubscriptionAdmin() {
             0,
           ),
     };
+  }, [getPlanAmount, visibleUsers]);
+
+  const referralSummary = useMemo(() => {
+    const grouped = new Map();
+
+    visibleUsers.forEach((user) => {
+      const referralCode = String(user.subscription?.referralCode || '').trim();
+      if (!referralCode) return;
+
+      const referralOwnerName =
+        String(user.subscription?.referralOwnerName || '').trim() || 'Referido sin nombre';
+      const key = `${referralOwnerName}::${referralCode}`;
+      const current = grouped.get(key) || {
+        referralOwnerName,
+        referralCode,
+        total: 0,
+        active: 0,
+        pending: 0,
+        revenue: 0,
+      };
+
+      current.total += 1;
+      if (user.subscription?.status === 'active') {
+        current.active += 1;
+        current.revenue += getPlanAmount(user.subscription?.plan, user.subscription);
+      } else if (user.subscription?.status === 'past_due') {
+        current.pending += 1;
+      }
+
+      grouped.set(key, current);
+    });
+
+    return [...grouped.values()].sort((a, b) => {
+      if (b.active !== a.active) return b.active - a.active;
+      if (b.total !== a.total) return b.total - a.total;
+      return a.referralOwnerName.localeCompare(b.referralOwnerName, 'es');
+    });
   }, [getPlanAmount, visibleUsers]);
 
   return (
@@ -905,18 +1019,74 @@ export default function SubscriptionAdmin() {
                 </select>
               </label>
               <label className={styles.priceField}>
-                <span>Descuento %</span>
-                <input
-                  type="number"
-                  value={couponDraft.discountPercent}
-                  onChange={(e) => handleCouponDraftChange('discountPercent', e.target.value)}
+                <span>Tipo de código</span>
+                <select
+                  value={couponDraft.couponCategory}
+                  onChange={(e) => handleCouponDraftChange('couponCategory', e.target.value)}
                   className={styles.priceInput}
-                  placeholder="5"
-                />
+                >
+                  <option value="standard">Cupón normal</option>
+                  <option value="referral">Código de referido</option>
+                </select>
+              </label>
+              {couponDraft.couponCategory === 'referral' ? (
+                <label className={styles.priceField}>
+                  <span>Referente / barbero</span>
+                  <input
+                    type="text"
+                    value={couponDraft.referralOwnerName}
+                    onChange={(e) => handleCouponDraftChange('referralOwnerName', e.target.value)}
+                    className={styles.priceInput}
+                    placeholder="Maira"
+                  />
+                  <small className={styles.fieldHint}>
+                    Después el panel agrupa cuántas cuentas activó este código para esa persona.
+                  </small>
+                </label>
+              ) : null}
+              <label className={styles.priceField}>
+                <span>Tipo de descuento</span>
+                <select
+                  value={couponDraft.discountType}
+                  onChange={(e) => handleCouponDraftChange('discountType', e.target.value)}
+                  className={styles.priceInput}
+                >
+                  <option value="percentage">Porcentaje</option>
+                  <option value="fixed_usd_reference">Monto fijo USD</option>
+                </select>
                 <small className={styles.fieldHint}>
-                  Si deja el plan en ARS 0, se activa directo sin checkout y el próximo cobro vuelve al flujo normal.
+                  Elegí porcentaje o monto fijo de referencia en USD para que el descuento siga al precio actual del plan.
                 </small>
               </label>
+              {couponDraft.discountType === 'percentage' ? (
+                <label className={styles.priceField}>
+                  <span>Descuento %</span>
+                  <input
+                    type="number"
+                    value={couponDraft.discountPercent}
+                    onChange={(e) => handleCouponDraftChange('discountPercent', e.target.value)}
+                    className={styles.priceInput}
+                    placeholder="5"
+                  />
+                  <small className={styles.fieldHint}>
+                    Si deja el plan en ARS 0, se activa directo sin checkout y el próximo cobro vuelve al flujo normal.
+                  </small>
+                </label>
+              ) : (
+                <label className={styles.priceField}>
+                  <span>Monto fijo USD ref.</span>
+                  <input
+                    type="number"
+                    value={couponDraft.discountAmountUsdReference}
+                    onChange={(e) => handleCouponDraftChange('discountAmountUsdReference', e.target.value)}
+                    className={styles.priceInput}
+                    placeholder="5"
+                  />
+                  <small className={styles.fieldHint}>
+                    Ejemplo: USD 5 OFF. El sistema calcula el equivalente en ARS según el precio actual del plan.
+                  </small>
+                </label>
+              )}
               <label className={styles.priceField}>
                 <span>El descuento dura</span>
                 <select
@@ -1001,16 +1171,24 @@ export default function SubscriptionAdmin() {
                 return (
                 <article key={coupon._id} className={styles.couponCard}>
                   <div className={styles.couponCardTop}>
-                    <div>
+                      <div>
                       <div className={styles.couponHeaderRow}>
                         <strong className={styles.couponCode}>{coupon.code}</strong>
+                        {coupon.couponCategory === 'referral' ? (
+                          <span className={styles.referralBadge}>Referido</span>
+                        ) : null}
                         <span className={`${styles.couponDurationBadge} ${durationBadge.className}`}>
                           {durationBadge.label}
                         </span>
                       </div>
                       <p className={styles.couponMeta}>
-                        {coupon.plan ? `Plan ${coupon.plan}` : 'Todos los planes'} · {coupon.discountPercent}% OFF
+                        {coupon.plan ? `Plan ${coupon.plan}` : 'Todos los planes'} · {getCouponDiscountLabel(coupon)}
                       </p>
+                      {coupon.couponCategory === 'referral' ? (
+                        <p className={styles.couponMeta}>
+                          Referente: {coupon.referralOwnerName || 'Sin nombre cargado'}
+                        </p>
+                      ) : null}
                     </div>
                     <button
                       type="button"
@@ -1042,6 +1220,47 @@ export default function SubscriptionAdmin() {
                 );
               })}
             </div>
+          </section>
+
+          <section className={styles.metricsSection}>
+            <div className={styles.sectionHeadingRow}>
+              <div>
+                <p className={styles.sectionEyebrow}>REFERIDOS</p>
+                <h2 className={styles.sectionTitle}>Rendimiento por código</h2>
+                <p className={styles.sectionMeta}>
+                  Te muestra cuántas cuentas reales activó cada referente y cuánto sigue facturando hoy.
+                </p>
+              </div>
+            </div>
+
+            {referralSummary.length ? (
+              <div className={styles.referralGrid}>
+                {referralSummary.map((item) => (
+                  <article
+                    key={`${item.referralOwnerName}-${item.referralCode}`}
+                    className={styles.referralCard}
+                  >
+                    <div className={styles.referralCardTop}>
+                      <div>
+                        <strong className={styles.referralOwner}>{item.referralOwnerName}</strong>
+                        <p className={styles.referralCodeText}>Código: {item.referralCode}</p>
+                      </div>
+                      <span className={styles.referralBadge}>Referido</span>
+                    </div>
+                    <p className={styles.referralMeta}>
+                      Total: {item.total} · Activos: {item.active} · Pendientes: {item.pending}
+                    </p>
+                    <p className={styles.referralMeta}>
+                      Facturación activa: ARS {item.revenue.toLocaleString('es-AR')}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className={styles.emptyState}>
+                Todavía no hay cuentas activas atribuidas a códigos de referido con los filtros actuales.
+              </div>
+            )}
           </section>
 
           <section className={styles.metricsSection}>
@@ -1295,13 +1514,34 @@ export default function SubscriptionAdmin() {
                 </button>
               </div>
 
+              <div className={styles.statusToolbar}>
+                <button
+                  type="button"
+                  className={`${styles.statusChip} ${selectedReferralFilter === 'all' ? styles.statusChipActive : ''}`}
+                  onClick={() => setSelectedReferralFilter('all')}
+                >
+                  Todos los referidos
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.statusChip} ${selectedReferralFilter === 'referred' ? styles.discountChipActive : ''}`}
+                  onClick={() => setSelectedReferralFilter('referred')}
+                >
+                  Con referido
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.statusChip} ${selectedReferralFilter === 'none' ? styles.statusChipActive : ''}`}
+                  onClick={() => setSelectedReferralFilter('none')}
+                >
+                  Sin referido
+                </button>
+              </div>
+
               <section className={styles.list}>
                 {visibleUsers.map((user) => {
                   const draft = drafts[user._id] || {};
-                  const hasDiscount =
-                    user.subscription?.customPriceArs != null ||
-                    user.subscription?.customPriceUsdReference != null ||
-                    Number(user.subscription?.couponDiscountPercent || 0) > 0;
+                  const hasDiscount = hasSubscriptionDiscount(user.subscription);
                   const activeCouponDurationBadge = user.subscription?.couponCode
                     ? getCouponDurationBadge({
                         benefitDurationType: user.subscription?.couponBenefitDurationType,
@@ -1329,6 +1569,16 @@ export default function SubscriptionAdmin() {
                                   {activeCouponDurationBadge.label}
                                 </span>
                               ) : null}
+                            </span>
+                          ) : null}
+                          {user.subscription?.referralCode ? (
+                            <span className={styles.accountCouponWrap}>
+                              <span className={styles.referralBadge}>
+                                Referido: {user.subscription.referralOwnerName || user.subscription.referralCode}
+                              </span>
+                              <span className={styles.cardMeta}>
+                                Código {user.subscription.referralCode}
+                              </span>
                             </span>
                           ) : null}
                         </div>
@@ -1485,9 +1735,14 @@ export default function SubscriptionAdmin() {
                           </span>
                           {user.subscription?.couponCode ? (
                             <span className={styles.currentMeta}>
-                              Beneficio activo: cupón {user.subscription.couponCode} · {Number(
-                                user.subscription?.couponDiscountPercent || 0,
-                              )}% OFF
+                              Beneficio activo: cupón {user.subscription.couponCode} ·{' '}
+                              {getSubscriptionDiscountLabel(user.subscription)}
+                            </span>
+                          ) : null}
+                          {user.subscription?.referralCode ? (
+                            <span className={styles.currentMeta}>
+                              Alta atribuida a {user.subscription.referralOwnerName || 'referido'} · código{' '}
+                              {user.subscription.referralCode}
                             </span>
                           ) : null}
                         </div>

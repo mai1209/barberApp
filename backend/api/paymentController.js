@@ -276,8 +276,13 @@ async function appointmentHasConfirmedOverlap(appointment) {
 
 export async function applyPendingCouponToSubscription({ userDoc, plan, pricing }) {
   const pendingCouponCode = String(userDoc.subscription?.pendingCouponCode || "").trim();
+  const pendingCouponDiscountType =
+    String(userDoc.subscription?.pendingCouponDiscountType || "").trim() || "percentage";
   const pendingCouponDiscountPercent = Number(
     userDoc.subscription?.pendingCouponDiscountPercent || 0,
+  );
+  const pendingCouponDiscountAmountUsdReference = Number(
+    userDoc.subscription?.pendingCouponDiscountAmountUsdReference || 0,
   );
   const pendingBenefitDurationType =
     String(userDoc.subscription?.pendingCouponBenefitDurationType || "").trim() || "forever";
@@ -285,11 +290,18 @@ export async function applyPendingCouponToSubscription({ userDoc, plan, pricing 
     userDoc.subscription?.pendingCouponBenefitDurationValue || 0,
   );
 
-  if (!pendingCouponCode || !(pendingCouponDiscountPercent > 0)) {
+  const hasDiscountValue =
+    (pendingCouponDiscountType === "percentage" && pendingCouponDiscountPercent > 0) ||
+    (pendingCouponDiscountType === "fixed_usd_reference" &&
+      pendingCouponDiscountAmountUsdReference > 0);
+
+  if (!pendingCouponCode || !hasDiscountValue) {
     userDoc.subscription = {
       ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
       pendingCouponCode: null,
+      pendingCouponDiscountType: null,
       pendingCouponDiscountPercent: null,
+      pendingCouponDiscountAmountUsdReference: null,
       pendingCouponBenefitDurationType: null,
       pendingCouponBenefitDurationValue: null,
     };
@@ -309,7 +321,9 @@ export async function applyPendingCouponToSubscription({ userDoc, plan, pricing 
       customPriceArs: null,
       customPriceUsdReference: null,
     },
+    couponDiscountType: pendingCouponDiscountType,
     couponDiscountPercent: pendingCouponDiscountPercent,
+    couponDiscountAmountUsdReference: pendingCouponDiscountAmountUsdReference,
   });
 
   const couponAppliedAt = new Date();
@@ -324,7 +338,12 @@ export async function applyPendingCouponToSubscription({ userDoc, plan, pricing 
   userDoc.subscription = {
     ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
     couponCode: pendingCouponCode,
+    couponDiscountType: pendingCouponDiscountType,
     couponDiscountPercent: pendingCouponDiscountPercent,
+    couponDiscountAmountUsdReference:
+      pendingCouponDiscountType === "fixed_usd_reference"
+        ? pendingCouponDiscountAmountUsdReference
+        : null,
     couponBenefitDurationType: pendingBenefitDurationType,
     couponBenefitDurationValue:
       pendingBenefitDurationType === "months" && pendingBenefitDurationValue > 0
@@ -333,12 +352,23 @@ export async function applyPendingCouponToSubscription({ userDoc, plan, pricing 
     couponAppliedAt,
     couponValidUntil,
     pendingCouponCode: null,
+    pendingCouponDiscountType: null,
     pendingCouponDiscountPercent: null,
+    pendingCouponDiscountAmountUsdReference: null,
     pendingCouponBenefitDurationType: null,
     pendingCouponBenefitDurationValue: null,
     customPriceArs: null,
     customPriceUsdReference: null,
   };
+
+  if (
+    couponDoc?.couponCategory === "referral" &&
+    !String(userDoc.subscription?.referralCode || "").trim()
+  ) {
+    userDoc.subscription.referralCode = couponDoc.code;
+    userDoc.subscription.referralOwnerName = String(couponDoc.referralOwnerName || "").trim() || null;
+    userDoc.subscription.referralAttributedAt = couponAppliedAt;
+  }
 
   if (couponDoc) {
     couponDoc.redemptionCount = Number(couponDoc.redemptionCount || 0) + 1;
@@ -352,7 +382,9 @@ function clearSubscriptionCouponBenefit(userDoc) {
   userDoc.subscription = {
     ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
     couponCode: null,
+    couponDiscountType: null,
     couponDiscountPercent: null,
+    couponDiscountAmountUsdReference: null,
     couponBenefitDurationType: null,
     couponBenefitDurationValue: null,
     couponAppliedAt: null,
@@ -447,7 +479,7 @@ async function syncAutomaticSubscriptionFromPreapproval(preapproval) {
       try {
         const pricingDoc = await getOrCreatePlanPricing();
         const pricing = serializePlanPricing(pricingDoc);
-        const amountArs =
+      const amountArs =
           Number(userDoc.subscription?.customPriceArs || 0) > 0
             ? Number(userDoc.subscription.customPriceArs)
             : resolvedCouponPricing?.effectiveArs || Number(pricing[plan]?.ars || 0);

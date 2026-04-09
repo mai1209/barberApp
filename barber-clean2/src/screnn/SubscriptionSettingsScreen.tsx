@@ -28,7 +28,9 @@ type SubscriptionState = {
   customPriceArs?: number | null;
   customPriceUsdReference?: number | null;
   couponCode?: string | null;
+  couponDiscountType?: 'percentage' | 'fixed_usd_reference' | null;
   couponDiscountPercent?: number | null;
+  couponDiscountAmountUsdReference?: number | null;
   couponBenefitDurationType?: 'forever' | 'one_time' | 'months' | null;
   couponBenefitDurationValue?: number | null;
   couponValidUntil?: string | null;
@@ -82,6 +84,16 @@ const PLAN_COPY: Record<
     ],
   },
 };
+
+function applyFixedDiscountByUsdReference(amountArs: number, baseUsdReference: number, discountUsdReference: number) {
+  if (!(amountArs > 0) || !(baseUsdReference > 0) || !(discountUsdReference > 0)) {
+    return amountArs;
+  }
+
+  const arsPerUsd = amountArs / baseUsdReference;
+  const discountArs = Number((arsPerUsd * discountUsdReference).toFixed(2));
+  return Math.max(0, Number((amountArs - discountArs).toFixed(2)));
+}
 
 function formatDateLabel(value?: string | null) {
   if (!value) return 'Sin fecha definida';
@@ -179,27 +191,43 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
       : planKey === 'pro'
         ? priceOverrides.pro.usdReference
         : 0;
+  const couponStillValid =
+    !subscription?.couponValidUntil ||
+    new Date(subscription.couponValidUntil).getTime() >= Date.now();
+  const hasFixedUsdCoupon =
+    subscription?.couponDiscountType === 'fixed_usd_reference' &&
+    Number(subscription?.couponDiscountAmountUsdReference || 0) > 0 &&
+    couponStillValid;
+  const hasPercentCoupon =
+    Number(subscription?.couponDiscountPercent || 0) > 0 && couponStillValid;
+  const calculatedCouponArs = hasFixedUsdCoupon
+    ? applyFixedDiscountByUsdReference(
+        basePriceArs,
+        baseUsdReference,
+        Number(subscription?.couponDiscountAmountUsdReference || 0),
+      )
+    : hasPercentCoupon
+      ? basePriceArs * (1 - Number(subscription?.couponDiscountPercent || 0) / 100)
+      : basePriceArs;
+  const calculatedCouponUsdReference = hasFixedUsdCoupon
+    ? Math.max(
+        0,
+        Number(
+          (
+            baseUsdReference - Number(subscription?.couponDiscountAmountUsdReference || 0)
+          ).toFixed(2),
+        ),
+      )
+    : hasPercentCoupon
+      ? baseUsdReference * (1 - Number(subscription?.couponDiscountPercent || 0) / 100)
+      : baseUsdReference;
   const effectiveArs =
     planKey === 'basic' || planKey === 'pro'
-      ? Number(
-          subscription?.customPriceArs ??
-            (Number(subscription?.couponDiscountPercent || 0) > 0 &&
-            (!subscription?.couponValidUntil ||
-              new Date(subscription.couponValidUntil).getTime() >= Date.now())
-              ? basePriceArs * (1 - Number(subscription?.couponDiscountPercent || 0) / 100)
-              : basePriceArs),
-        )
+      ? Number(subscription?.customPriceArs ?? calculatedCouponArs)
       : null;
   const effectiveUsdReference =
     planKey === 'basic' || planKey === 'pro'
-      ? Number(
-          subscription?.customPriceUsdReference ??
-            (Number(subscription?.couponDiscountPercent || 0) > 0 &&
-            (!subscription?.couponValidUntil ||
-              new Date(subscription.couponValidUntil).getTime() >= Date.now())
-              ? baseUsdReference * (1 - Number(subscription?.couponDiscountPercent || 0) / 100)
-              : baseUsdReference),
-        )
+      ? Number(subscription?.customPriceUsdReference ?? calculatedCouponUsdReference)
       : null;
   const effectivePlanPrice =
     planKey === 'basic' || planKey === 'pro'
@@ -351,6 +379,10 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
                 <Text style={styles.discountText}>
                   Se te aplicó un descuento de ARS {discountArs.toLocaleString('es-AR')} sobre el valor del plan
                   {subscription?.couponCode ? ` con el cupón ${subscription.couponCode}` : ''}
+                  {subscription?.couponDiscountType === 'fixed_usd_reference' &&
+                  Number(subscription?.couponDiscountAmountUsdReference || 0) > 0
+                    ? ` equivalente a USD ${Number(subscription?.couponDiscountAmountUsdReference || 0).toLocaleString('es-AR')} de referencia`
+                    : ''}
                   {subscription?.couponBenefitDurationType === 'forever'
                     ? '.'
                     : subscription?.couponBenefitDurationType === 'one_time'

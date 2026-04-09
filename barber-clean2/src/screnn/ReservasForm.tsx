@@ -172,16 +172,6 @@ function resolveBarberScheduleForDate(
   };
 }
 
-function formatBarberScheduleSummary(barber: Barber, date: Date) {
-  const resolved = resolveBarberScheduleForDate(barber, date);
-  if (resolved.scheduleRanges.length > 0) {
-    return resolved.scheduleRanges
-      .map(range => `${range.start}-${range.end}`)
-      .join(' / ');
-  }
-  return resolved.scheduleRange || 'Sin horario';
-}
-
 function ReservasForm({ navigation }: any) {
   const { theme } = useTheme();
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -715,9 +705,6 @@ function ReservasForm({ navigation }: any) {
                     >
                       {b.fullName.split(' ')[0]}
                     </Text>
-                    <Text style={styles.barberSchedule}>
-                      {formatBarberScheduleSummary(b, selectedDate)}
-                    </Text>
                   </Pressable>
                 ))}
               </ScrollView>
@@ -726,9 +713,13 @@ function ReservasForm({ navigation }: any) {
             {/* FECHA Y HORARIOS */}
             <View style={styles.section}>
               <View style={styles.dateHeader}>
-                <Text style={styles.sectionLabel}>Horarios Disponibles</Text>
+                  <Text style={[styles.sectionLabel, styles.scheduleHeaderLabel]}>
+                    Horarios{'\n'}Disponibles
+                  </Text>
                 <View style={styles.dateControls}>
                   <Pressable
+                    hitSlop={12}
+                    style={styles.navBtnWrap}
                     onPress={() => {
                       const d = new Date(selectedDate);
                       d.setDate(d.getDate() - 1);
@@ -742,6 +733,8 @@ function ReservasForm({ navigation }: any) {
                     {DAY_NAMES[selectedDate.getDay()]} {selectedDate.getDate()}
                   </Text>
                   <Pressable
+                    hitSlop={12}
+                    style={styles.navBtnWrap}
                     onPress={() => {
                       const d = new Date(selectedDate);
                       d.setDate(d.getDate() + 1);
@@ -946,22 +939,43 @@ const createStyles = (theme: Theme) =>
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: 5,
+      gap: 10,
+    },
+    scheduleHeaderLabel: {
+      width: 96,
+      lineHeight: 14,
     },
     dateControls: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
+      gap: 8,
       backgroundColor: '#252525',
-      paddingHorizontal: 12,
-      paddingVertical: 4,
-      borderRadius: 12,
+      paddingHorizontal: 8,
+      paddingVertical: 6,
+      borderRadius: 16,
+      flexShrink: 1,
+      flex: 1,
     },
-    navBtn: { color: theme.primary, fontSize: 28, fontWeight: 'bold' },
+    navBtnWrap: {
+      width: 42,
+      height: 42,
+      borderRadius: 14,
+      backgroundColor: hexToRgba(theme.primary, 0.12),
+      borderWidth: 1,
+      borderColor: hexToRgba(theme.primary, 0.2),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    navBtn: { color: theme.primary, fontSize: 34, fontWeight: 'bold', lineHeight: 36 },
     dateText: {
       color: '#fff',
-      fontSize: 14,
+      fontSize: 16,
       fontWeight: '700',
       textTransform: 'capitalize',
+      minWidth: 0,
+      flex: 1,
+      flexShrink: 1,
+      textAlign: 'center',
     },
     timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
     timeChip: {

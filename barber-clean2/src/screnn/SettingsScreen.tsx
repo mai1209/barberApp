@@ -23,7 +23,7 @@ import {
 import { useTheme } from '../context/ThemeContext';
 import { removeToken, removeUserProfile } from '../services/authStorage';
 
-const SUPPORT_EMAIL = 'soporte@barberappbycodex.com';
+const SUPPORT_EMAIL = 'barberappbycodex@gmail.com';
 
 type MenuItemProps = {
   icon: React.ComponentType<any>;

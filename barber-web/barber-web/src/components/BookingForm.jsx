@@ -168,16 +168,6 @@ const resolveBarberScheduleForDate = (barber, date) => {
   };
 };
 
-const formatBarberScheduleSummary = (barber, date) => {
-  const resolved = resolveBarberScheduleForDate(barber, date);
-  if (resolved.scheduleRanges.length > 0) {
-    return resolved.scheduleRanges
-      .map((range) => `${range.start}-${range.end}`)
-      .join(" / ");
-  }
-  return resolved.scheduleRange || "Sin horario configurado";
-};
-
 function BookingForm({ shopSlug, onNotFound }) {
   // 1. TODOS LOS USESTATE PRIMERO
   const [slugReady] = useState(() => {
@@ -785,9 +775,6 @@ function BookingForm({ shopSlug, onNotFound }) {
                     <span className={styles.barberName}>
                       {b.fullName.split(" ")[0]}
                     </span>
-                    <span className={styles.barberSchedule}>
-                      {formatBarberScheduleSummary(b, selectedDate)}
-                    </span>
                   </div>
                 </button>
               ))
@@ -797,7 +784,11 @@ function BookingForm({ shopSlug, onNotFound }) {
 
         <div className={styles.fieldGroup}>
           <div className={styles.scheduleHeader}>
-            <label className={styles.label}>Horarios disponibles</label>
+            <label className={`${styles.label} ${styles.scheduleHeaderLabel}`}>
+              Horarios
+              <br />
+              disponibles
+            </label>
             <div className={styles.dateSelector}>
               <button
                 type="button"

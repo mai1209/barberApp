@@ -521,15 +521,74 @@ function sanitizeSubscriptionCouponInput(input, { partial = false } = {}) {
     updates.plan = rawPlan;
   }
 
-  if (Object.prototype.hasOwnProperty.call(input, "discountPercent")) {
+  if (Object.prototype.hasOwnProperty.call(input, "couponCategory")) {
+    hasAnyField = true;
+    const couponCategory = String(input.couponCategory ?? "").trim() || "standard";
+    if (!["standard", "referral"].includes(couponCategory)) {
+      throw new Error("La categoría del cupón no es válida.");
+    }
+    updates.couponCategory = couponCategory;
+  } else if (!partial) {
+    updates.couponCategory = "standard";
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "referralOwnerName")) {
+    hasAnyField = true;
+    const referralOwnerName = String(input.referralOwnerName ?? "").trim();
+    if (referralOwnerName.length > 120) {
+      throw new Error("El nombre del referente no puede superar los 120 caracteres.");
+    }
+    updates.referralOwnerName = referralOwnerName;
+  } else if (!partial) {
+    updates.referralOwnerName = "";
+  }
+
+  const rawDiscountType = Object.prototype.hasOwnProperty.call(input, "discountType")
+    ? String(input.discountType ?? "").trim() || "percentage"
+    : partial
+      ? null
+      : "percentage";
+
+  if (rawDiscountType && !["percentage", "fixed_usd_reference"].includes(rawDiscountType)) {
+    throw new Error("El tipo de descuento del cupón no es válido.");
+  }
+
+  if (rawDiscountType) {
+    hasAnyField = true;
+    updates.discountType = rawDiscountType;
+  }
+
+  if (
+    (rawDiscountType === "percentage" || (!rawDiscountType && Object.prototype.hasOwnProperty.call(input, "discountPercent"))) &&
+    Object.prototype.hasOwnProperty.call(input, "discountPercent")
+  ) {
     hasAnyField = true;
     const discountPercent = Number(input.discountPercent);
     if (!Number.isFinite(discountPercent) || discountPercent <= 0 || discountPercent > 100) {
       throw new Error("El descuento del cupón debe estar entre 0 y 100.");
     }
     updates.discountPercent = Number(discountPercent.toFixed(2));
-  } else if (!partial) {
-    throw new Error("El descuento del cupón es obligatorio.");
+  } else if (!partial && rawDiscountType === "percentage") {
+    throw new Error("El descuento porcentual del cupón es obligatorio.");
+  } else if (rawDiscountType === "fixed_usd_reference") {
+    updates.discountPercent = null;
+  }
+
+  if (
+    (rawDiscountType === "fixed_usd_reference" ||
+      Object.prototype.hasOwnProperty.call(input, "discountAmountUsdReference")) &&
+    Object.prototype.hasOwnProperty.call(input, "discountAmountUsdReference")
+  ) {
+    hasAnyField = true;
+    const discountAmountUsdReference = Number(input.discountAmountUsdReference);
+    if (!Number.isFinite(discountAmountUsdReference) || discountAmountUsdReference <= 0) {
+      throw new Error("El monto fijo del cupón en USD de referencia no es válido.");
+    }
+    updates.discountAmountUsdReference = Number(discountAmountUsdReference.toFixed(2));
+  } else if (!partial && rawDiscountType === "fixed_usd_reference") {
+    throw new Error("El monto fijo del cupón en USD de referencia es obligatorio.");
+  } else if (rawDiscountType === "percentage") {
+    updates.discountAmountUsdReference = null;
   }
 
   if (Object.prototype.hasOwnProperty.call(input, "benefitDurationType")) {
@@ -600,6 +659,17 @@ function sanitizeSubscriptionCouponInput(input, { partial = false } = {}) {
     updates.isActive = true;
   }
 
+  const effectiveCategory =
+    updates.couponCategory ??
+    (partial ? null : "standard");
+  const effectiveReferralOwnerName =
+    updates.referralOwnerName ??
+    (partial ? null : "");
+
+  if (effectiveCategory === "referral" && !String(effectiveReferralOwnerName || "").trim()) {
+    throw new Error("El nombre del referente es obligatorio para códigos de referido.");
+  }
+
   return { updates, hasAnyField };
 }
 
@@ -609,7 +679,11 @@ function serializeSubscriptionCoupon(coupon) {
     _id: String(coupon._id),
     code: coupon.code,
     plan: coupon.plan || null,
+    couponCategory: coupon.couponCategory || "standard",
+    referralOwnerName: coupon.referralOwnerName || "",
+    discountType: coupon.discountType || "percentage",
     discountPercent: Number(coupon.discountPercent || 0),
+    discountAmountUsdReference: Number(coupon.discountAmountUsdReference || 0),
     benefitDurationType: coupon.benefitDurationType || "forever",
     benefitDurationValue: coupon.benefitDurationValue ?? null,
     maxRedemptions: coupon.maxRedemptions ?? null,

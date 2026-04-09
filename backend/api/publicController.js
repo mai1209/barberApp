@@ -180,7 +180,9 @@ async function activateFreeSubscriptionCoupon({
     billingCycle: "monthly",
     renewalMode: "manual",
     pendingCouponCode: coupon ? coupon.code : null,
+    pendingCouponDiscountType: coupon ? coupon.discountType || "percentage" : null,
     pendingCouponDiscountPercent: coupon ? Number(coupon.discountPercent || 0) : null,
+    pendingCouponDiscountAmountUsdReference: coupon ? Number(coupon.discountAmountUsdReference || 0) : null,
     pendingCouponBenefitDurationType: coupon ? coupon.benefitDurationType || "forever" : null,
     pendingCouponBenefitDurationValue: coupon ? coupon.benefitDurationValue ?? null : null,
   };
@@ -335,13 +337,16 @@ export async function publicCreateSubscriptionCheckout(req, res, next) {
       plan,
       pricing,
       subscription: userDoc.subscription,
+      couponDiscountType: String(coupon?.discountType || "percentage").trim() || "percentage",
       couponDiscountPercent: Number(coupon?.discountPercent || 0),
+      couponDiscountAmountUsdReference: Number(coupon?.discountAmountUsdReference || 0),
     });
     const amount = Number(resolvedPricing.effectiveArs || 0);
 
     const canActivateForFree =
       Boolean(coupon) &&
-      Number(coupon?.discountPercent || 0) >= 100 &&
+      resolvedPricing.discountApplied &&
+      !(amount > 0) &&
       Number(resolvedPricing.baseArs || 0) > 0;
 
     if (!(amount > 0) && canActivateForFree) {
@@ -412,7 +417,9 @@ export async function publicCreateSubscriptionCheckout(req, res, next) {
       billingCycle: userDoc.subscription?.billingCycle || "monthly",
       mercadoPagoPreferenceId: preference.id || null,
       pendingCouponCode: coupon ? coupon.code : null,
+      pendingCouponDiscountType: coupon ? coupon.discountType || "percentage" : null,
       pendingCouponDiscountPercent: coupon ? Number(coupon.discountPercent || 0) : null,
+      pendingCouponDiscountAmountUsdReference: coupon ? Number(coupon.discountAmountUsdReference || 0) : null,
       pendingCouponBenefitDurationType: coupon ? coupon.benefitDurationType || "forever" : null,
       pendingCouponBenefitDurationValue: coupon ? coupon.benefitDurationValue ?? null : null,
     };
@@ -427,6 +434,8 @@ export async function publicCreateSubscriptionCheckout(req, res, next) {
       discountApplied: resolvedPricing.discountApplied,
       baseAmount: resolvedPricing.baseArs,
       couponApplied: coupon ? coupon.code : null,
+      couponDiscountType: coupon ? coupon.discountType || "percentage" : null,
+      couponDiscountAmountUsdReference: coupon ? Number(coupon.discountAmountUsdReference || 0) : null,
       couponBenefitDurationType: coupon ? coupon.benefitDurationType || "forever" : null,
       couponBenefitDurationValue: coupon ? coupon.benefitDurationValue ?? null : null,
     });
@@ -463,13 +472,16 @@ export async function publicCreateRecurringSubscriptionCheckout(req, res, next) 
       plan,
       pricing,
       subscription: userDoc.subscription,
+      couponDiscountType: String(coupon?.discountType || "percentage").trim() || "percentage",
       couponDiscountPercent: Number(coupon?.discountPercent || 0),
+      couponDiscountAmountUsdReference: Number(coupon?.discountAmountUsdReference || 0),
     });
     const amount = Number(resolvedPricing.effectiveArs || 0);
 
     const canActivateForFree =
       Boolean(coupon) &&
-      Number(coupon?.discountPercent || 0) >= 100 &&
+      resolvedPricing.discountApplied &&
+      !(amount > 0) &&
       Number(resolvedPricing.baseArs || 0) > 0;
 
     if (!(amount > 0) && canActivateForFree) {
@@ -531,7 +543,9 @@ export async function publicCreateRecurringSubscriptionCheckout(req, res, next) 
       mercadoPagoPreapprovalId: preapproval.id || null,
       mercadoPagoPreapprovalStatus: preapproval.status || "pending",
       pendingCouponCode: coupon ? coupon.code : null,
+      pendingCouponDiscountType: coupon ? coupon.discountType || "percentage" : null,
       pendingCouponDiscountPercent: coupon ? Number(coupon.discountPercent || 0) : null,
+      pendingCouponDiscountAmountUsdReference: coupon ? Number(coupon.discountAmountUsdReference || 0) : null,
       pendingCouponBenefitDurationType: coupon ? coupon.benefitDurationType || "forever" : null,
       pendingCouponBenefitDurationValue: coupon ? coupon.benefitDurationValue ?? null : null,
     };
@@ -546,6 +560,8 @@ export async function publicCreateRecurringSubscriptionCheckout(req, res, next) 
       discountApplied: resolvedPricing.discountApplied,
       baseAmount: resolvedPricing.baseArs,
       couponApplied: coupon ? coupon.code : null,
+      couponDiscountType: coupon ? coupon.discountType || "percentage" : null,
+      couponDiscountAmountUsdReference: coupon ? Number(coupon.discountAmountUsdReference || 0) : null,
       couponBenefitDurationType: coupon ? coupon.benefitDurationType || "forever" : null,
       couponBenefitDurationValue: coupon ? coupon.benefitDurationValue ?? null : null,
       renewalMode: "automatic",

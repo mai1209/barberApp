@@ -114,11 +114,21 @@ const subscriptionSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    couponDiscountType: {
+      type: String,
+      enum: ["percentage", "fixed_usd_reference", null],
+      default: null,
+    },
     couponDiscountPercent: {
       type: Number,
       default: null,
       min: 0,
       max: 100,
+    },
+    couponDiscountAmountUsdReference: {
+      type: Number,
+      default: null,
+      min: 0,
     },
     couponBenefitDurationType: {
       type: String,
@@ -138,8 +148,25 @@ const subscriptionSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    referralCode: {
+      type: String,
+      default: null,
+    },
+    referralOwnerName: {
+      type: String,
+      default: null,
+    },
+    referralAttributedAt: {
+      type: Date,
+      default: null,
+    },
     pendingCouponCode: {
       type: String,
+      default: null,
+    },
+    pendingCouponDiscountType: {
+      type: String,
+      enum: ["percentage", "fixed_usd_reference", null],
       default: null,
     },
     pendingCouponDiscountPercent: {
@@ -147,6 +174,11 @@ const subscriptionSchema = new mongoose.Schema(
       default: null,
       min: 0,
       max: 100,
+    },
+    pendingCouponDiscountAmountUsdReference: {
+      type: Number,
+      default: null,
+      min: 0,
     },
     pendingCouponBenefitDurationType: {
       type: String,

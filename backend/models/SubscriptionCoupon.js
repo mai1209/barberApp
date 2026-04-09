@@ -15,11 +15,32 @@ const subscriptionCouponSchema = new mongoose.Schema(
       enum: ["basic", "pro", null],
       default: null,
     },
+    couponCategory: {
+      type: String,
+      enum: ["standard", "referral"],
+      default: "standard",
+    },
+    referralOwnerName: {
+      type: String,
+      trim: true,
+      default: "",
+      maxlength: 120,
+    },
+    discountType: {
+      type: String,
+      enum: ["percentage", "fixed_usd_reference"],
+      default: "percentage",
+    },
     discountPercent: {
       type: Number,
-      required: true,
+      default: null,
       min: 0,
       max: 100,
+    },
+    discountAmountUsdReference: {
+      type: Number,
+      default: null,
+      min: 0,
     },
     benefitDurationType: {
       type: String,
