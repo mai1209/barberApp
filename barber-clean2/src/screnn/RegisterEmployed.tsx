@@ -793,9 +793,9 @@ function RegisterEmployed({ navigation, route }: Props) {
         mediaType: 'photo',
         selectionLimit: 1,
         includeBase64: true,
-        maxWidth: 600,
-        maxHeight: 600,
-        quality: 0.7,
+        maxWidth: 320,
+        maxHeight: 320,
+        quality: 0.55,
       });
 
       if (result.didCancel) return;
@@ -1605,9 +1605,9 @@ const createStyles = (theme: Theme) =>
       gap: 8,
     },
     photoPreviewCircle: {
-      width: 88,
-      height: 88,
-      borderRadius: 44,
+      width: 72,
+      height: 72,
+      borderRadius: 36,
       backgroundColor: '#252525',
       borderWidth: 1,
       borderColor: '#333',
@@ -1621,7 +1621,7 @@ const createStyles = (theme: Theme) =>
     },
     photoPreviewInitial: {
       color: theme.primary,
-      fontSize: 28,
+      fontSize: 24,
       fontWeight: '900',
     },
     photoPreviewHint: {

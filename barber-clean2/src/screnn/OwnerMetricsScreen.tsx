@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  Image,
   View,
   Dimensions,
 } from 'react-native';
@@ -138,8 +139,8 @@ function OwnerMetricsScreen({ navigation }: Props) {
               <Text style={styles.headerSubtitle}>ADMINISTRACIÓN</Text>
               <Text style={styles.headerTitle}>Global Local</Text>
             </View>
-            <View style={styles.headerIcon}>
-              <Store size={22} color={theme.primary} />
+            <View>
+              <Image style={styles.headerIcon} source={require('../assets/logo.png')} />
             </View>
           </View>
         </View>
@@ -363,8 +364,8 @@ const makeStyles = (theme: Theme) =>
       fontWeight: '900',
     },
     headerIcon: {
-      width: 42,
-      alignItems: 'flex-end',
+      width: 20,
+      height: 20,
     },
 
     // Filtros

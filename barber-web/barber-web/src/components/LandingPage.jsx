@@ -210,8 +210,13 @@ function LandingPage() {
           <span className={styles.navLogoScissors}>✂</span>
           <span className={styles.navLogoText}>BarberAppByCodex</span>
         </div>
-        <a  href="https://www.letsbuilditcodex.com/" target="_blank" rel="noreferrer"><span className={styles.navBadge}>by CODEX®</span>
-</a>
+        <a
+          href="https://www.letsbuilditcodex.com/"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <span className={styles.navBadge}>by CODEX®</span>
+        </a>
       </nav>
 
       {/* HERO */}
@@ -313,7 +318,10 @@ function LandingPage() {
       </section>
 
       <section id="planes" className={styles.plansSection}>
-        <div className={`${styles.featuresLabel} ${styles.revealUp}`} data-animate>
+        <div
+          className={`${styles.featuresLabel} ${styles.revealUp}`}
+          data-animate
+        >
           Planes
         </div>
         <h2
@@ -327,12 +335,18 @@ function LandingPage() {
 
         <div className={styles.plansGrid}>
           {plans.map((plan) => (
-            <article key={plan.badge} className={`${styles.planCard} ${styles.revealUp}`} data-animate>
+            <article
+              key={plan.badge}
+              className={`${styles.planCard} ${styles.revealUp}`}
+              data-animate
+            >
               <div className={plan.badgeClassName}>{plan.badge}</div>
               <h3 className={styles.planTitle}>{plan.title}</h3>
               <div className={styles.planPriceRow}>
                 <span className={styles.planPrice}>{plan.price}</span>
-                <span className={styles.planPriceLabel}>{plan.billingLabel}</span>
+                <span className={styles.planPriceLabel}>
+                  {plan.billingLabel}
+                </span>
               </div>
               <p className={styles.planDescription}>{plan.description}</p>
               <ul className={styles.planList}>
@@ -478,7 +492,11 @@ function LandingPage() {
 
       <footer className={styles.footer}>
         <img className={styles.logo} src="./logo.png" alt="codex" />
-        <a href="https://www.letsbuilditcodex.com/" target="_blank" rel="noreferrer">
+        <a
+          href="https://www.letsbuilditcodex.com/"
+          target="_blank"
+          rel="noreferrer"
+        >
           {" "}
           <span>
             BarberApp by <strong>CODEX®</strong> · {new Date().getFullYear()}

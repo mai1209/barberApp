@@ -299,9 +299,9 @@ const createStyles = (theme: Theme) =>
       gap: 8,
     },
     avatarCircle: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       backgroundColor: "#1a1a1a",
       alignItems: "center",
       justifyContent: "center",
@@ -315,7 +315,7 @@ const createStyles = (theme: Theme) =>
     },
     avatarText: {
       color: theme.primary,
-      fontSize: 18,
+      fontSize: 16,
       fontWeight: "800",
     },
     barberName: {

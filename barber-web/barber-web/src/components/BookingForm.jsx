@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "../styles/BookingForm.module.css";
+import style from "../styles/LandingPage.module.css";
+
 import {
   fetchBarbers,
   fetchBarberAppointments,
@@ -24,7 +26,7 @@ const minutesToLabel = (totalMinutes) => {
 
 const SLOT_INTERVAL_MINUTES = 30;
 const SHOP_TZ = "America/Argentina/Cordoba";
-const DEFAULT_BOOKING_BANNER = "/barberoSen%CC%83al.png";
+const DEFAULT_BOOKING_BANNER = "/logo.png";
 
 function formatTimeInShopTZ(value) {
   const parts = new Intl.DateTimeFormat("es-AR", {
@@ -157,7 +159,9 @@ const resolveBarberScheduleForDate = (barber, date) => {
 
     const scheduleRanges = normalizeScheduleRanges(override.scheduleRanges);
     return {
-      scheduleRange: scheduleRanges.length ? null : override.scheduleRange ?? null,
+      scheduleRange: scheduleRanges.length
+        ? null
+        : (override.scheduleRange ?? null),
       scheduleRanges,
     };
   }
@@ -264,7 +268,12 @@ function BookingForm({ shopSlug, onNotFound }) {
         ),
       },
     ];
-  }, [currentDuration, resolvedBarberSchedule, selectedBarberData, selectedDate]);
+  }, [
+    currentDuration,
+    resolvedBarberSchedule,
+    selectedBarberData,
+    selectedDate,
+  ]);
 
   // Lista plana para isSlotDisabled
   const allSlots = useMemo(
@@ -630,9 +639,22 @@ function BookingForm({ shopSlug, onNotFound }) {
         </div>
       )}
 
-      <header className={styles.header}>
-        <h1 className={styles.title}>Nueva Cita</h1>
-      </header>
+      {/* NAV */}
+      <nav className={style.nav}>
+        <div className={style.navLogo}>
+          <span className={style.navLogoScissors}>
+            <img src="" alt="" />
+          </span>
+          <span className={style.navLogoText}>BarberAppByCodex</span>
+        </div>
+        <a
+          href="https://www.letsbuilditcodex.com/"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <span className={style.navBadge}>by CODEX®</span>
+        </a>
+      </nav>
 
       <form className={styles.card} onSubmit={handleSubmit}>
         <div className={styles.cardHero}>
@@ -657,7 +679,6 @@ function BookingForm({ shopSlug, onNotFound }) {
                 aria-hidden="true"
               />
             </picture>
-            <div className={styles.shopHeroOverlay} />
           </div>
         </div>
 
@@ -724,19 +745,26 @@ function BookingForm({ shopSlug, onNotFound }) {
             <label className={styles.label}>¿Cómo preferís pagar?</label>
             <div className={styles.paymentMethodRow}>
               {paymentOptions.map((option) => (
-                <button
-                  type="button"
-                  key={option.value}
-                  className={`${styles.paymentMethodChip} ${paymentMethod === option.value ? styles.paymentMethodChipActive : ""}`}
-                  onClick={() => setPaymentMethod(option.value)}
-                >
-                  <span className={styles.paymentMethodChipTitle}>
-                    {option.label}
-                  </span>
-                  <span className={styles.paymentMethodChipHelper}>
+                <div className={style.containerMetodo}>
+                  <button
+                    type="button"
+                    key={option.value}
+                    className={`${styles.paymentMethodChip} ${paymentMethod === option.value ? styles.paymentMethodChipActive : ""}`}
+                    onClick={() => setPaymentMethod(option.value)}
+                  >
+                    <span className={styles.paymentMethodChipTitle}>
+                      {option.label}
+                    </span>
+                  </button>
+                  <div className={styles.paymentMethodChipHelper}>
+                    <img
+                      className={styles.infoicon}
+                      src="/infoicon.png"
+                      alt="info"
+                    />
                     {option.helper}
-                  </span>
-                </button>
+                  </div>
+                </div>
               ))}
             </div>
           </div>

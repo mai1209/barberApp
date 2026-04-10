@@ -14,14 +14,14 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.barber"
+    namespace "com.barberAppByCodex.hub"
     // --- AGREGA ESTO AQUÍ ---
     lintOptions {
         checkReleaseBuilds false
         abortOnError false
     }
     defaultConfig {
-        applicationId "com.barber"
+        applicationId "com.barberAppByCodex.hub"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

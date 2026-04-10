@@ -26,7 +26,10 @@ import { Swipeable } from 'react-native-gesture-handler';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
-import { getUserProfile, subscribeToUserProfile } from '../services/authStorage';
+import {
+  getUserProfile,
+  subscribeToUserProfile,
+} from '../services/authStorage';
 import { hasProPlanAccess } from '../services/planAccess';
 import ProFeatureModal from '../components/ProFeatureModal';
 import {
@@ -35,7 +38,13 @@ import {
   updateAppointmentStatus,
   deleteAppointment,
 } from '../services/api';
-import { TrendingUp, Share2, Users, Clock, Scissors } from 'lucide-react-native';
+import {
+  TrendingUp,
+  Share2,
+  Users,
+  Clock,
+  Scissors,
+} from 'lucide-react-native';
 
 type Props = {
   navigation: any;
@@ -121,7 +130,9 @@ function Home({ navigation }: Props) {
   const [error, setError] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [hasProAccess, setHasProAccess] = useState(false);
-  const [proModalVariant, setProModalVariant] = useState<null | 'metrics' | 'history'>(null);
+  const [proModalVariant, setProModalVariant] = useState<
+    null | 'metrics' | 'history'
+  >(null);
 
   const selectedDateRef = useRef(selectedDate);
   const didInitDateEffect = useRef(false);
@@ -273,72 +284,88 @@ function Home({ navigation }: Props) {
   };
 
   const handleComplete = async (appointmentId: string) => {
-    Alert.alert('Finalizar turno', '¿Deseas marcar este turno como completado?', [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Sí, finalizar',
-        onPress: () => {
-          const appointment = appointments.find(item => item._id === appointmentId);
-          const totalAmount = Number(
-            appointment?.amountTotal ??
-              appointment?.servicePrice ??
-              0,
-          );
+    Alert.alert(
+      'Finalizar turno',
+      '¿Deseas marcar este turno como completado?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Sí, finalizar',
+          onPress: () => {
+            const appointment = appointments.find(
+              item => item._id === appointmentId,
+            );
+            const totalAmount = Number(
+              appointment?.amountTotal ?? appointment?.servicePrice ?? 0,
+            );
 
-          Alert.alert(
-            '¿Cómo pagó este cliente?',
-            'Esto define las métricas reales del local.',
-            [
-              { text: 'Cancelar', style: 'cancel' },
-              {
-                text: 'Efectivo',
-                onPress: async () => {
-                  try {
-                    await updateAppointmentStatus(appointmentId, 'completed', {
-                      paymentMethodCollected: 'cash',
-                      paymentStatus: 'paid',
-                      amountPaid: totalAmount,
-                    });
-                    await loadData(true, selectedDateRef.current);
-                  } catch (err: any) {
-                    setError(err?.message ?? 'Error');
-                  }
+            Alert.alert(
+              '¿Cómo pagó este cliente?',
+              'Esto define las métricas reales del local.',
+              [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                  text: 'Efectivo',
+                  onPress: async () => {
+                    try {
+                      await updateAppointmentStatus(
+                        appointmentId,
+                        'completed',
+                        {
+                          paymentMethodCollected: 'cash',
+                          paymentStatus: 'paid',
+                          amountPaid: totalAmount,
+                        },
+                      );
+                      await loadData(true, selectedDateRef.current);
+                    } catch (err: any) {
+                      setError(err?.message ?? 'Error');
+                    }
+                  },
                 },
-              },
-              {
-                text: 'Transferencia / adelantado',
-                onPress: async () => {
-                  try {
-                    await updateAppointmentStatus(appointmentId, 'completed', {
-                      paymentMethodCollected: 'transfer',
-                      paymentStatus: 'paid',
-                      amountPaid: totalAmount,
-                    });
-                    await loadData(true, selectedDateRef.current);
-                  } catch (err: any) {
-                    setError(err?.message ?? 'Error');
-                  }
+                {
+                  text: 'Transferencia / adelantado',
+                  onPress: async () => {
+                    try {
+                      await updateAppointmentStatus(
+                        appointmentId,
+                        'completed',
+                        {
+                          paymentMethodCollected: 'transfer',
+                          paymentStatus: 'paid',
+                          amountPaid: totalAmount,
+                        },
+                      );
+                      await loadData(true, selectedDateRef.current);
+                    } catch (err: any) {
+                      setError(err?.message ?? 'Error');
+                    }
+                  },
                 },
-              },
-              {
-                text: 'Aún no pagó',
-                onPress: async () => {
-                  try {
-                    await updateAppointmentStatus(appointmentId, 'completed', {
-                      paymentStatus: 'unpaid',
-                      amountPaid: 0,
-                    });
-                    await loadData(true, selectedDateRef.current);
-                  } catch (err: any) {
-                    setError(err?.message ?? 'Error');
-                  }
+                {
+                  text: 'Aún no pagó',
+                  onPress: async () => {
+                    try {
+                      await updateAppointmentStatus(
+                        appointmentId,
+                        'completed',
+                        {
+                          paymentStatus: 'unpaid',
+                          amountPaid: 0,
+                        },
+                      );
+                      await loadData(true, selectedDateRef.current);
+                    } catch (err: any) {
+                      setError(err?.message ?? 'Error');
+                    }
+                  },
                 },
-              },
-            ],
-          );
+              ],
+            );
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   const handleRelease = async (appointmentId: string) => {
@@ -362,7 +389,10 @@ function Home({ navigation }: Props) {
         onPress: async () => {
           try {
             if (!appointment?.notes) {
-              Alert.alert('Sin contacto', 'No hay WhatsApp registrado para este cliente.');
+              Alert.alert(
+                'Sin contacto',
+                'No hay WhatsApp registrado para este cliente.',
+              );
               return;
             }
             const phone = sanitizeWhatsappNumber(appointment.notes);
@@ -425,7 +455,9 @@ function Home({ navigation }: Props) {
         <View style={styles.cardHeader}>
           <View style={styles.timeTag}>
             <Clock size={14} color={theme.primary} style={{ marginRight: 6 }} />
-            <Text style={styles.timeText}>{formatTimeOnly(appointment.startTime)}</Text>
+            <Text style={styles.timeText}>
+              {formatTimeOnly(appointment.startTime)}
+            </Text>
           </View>
           <View
             style={[
@@ -433,7 +465,12 @@ function Home({ navigation }: Props) {
               isCompleted ? styles.statusBadgeDone : styles.statusBadgePending,
             ]}
           >
-            <Text style={[styles.statusText, isCompleted ? styles.statusTextDone : styles.statusTextPending]}>
+            <Text
+              style={[
+                styles.statusText,
+                isCompleted ? styles.statusTextDone : styles.statusTextPending,
+              ]}
+            >
               {isCompleted ? 'COMPLETADO' : 'PENDIENTE'}
             </Text>
           </View>
@@ -441,22 +478,28 @@ function Home({ navigation }: Props) {
 
         {/* Body: Cliente y Servicio */}
         <View style={styles.cardBody}>
-          <Text style={styles.customerNameText}>{appointment.customerName}</Text>
+          <Text style={styles.customerNameText}>
+            {appointment.customerName}
+          </Text>
           <View style={styles.serviceRow}>
             <Scissors size={14} color="#888" style={{ marginRight: 6 }} />
             <Text style={styles.serviceNameText}>{appointment.service}</Text>
             <Text style={styles.dotSeparator}>•</Text>
-            <Text style={styles.durationText}>{appointment.durationMinutes || 60} min</Text>
+            <Text style={styles.durationText}>
+              {appointment.durationMinutes || 60} min
+            </Text>
           </View>
-          <Text style={styles.barberSubText}>Atendido por: <Text style={{color: '#BBB'}}>{barberName}</Text></Text>
+          <Text style={styles.barberSubText}>
+            Atendido por: <Text style={{ color: '#BBB' }}>{barberName}</Text>
+          </Text>
           <View
             style={[
               styles.paymentInfoBadge,
               paymentSnapshot.tone === 'cash'
                 ? styles.paymentInfoBadgeCash
                 : paymentSnapshot.tone === 'transfer'
-                  ? styles.paymentInfoBadgeTransfer
-                  : styles.paymentInfoBadgeNeutral,
+                ? styles.paymentInfoBadgeTransfer
+                : styles.paymentInfoBadgeNeutral,
             ]}
           >
             <Text style={styles.paymentInfoText}>{paymentSnapshot.label}</Text>
@@ -553,29 +596,43 @@ function Home({ navigation }: Props) {
 
         <View style={styles.compactCardsRow}>
           <Pressable
-            style={[styles.dualCompactCard, !hasProAccess && styles.dualCompactCardLocked]}
+            style={[
+              styles.dualCompactCard,
+              !hasProAccess && styles.dualCompactCardLocked,
+            ]}
             onPress={() =>
-              hasProAccess ? navigation.navigate('Owner-Metrics') : handleOpenProModal('metrics')
+              hasProAccess
+                ? navigation.navigate('Owner-Metrics')
+                : handleOpenProModal('metrics')
             }
           >
             <View style={styles.metricsIconBox}>
               <TrendingUp size={20} color={theme.primary} />
             </View>
             <Text style={styles.metricsTitleCompact}>Métricas</Text>
-            {!hasProAccess ? <Text style={styles.proBadgeCompact}>PRO</Text> : null}
+            {!hasProAccess ? (
+              <Text style={styles.proBadgeCompact}>PRO</Text>
+            ) : null}
           </Pressable>
 
           <Pressable
-            style={[styles.dualCompactCard, !hasProAccess && styles.dualCompactCardLocked]}
+            style={[
+              styles.dualCompactCard,
+              !hasProAccess && styles.dualCompactCardLocked,
+            ]}
             onPress={() =>
-              hasProAccess ? navigation.navigate('Customer-History') : handleOpenProModal('history')
+              hasProAccess
+                ? navigation.navigate('Customer-History')
+                : handleOpenProModal('history')
             }
           >
             <View style={styles.metricsIconBox}>
               <Users size={20} color={theme.primary} />
             </View>
             <Text style={styles.metricsTitleCompact}>Historial</Text>
-            {!hasProAccess ? <Text style={styles.proBadgeCompact}>PRO</Text> : null}
+            {!hasProAccess ? (
+              <Text style={styles.proBadgeCompact}>PRO</Text>
+            ) : null}
           </Pressable>
         </View>
 
@@ -707,18 +764,73 @@ const createStyles = (theme: Theme) =>
     welcomeText: { color: '#fff', fontSize: 16, fontWeight: '500' },
     nameText: { color: '#fff', fontSize: 28, fontWeight: '800' },
     scrollContent: { paddingHorizontal: 20, paddingBottom: 120 },
-    
+
     // Links y Métricas (Mismo estilo anterior)
-    linkCardCompact: { backgroundColor: '#151515', borderRadius: 18, padding: 12, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#222', marginTop: 20, gap: 12 },
-    linkIconBox: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#222', alignItems: 'center', justifyContent: 'center' },
-    linkTitleCompact: { color: '#666', fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
+    linkCardCompact: {
+      backgroundColor: '#151515',
+      borderRadius: 18,
+      padding: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: '#222',
+      marginTop: 20,
+      gap: 12,
+    },
+    linkIconBox: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      backgroundColor: '#222',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    linkTitleCompact: {
+      color: '#666',
+      fontSize: 10,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+    },
     linkUrlCompact: { color: '#AAA', fontSize: 13, marginTop: 1 },
-    linkHelperCompact: { color: '#6F7787', fontSize: 10, marginTop: 3, lineHeight: 14 },
-    copyBadgeCompact: { backgroundColor: hexToRgba(theme.primary, 0.15), paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-    copyBadgeTextCompact: { color: theme.primary, fontSize: 9, fontWeight: '900' },
+    linkHelperCompact: {
+      color: '#6F7787',
+      fontSize: 10,
+      marginTop: 3,
+      lineHeight: 14,
+    },
+    copyBadgeCompact: {
+      backgroundColor: hexToRgba(theme.primary, 0.15),
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 6,
+    },
+    copyBadgeTextCompact: {
+      color: theme.primary,
+      fontSize: 9,
+      fontWeight: '900',
+    },
     compactCardsRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
-    dualCompactCard: { flex: 1, backgroundColor: theme.card, borderRadius: 20, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: '#2A2A2A', flexDirection: 'row' },
-    metricsIconBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: hexToRgba(theme.primary, 0.1), alignItems: 'center', justifyContent: 'center' },
+    dualCompactCard: {
+      flex: 1,
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      alignItems: 'center',
+      justifyContent: 'start',
+      gap: 8,
+      borderWidth: 1,
+      borderColor: '#2A2A2A',
+      flexDirection: 'row',
+    },
+    metricsIconBox: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      backgroundColor: hexToRgba(theme.primary, 0.1),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     metricsTitleCompact: { color: '#FFF', fontSize: 13, fontWeight: '800' },
     dualCompactCardLocked: {
       opacity: 0.82,
@@ -736,19 +848,62 @@ const createStyles = (theme: Theme) =>
     // Agenda Section
     section: { marginTop: 25 },
     sectionTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-    agendaTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-    todayButton: { backgroundColor: hexToRgba(theme.primary, 0.12), paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
+    agendaTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 14,
+    },
+    todayButton: {
+      backgroundColor: hexToRgba(theme.primary, 0.12),
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 999,
+    },
     todayButtonText: { color: theme.primary, fontSize: 12, fontWeight: '700' },
-    dateHeroCard: { backgroundColor: theme.card, borderRadius: 24, borderWidth: 1, borderColor: '#2A2A2A', paddingVertical: 15 },
-    dateHeroHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14 },
-    dateCircleBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center' },
-    dateCircleBtnText: { color: theme.primary, fontSize: 24, fontWeight: '700' },
+    dateHeroCard: {
+      backgroundColor: theme.card,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: '#2A2A2A',
+      paddingVertical: 15,
+    },
+    dateHeroHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+    },
+    dateCircleBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: theme.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    dateCircleBtnText: {
+      color: theme.primary,
+      fontSize: 24,
+      fontWeight: '700',
+    },
     dateHeroTextWrap: { flex: 1, alignItems: 'center' },
     dateHeroTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
     dateHeroSubtitle: { color: '#8E8E8E', fontSize: 11, fontWeight: '500' },
     weekStripContent: { paddingHorizontal: 14, paddingTop: 15 },
-    weekDayChip: { width: 55, height: 60, borderRadius: 15, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
-    weekDayChipActive: { backgroundColor: hexToRgba(theme.primary, 0.15), borderWidth: 1, borderColor: theme.primary },
+    weekDayChip: {
+      width: 55,
+      height: 60,
+      borderRadius: 15,
+      backgroundColor: theme.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 8,
+    },
+    weekDayChipActive: {
+      backgroundColor: hexToRgba(theme.primary, 0.15),
+      borderWidth: 1,
+      borderColor: theme.primary,
+    },
     weekDayName: { color: '#7A7A7A', fontSize: 10, fontWeight: '700' },
     weekDayNameActive: { color: theme.primary },
     weekDayNumber: { color: '#F2F2F2', fontSize: 16, fontWeight: '800' },
@@ -795,7 +950,7 @@ const createStyles = (theme: Theme) =>
     statusText: { fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
     statusTextPending: { color: theme.primary },
     statusTextDone: { color: '#66DA92' },
-    
+
     cardBody: {
       marginBottom: 16,
     },
@@ -864,7 +1019,15 @@ const createStyles = (theme: Theme) =>
       marginLeft: 12,
     },
     swipeActionText: { color: '#fff', fontSize: 12, fontWeight: '800' },
-    emptyContainer: { padding: 40, alignItems: 'center', backgroundColor: '#111', borderRadius: 20, borderStyle: 'dashed', borderWidth: 1, borderColor: '#333' },
+    emptyContainer: {
+      padding: 40,
+      alignItems: 'center',
+      backgroundColor: '#111',
+      borderRadius: 20,
+      borderStyle: 'dashed',
+      borderWidth: 1,
+      borderColor: '#333',
+    },
     emptyTitle: { color: '#555', fontSize: 14, fontWeight: '600' },
     errorText: { color: '#ff7b7b', textAlign: 'center', marginBottom: 10 },
     logo: { width: 55, height: 55 },

@@ -21,7 +21,6 @@ import {
   TrendingUp,
   Users,
   Wallet,
-  ArrowLeft,
   Calendar,
   CreditCard,
   Banknote,

@@ -17,9 +17,7 @@ import RNFS from 'react-native-fs';
 import Share from 'react-native-share';
 import * as XLSX from 'xlsx';
 import {
-  ArrowLeft,
   Banknote,
-  Calendar,
   ChevronDown,
   CreditCard,
   FileSpreadsheet,
@@ -27,7 +25,6 @@ import {
   Filter,
   Scissors,
   Search,
-  User,
   Users,
   X,
 } from 'lucide-react-native';
@@ -1019,7 +1016,7 @@ function CustomerHistoryScreen({ navigation }: Props) {
             <PaymentFilterButton
               label="Efectivo"
               active={paymentFilter === 'cash'}
-              icon={<Banknote size={14} color={paymentFilter === 'cash' ? '#08110B' : theme.primary} />}
+              icon={<Banknote size={14} color={paymentFilter === 'cash' ? '#fff' : theme.primary} />}
               onPress={() =>
                 setPaymentFilter(current => (current === 'cash' ? 'all' : 'cash'))
               }
@@ -1029,7 +1026,7 @@ function CustomerHistoryScreen({ navigation }: Props) {
             <PaymentFilterButton
               label="Transferencia"
               active={paymentFilter === 'transfer'}
-              icon={<CreditCard size={14} color={paymentFilter === 'transfer' ? '#08110B' : theme.primary} />}
+              icon={<CreditCard size={14} color={paymentFilter === 'transfer' ? '#fff' : theme.primary} />}
               onPress={() =>
                 setPaymentFilter(current =>
                   current === 'transfer' ? 'all' : 'transfer',
