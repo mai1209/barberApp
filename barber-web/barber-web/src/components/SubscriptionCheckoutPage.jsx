@@ -80,7 +80,8 @@ export default function SubscriptionCheckoutPage() {
     url.searchParams.set('plan', selectedPlan);
     if (email.trim()) url.searchParams.set('email', email.trim());
     else url.searchParams.delete('email');
-    url.searchParams.set('mode', paymentMode);
+    if (paymentMode === 'automatic') url.searchParams.set('mode', paymentMode);
+    else url.searchParams.delete('mode');
     window.history.replaceState({}, '', url.toString());
   }, [selectedPlan, email, paymentMode]);
 
@@ -168,6 +169,9 @@ export default function SubscriptionCheckoutPage() {
   return (
     <main className={styles.screen}>
       <section className={styles.hero}>
+        <a href="/" className={styles.backHomeButton}>
+          ← Volver al inicio
+        </a>
         <p className={styles.eyebrow}>PLANES BARBERAPP</p>
         <h1 className={styles.title}>Alta o renovación de plan</h1>
         <p className={styles.subtitle}>
@@ -203,14 +207,14 @@ export default function SubscriptionCheckoutPage() {
               className={`${styles.modeButton} ${paymentMode === 'manual' ? styles.modeButtonActive : ''}`}
               onClick={() => setPaymentMode('manual')}
             >
-              Pago mensual manual
+              Pago mensual manual · recomendado
             </button>
             <button
               type="button"
-              className={`${styles.modeButton} ${paymentMode === 'automatic' ? styles.modeButtonActive : ''}`}
+              className={`${styles.modeButton} ${styles.modeButtonAutomatic} ${paymentMode === 'automatic' ? styles.modeButtonAutomaticActive : ''}`}
               onClick={() => setPaymentMode('automatic')}
             >
-              Renovación automática
+              Renovación automática · puede fallar con prepagas
             </button>
           </div>
 
@@ -219,6 +223,13 @@ export default function SubscriptionCheckoutPage() {
               ? 'Autorizás una vez el cobro mensual y después Mercado Pago intenta renovar solo cada mes.'
               : 'Pagás cada mes manualmente desde la web cuando toque renovar.'}
           </p>
+
+          {paymentMode === 'automatic' ? (
+            <div className={styles.modeWarning}>
+              Importante: para renovación automática, Mercado Pago puede rechazar tarjetas
+              prepagas. Si falla, probá con una tarjeta de crédito o débito tradicional.
+            </div>
+          ) : null}
 
           <label className={styles.field}>
             <span>Email de la cuenta</span>
@@ -250,6 +261,13 @@ export default function SubscriptionCheckoutPage() {
                 ? 'Activar renovación automática'
                 : 'Completar pago'}
           </button>
+
+          {paymentMode === 'automatic' ? (
+            <p className={styles.submitWarning}>
+              Si tu tarjeta es prepaga, usá pago mensual manual para evitar rechazos en Mercado
+              Pago.
+            </p>
+          ) : null}
         </form>
 
         {message ? <div className={styles.messageBox}>{message}</div> : null}

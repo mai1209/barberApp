@@ -242,12 +242,14 @@ function ReservasForm({ navigation }: any) {
           selectedDate.getMonth() + 1,
         ).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
         const res = await fetchBarberAppointments(selectedBarber!, dateStr);
-        setClosedDayNotice(
-          res.shopClosure?.isClosed
-            ? res.shopClosure.message ||
-                'Este día el local permanecerá cerrado. Elegí otro turno disponible.'
-            : '',
-        );
+        const closureMessage = res.shopClosure?.isClosed
+          ? res.shopClosure.message ||
+            'Este día el local permanecerá cerrado. Elegí otro turno disponible.'
+          : res.barberClosure?.isClosed
+            ? res.barberClosure.message ||
+              'Este barbero no atenderá ese día. Elegí otro profesional o seleccioná otra fecha.'
+            : '';
+        setClosedDayNotice(closureMessage);
         const blocked = new Set<string>();
         const blockStep = 30; // bloquear en intervalos de 30 min para todos los turnos
         res.appointments.forEach(a => {
@@ -401,7 +403,7 @@ function ReservasForm({ navigation }: any) {
       return;
     }
     if (closedDayNotice) {
-      Alert.alert('Barbería cerrada', closedDayNotice);
+      Alert.alert('No disponible', closedDayNotice);
       return;
     }
     if (!paymentMethod) {
@@ -762,7 +764,7 @@ function ReservasForm({ navigation }: any) {
               {closedDayNotice ? (
                 <View style={styles.notWorkingBox}>
                   <Text style={styles.notWorkingIcon}>🔒</Text>
-                  <Text style={styles.notWorkingText}>LA BARBERIA ESTARA CERRADA ESTE DIA</Text>
+                  <Text style={styles.notWorkingText}>ESTE TURNO NO ESTA DISPONIBLE ESE DIA</Text>
                   <Text
                     style={{
                       color: hexToRgba(theme.primary, 0.56),

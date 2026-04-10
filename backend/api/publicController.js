@@ -14,6 +14,11 @@ import {
 import { getTimeZoneDayRange, getTimeZoneWeekday } from "../utils/timezone.js";
 import { resolveBarberScheduleForWeekday } from "../utils/barberSchedule.js";
 import {
+  normalizeBarberClosedDays,
+  resolveBarberClosureForDate,
+  serializeBarberClosure,
+} from "../utils/barberClosures.js";
+import {
   normalizeShopClosedDays,
   resolveShopClosureForDate,
   serializeShopClosure,
@@ -71,6 +76,7 @@ function sanitizeBarber(barber) {
       scheduleRange: item?.scheduleRange || null,
       scheduleRanges: item?.scheduleRanges || [],
     })),
+    barberClosedDays: normalizeBarberClosedDays(barber.barberClosedDays),
     workDays: barber.workDays || [],
   };
 }
@@ -636,6 +642,10 @@ export async function publicBarberAppointments(req, res, next) {
       shop,
       effectiveDate || req.query.date || new Date(),
     );
+    const barberClosure = resolveBarberClosureForDate(
+      barber,
+      effectiveDate || req.query.date || new Date(),
+    );
     const appointments = await AppointmentModel.find({
       owner: ownerId,
       barber: barberId,
@@ -655,10 +665,11 @@ export async function publicBarberAppointments(req, res, next) {
     return res.json({
       shop: sanitizeShop(shop),
       barber: sanitizeBarber(barber),
-      resolvedSchedule: shopClosure
+      resolvedSchedule: shopClosure || barberClosure
         ? { scheduleRange: null, scheduleRanges: [] }
         : resolvedSchedule,
       shopClosure: serializeShopClosure(shopClosure),
+      barberClosure: serializeBarberClosure(barberClosure),
       appointments: appointments.map(sanitizeAppointment),
     });
   } catch (err) {
@@ -702,6 +713,13 @@ export async function publicCreateAppointment(req, res, next) {
       return res.status(400).json({
         error: shopClosure.message,
         closedDay: serializeShopClosure(shopClosure),
+      });
+    }
+    const barberClosure = resolveBarberClosureForDate(barber, appointmentDate);
+    if (barberClosure) {
+      return res.status(400).json({
+        error: barberClosure.message,
+        closedDay: serializeBarberClosure(barberClosure),
       });
     }
     const barberWorkDays = (barber.workDays || []).map(Number);

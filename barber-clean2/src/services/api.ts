@@ -370,6 +370,10 @@ export type Barber = {
   photoUrl?: string | null;
   scheduleRange?: string; 
   scheduleRanges?: { label: string; start: string; end: string }[];
+  barberClosedDays?: {
+    date: string;
+    message?: string | null;
+  }[];
   dayScheduleOverrides?: {
     day: number;
     validFrom?: string | null;
@@ -539,6 +543,7 @@ export function createBarber(payload: {
   photoUrl?: string;
   scheduleRange?: string;
   scheduleRanges?: { label: string; start: string; end: string }[];
+  barberClosedDays?: { date: string; message?: string | null }[];
   dayScheduleOverrides?: {
     day: number;
     validFrom?: string | null;
@@ -564,6 +569,7 @@ export function updateBarber(
     photoUrl?: string;
     scheduleRange?: string;
     scheduleRanges?: { label: string; start: string; end: string }[];
+    barberClosedDays?: { date: string; message?: string | null }[];
     dayScheduleOverrides?: {
       day: number;
       validFrom?: string | null;
@@ -603,6 +609,7 @@ export function fetchBarberAppointments(barberId: string, date?: string) {
       source?: string;
     };
     shopClosure?: ShopClosureInfo | null;
+    barberClosure?: ShopClosureInfo | null;
     appointments: Appointment[];
   }>(`/api/barbers/${barberId}/appointments${query}`, { auth: true });
 }

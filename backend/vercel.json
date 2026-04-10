@@ -23,7 +23,7 @@
   "crons": [
     {
       "path": "/api/appointments/reminders/run",
-      "schedule": "0 10 * * *"
+      "schedule": "*/10 * * * *"
     },
     {
       "path": "/api/auth/subscription/lifecycle/run",

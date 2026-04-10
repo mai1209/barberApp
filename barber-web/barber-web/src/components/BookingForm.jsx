@@ -404,6 +404,11 @@ function BookingForm({ shopSlug, onNotFound }) {
           res.shopClosure.message ||
             "Este día el local permanecerá cerrado. Elegí otro turno disponible.",
         );
+      } else if (res?.barberClosure?.isClosed) {
+        setClosedDayNotice(
+          res.barberClosure.message ||
+            "Este barbero no atenderá ese día. Elegí otro profesional o seleccioná otra fecha.",
+        );
       } else {
         setClosedDayNotice("");
       }
@@ -855,7 +860,7 @@ function BookingForm({ shopSlug, onNotFound }) {
             ) : closedDayNotice ? (
               <div className={styles.noScheduleMessage}>
                 <p>
-                  <strong>Barbería cerrada este día</strong>
+                  <strong>No disponible este día</strong>
                 </p>
                 <p>{closedDayNotice}</p>
                 <p className={styles.subtitleError}>

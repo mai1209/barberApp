@@ -7,6 +7,10 @@ import admin from "../firebase.js";
 import { sendAppMail } from "../services/mailer.js";
 import { getTimeZoneDayRange, getTimeZoneWeekday } from "../utils/timezone.js";
 import {
+  resolveBarberClosureForDate,
+  serializeBarberClosure,
+} from "../utils/barberClosures.js";
+import {
   resolveShopClosureForDate,
   serializeShopClosure,
 } from "../utils/shopClosures.js";
@@ -259,6 +263,13 @@ export async function createAppointment(req, res, next) {
       return res.status(400).json({
         error: shopClosure.message,
         closedDay: serializeShopClosure(shopClosure),
+      });
+    }
+    const barberClosure = resolveBarberClosureForDate(barber, startTime);
+    if (barberClosure) {
+      return res.status(400).json({
+        error: barberClosure.message,
+        closedDay: serializeBarberClosure(barberClosure),
       });
     }
 

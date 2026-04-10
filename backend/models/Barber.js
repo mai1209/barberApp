@@ -66,6 +66,15 @@ const barberSchema = new mongoose.Schema(
       ],
       default: [],
     },
+    barberClosedDays: {
+      type: [
+        {
+          date: { type: String, required: true },
+          message: { type: String, default: null },
+        },
+      ],
+      default: [],
+    },
     shift: {
       type: String,
       trim: true,

@@ -12,19 +12,20 @@ import {
   Pressable,
   Image,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 
 import { registerUser } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
 import { saveToken, saveUserProfile } from '../services/authStorage';
+import OjoAbierto from '../assets/ojo_abierto.png';
+import OjoCerrado from '../assets/ojo_cerrado.png';
 
 const AUTH_THEME = {
-  primary: "#FF1493",
-  card: "#1C1C1C",
-  background: "#121212",
-  logo: require("../assets/logo.png"),
+  primary: '#FF1493',
+  card: '#1C1C1C',
+  background: '#121212',
+  logo: require('../assets/logoBarber.png'),
 } as const;
 
 function Register({ navigation }: any) {
@@ -94,18 +95,18 @@ function Register({ navigation }: any) {
           </View>
           <View style={styles.registerCard}>
             <Text style={styles.instructionText}>
-              Crea tu cuenta de administrador
+              Crea tu cuenta de Barberia
             </Text>
 
             {/* Nombre */}
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Nombre Completo</Text>
+              <Text style={styles.inputLabel}>Nombre de tu Barberia</Text>
               <TextInput
                 style={[
                   styles.input,
                   focusedField === 'name' && styles.inputFocused,
                 ]}
-                placeholder="Tu nombre"
+                placeholder="Nombre de tu negocio"
                 placeholderTextColor="#555"
                 value={fullName}
                 onChangeText={setFullName}
@@ -132,7 +133,6 @@ function Register({ navigation }: any) {
                 onBlur={() => setFocusedField(null)}
               />
             </View>
-
             {/* Password */}
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Contraseña</Text>
@@ -155,7 +155,11 @@ function Register({ navigation }: any) {
                   onPress={() => setShowPass(!showPass)}
                   style={styles.eyeBtn}
                 >
-                  <Text style={styles.eyeIcon}>{showPass ? '👁️' : '👁️‍🗨️'}</Text>
+                  {/* CAMBIO AQUÍ: Usamos Image en lugar de Text */}
+                  <Image
+                    source={showPass ? OjoAbierto : OjoCerrado}
+                    style={styles.eyeIconImage}
+                  />
                 </Pressable>
               </View>
             </View>
@@ -182,9 +186,11 @@ function Register({ navigation }: any) {
                   onPress={() => setShowConfirmPass(!showConfirmPass)}
                   style={styles.eyeBtn}
                 >
-                  <Text style={styles.eyeIcon}>
-                    {showConfirmPass ? '👁️' : '👁️‍🗨️'}
-                  </Text>
+                  {/* CAMBIO AQUÍ TAMBIÉN */}
+                  <Image
+                    source={showConfirmPass ? OjoAbierto : OjoCerrado}
+                    style={styles.eyeIconImage}
+                  />
                 </Pressable>
               </View>
             </View>
@@ -306,6 +312,13 @@ const createStyles = (theme: Theme | typeof AUTH_THEME) =>
       marginTop: 25,
       fontSize: 11,
       fontWeight: '700',
+    },
+
+    eyeIconImage: {
+      width: 22,
+      height: 22,
+      resizeMode: 'contain',
+      tintColor: '#888',
     },
   });
 

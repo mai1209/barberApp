@@ -10,6 +10,11 @@ import {
   sanitizeScheduleRange,
 } from "../utils/barberSchedule.js";
 import {
+  normalizeBarberClosedDays,
+  resolveBarberClosureForDate,
+  serializeBarberClosure,
+} from "../utils/barberClosures.js";
+import {
   resolveShopClosureForDate,
   serializeShopClosure,
 } from "../utils/shopClosures.js";
@@ -28,6 +33,7 @@ function serializeBarber(doc) {
     scheduleRange: doc.scheduleRange || null,
     scheduleRanges: normalizeScheduleRanges(doc.scheduleRanges),
     dayScheduleOverrides: normalizeDayScheduleOverrides(doc.dayScheduleOverrides),
+    barberClosedDays: normalizeBarberClosedDays(doc.barberClosedDays),
     workDays: Array.from(new Set(doc.workDays || []))
       .map(Number)
       .sort(),
@@ -80,6 +86,7 @@ export async function createBarber(req, res, next) {
     const dayScheduleOverrides = normalizeDayScheduleOverrides(
       req.body?.dayScheduleOverrides,
     );
+    const barberClosedDays = normalizeBarberClosedDays(req.body?.barberClosedDays);
 
 
     if (!fullName) {
@@ -99,6 +106,7 @@ export async function createBarber(req, res, next) {
       scheduleRange: scheduleRange,
       scheduleRanges,
       dayScheduleOverrides,
+      barberClosedDays,
       workDays: cleanWorkDays,
       isActive: true,
     });
@@ -133,6 +141,7 @@ export async function updateBarber(req, res, next) {
     const dayScheduleOverrides = normalizeDayScheduleOverrides(
       req.body?.dayScheduleOverrides,
     );
+    const barberClosedDays = normalizeBarberClosedDays(req.body?.barberClosedDays);
 
     if (!fullName) {
       return res
@@ -161,6 +170,7 @@ export async function updateBarber(req, res, next) {
         scheduleRange: scheduleRange ?? null,
         scheduleRanges,
         dayScheduleOverrides,
+        barberClosedDays,
         workDays: cleanWorkDays,
       },
       {
@@ -237,6 +247,10 @@ export async function listBarberAppointments(req, res, next) {
       ownerDoc,
       effectiveDate || date || new Date(),
     );
+    const barberClosure = resolveBarberClosureForDate(
+      barber,
+      effectiveDate || date || new Date(),
+    );
 
     // Buscamos los turnos ya ocupados para ese día
     const appointments = await AppointmentModel.find({
@@ -258,10 +272,11 @@ export async function listBarberAppointments(req, res, next) {
     // Enviamos el barbero CON sus workDays limpios
     return res.json({
       barber: serializeBarber(barber),
-      resolvedSchedule: shopClosure
+      resolvedSchedule: shopClosure || barberClosure
         ? { scheduleRange: null, scheduleRanges: [] }
         : resolvedSchedule,
       shopClosure: serializeShopClosure(shopClosure),
+      barberClosure: serializeBarberClosure(barberClosure),
       appointments,
     });
   } catch (err) {

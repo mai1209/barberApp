@@ -605,6 +605,31 @@
   border-color: rgba(255, 20, 147, 0.26);
 }
 
+.couponActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.deleteInlineButton {
+  border: 1px solid rgba(255, 90, 95, 0.3);
+  background: rgba(255, 90, 95, 0.08);
+  color: #ffd6d8;
+  border-radius: 14px;
+  min-height: 44px;
+  padding: 0 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.deleteInlineButton:hover {
+  border-color: rgba(255, 90, 95, 0.5);
+  background: rgba(255, 90, 95, 0.14);
+  transform: translateY(-1px);
+}
+
 .couponCreateGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -87,6 +87,11 @@ type DayScheduleOverride = {
   scheduleRanges?: { label: string; start: string; end: string }[];
 };
 
+type BarberClosedDay = {
+  date: string;
+  message?: string | null;
+};
+
 type ActivePicker =
   | 'start'
   | 'end'
@@ -120,6 +125,28 @@ function resolveActiveDayOverride(
   );
 }
 
+const normalizeClosedDayDate = (value?: string | null) => {
+  const text = String(value ?? '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
+};
+
+const normalizeClosedDayMessage = (value?: string | null) => {
+  const text = String(value ?? '').trim();
+  return text.slice(0, 220);
+};
+
+function formatClosedDayLabel(value: string) {
+  const normalized = normalizeClosedDayDate(value);
+  if (!normalized) return value;
+  const date = new Date(`${normalized}T12:00:00`);
+  return new Intl.DateTimeFormat('es-AR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: SHOP_TZ,
+  }).format(date);
+}
+
 function RegisterEmployed({ navigation, route }: Props) {
   const { theme } = useTheme();
   const routeBarber = route?.params?.barber ?? null;
@@ -146,12 +173,16 @@ function RegisterEmployed({ navigation, route }: Props) {
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [dayScheduleOverrides, setDayScheduleOverrides] = useState<DayScheduleOverride[]>([]);
+  const [barberClosedDays, setBarberClosedDays] = useState<BarberClosedDay[]>([]);
+  const [closedDateInput, setClosedDateInput] = useState('');
+  const [closedMessageInput, setClosedMessageInput] = useState('');
   const [selectedOverrideDay, setSelectedOverrideDay] = useState<number | null>(null);
   const [multiEditMode, setMultiEditMode] = useState(false);
   const [multiEditDays, setMultiEditDays] = useState<number[]>([]);
   const todayDateLabel = useMemo(() => getTodayDateLabel(), []);
   const selectedDaysRef = useRef<number[]>([]);
   const dayScheduleOverridesRef = useRef<DayScheduleOverride[]>([]);
+  const barberClosedDaysRef = useRef<BarberClosedDay[]>([]);
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   useEffect(() => {
@@ -165,6 +196,15 @@ function RegisterEmployed({ navigation, route }: Props) {
     selectedDaysRef.current = (barberToEdit.workDays || []).map(Number);
     setDayScheduleOverrides(barberToEdit.dayScheduleOverrides || []);
     dayScheduleOverridesRef.current = barberToEdit.dayScheduleOverrides || [];
+    const nextClosedDays = (barberToEdit.barberClosedDays || [])
+      .map(item => ({
+        date: normalizeClosedDayDate(item.date),
+        message: normalizeClosedDayMessage(item.message),
+      }))
+      .filter(item => item.date)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    setBarberClosedDays(nextClosedDays);
+    barberClosedDaysRef.current = nextClosedDays;
 
     const hasSplitShift =
       Array.isArray(barberToEdit.scheduleRanges) && barberToEdit.scheduleRanges.length > 0;
@@ -229,6 +269,36 @@ function RegisterEmployed({ navigation, route }: Props) {
       prev != null && selectedDays.includes(prev) ? prev : selectedDays[0],
     );
   }, [selectedDays]);
+
+  const upsertClosedDay = useCallback((date: string, message: string) => {
+    const normalizedDate = normalizeClosedDayDate(date);
+    if (!normalizedDate) {
+      Alert.alert('Fecha inválida', 'Usá el formato YYYY-MM-DD.');
+      return;
+    }
+
+    const normalizedMessage = normalizeClosedDayMessage(message);
+    const nextState = [...barberClosedDaysRef.current]
+      .filter(item => item.date !== normalizedDate)
+      .concat({
+        date: normalizedDate,
+        message:
+          normalizedMessage ||
+          'Este barbero no atenderá ese día. Elegí otro profesional o seleccioná otra fecha.',
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    barberClosedDaysRef.current = nextState;
+    setBarberClosedDays(nextState);
+    setClosedDateInput('');
+    setClosedMessageInput('');
+  }, []);
+
+  const removeClosedDay = useCallback((date: string) => {
+    const nextState = barberClosedDaysRef.current.filter(item => item.date !== date);
+    barberClosedDaysRef.current = nextState;
+    setBarberClosedDays(nextState);
+  }, []);
 
   useEffect(() => {
     setMultiEditDays(prev => prev.filter(day => selectedDays.includes(day)));
@@ -729,6 +799,15 @@ function RegisterEmployed({ navigation, route }: Props) {
               normalizeOverrideValidFrom(b.validFrom),
             ),
         );
+      const cleanClosedDays = barberClosedDaysRef.current
+        .map(item => ({
+          date: normalizeClosedDayDate(item.date),
+          message:
+            normalizeClosedDayMessage(item.message) ||
+            'Este barbero no atenderá ese día. Elegí otro profesional o seleccioná otra fecha.',
+        }))
+        .filter(item => item.date)
+        .sort((a, b) => a.date.localeCompare(b.date));
 
       const payload = {
         fullName: fullName.trim(),
@@ -750,6 +829,7 @@ function RegisterEmployed({ navigation, route }: Props) {
               },
             ]
           : [],
+        barberClosedDays: cleanClosedDays,
         dayScheduleOverrides: cleanOverrides,
         workDays: cleanDays,
         isActive: true,
@@ -1309,6 +1389,88 @@ function RegisterEmployed({ navigation, route }: Props) {
                 ) : (
                   <Text style={styles.overrideEmptyText}>
                     Primero elegí al menos un día de atención para habilitar horarios especiales.
+                  </Text>
+                )}
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Días no disponibles del barbero</Text>
+                <Text style={styles.closedDaysHint}>
+                  Si la barbería abre pero este barbero no viene, cargá la fecha acá para bloquear nuevos turnos.
+                </Text>
+
+                <View style={styles.closedDaysQuickRow}>
+                  <Pressable
+                    style={styles.closedDaysQuickChip}
+                    onPress={() => setClosedDateInput(todayDateLabel)}
+                  >
+                    <Text style={styles.closedDaysQuickChipText}>Hoy</Text>
+                  </Pressable>
+                  <Pressable
+                    style={styles.closedDaysQuickChip}
+                    onPress={() => {
+                      const nextDate = new Date(`${todayDateLabel}T12:00:00`);
+                      nextDate.setDate(nextDate.getDate() + 1);
+                      const yyyy = nextDate.getFullYear();
+                      const mm = String(nextDate.getMonth() + 1).padStart(2, '0');
+                      const dd = String(nextDate.getDate()).padStart(2, '0');
+                      setClosedDateInput(`${yyyy}-${mm}-${dd}`);
+                    }}
+                  >
+                    <Text style={styles.closedDaysQuickChipText}>Mañana</Text>
+                  </Pressable>
+                </View>
+
+                <TextInput
+                  style={styles.input}
+                  placeholder="Fecha YYYY-MM-DD"
+                  placeholderTextColor="#666"
+                  value={closedDateInput}
+                  onChangeText={setClosedDateInput}
+                  autoCapitalize="none"
+                />
+                <TextInput
+                  style={[styles.input, styles.closedDaysMessageInput]}
+                  placeholder="Motivo o mensaje para mostrar en la reserva"
+                  placeholderTextColor="#666"
+                  value={closedMessageInput}
+                  onChangeText={setClosedMessageInput}
+                  multiline
+                />
+
+                <Pressable
+                  style={styles.closedDaysSaveButton}
+                  onPress={() => upsertClosedDay(closedDateInput, closedMessageInput)}
+                >
+                  <Text style={styles.closedDaysSaveButtonText}>Agregar día no disponible</Text>
+                </Pressable>
+
+                {barberClosedDays.length ? (
+                  <View style={styles.closedDaysList}>
+                    {barberClosedDays.map(item => (
+                      <View key={item.date} style={styles.closedDayItem}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.closedDayItemTitle}>
+                            {formatClosedDayLabel(item.date)}
+                          </Text>
+                          <Text style={styles.closedDayItemDate}>{item.date}</Text>
+                          <Text style={styles.closedDayItemMessage}>
+                            {item.message ||
+                              'Este barbero no atenderá ese día. Elegí otro profesional o seleccioná otra fecha.'}
+                          </Text>
+                        </View>
+                        <Pressable
+                          style={styles.closedDayDeleteButton}
+                          onPress={() => removeClosedDay(item.date)}
+                        >
+                          <Text style={styles.closedDayDeleteButtonText}>Quitar</Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.closedDaysEmptyText}>
+                    No hay fechas bloqueadas para este barbero.
                   </Text>
                 )}
               </View>
@@ -1904,6 +2066,99 @@ const createStyles = (theme: Theme) =>
       fontSize: 13,
       lineHeight: 20,
       marginLeft: 4,
+    },
+    closedDaysHint: {
+      color: '#8C8C95',
+      fontSize: 12,
+      lineHeight: 18,
+      marginTop: 2,
+    },
+    closedDaysQuickRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 12,
+      marginBottom: 2,
+    },
+    closedDaysQuickChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      borderRadius: 14,
+      backgroundColor: '#25252D',
+      borderWidth: 1,
+      borderColor: '#333340',
+    },
+    closedDaysQuickChipText: {
+      color: theme.primary,
+      fontSize: 12,
+      fontWeight: '800',
+    },
+    closedDaysMessageInput: {
+      minHeight: 88,
+      textAlignVertical: 'top',
+      paddingTop: 16,
+    },
+    closedDaysSaveButton: {
+      backgroundColor: hexToRgba(theme.primary, 0.16),
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.primary,
+      paddingVertical: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    closedDaysSaveButtonText: {
+      color: theme.primary,
+      fontSize: 13,
+      fontWeight: '900',
+    },
+    closedDaysList: {
+      gap: 12,
+    },
+    closedDayItem: {
+      flexDirection: 'row',
+      gap: 12,
+      alignItems: 'flex-start',
+      backgroundColor: '#202127',
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: '#2E303A',
+      padding: 14,
+    },
+    closedDayItemTitle: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '800',
+      textTransform: 'capitalize',
+    },
+    closedDayItemDate: {
+      color: theme.primary,
+      fontSize: 11,
+      fontWeight: '700',
+      marginTop: 4,
+    },
+    closedDayItemMessage: {
+      color: '#B0B0B8',
+      fontSize: 12,
+      lineHeight: 18,
+      marginTop: 6,
+    },
+    closedDayDeleteButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 14,
+      backgroundColor: 'rgba(255, 77, 77, 0.12)',
+      borderWidth: 1,
+      borderColor: 'rgba(255, 77, 77, 0.28)',
+    },
+    closedDayDeleteButtonText: {
+      color: '#FF8A8A',
+      fontSize: 12,
+      fontWeight: '800',
+    },
+    closedDaysEmptyText: {
+      color: '#757575',
+      fontSize: 13,
+      lineHeight: 20,
     },
 
     submitBtn: {

@@ -588,6 +588,21 @@ export default function SubscriptionAdmin() {
     }
   };
 
+  const handleDeleteCoupon = async (coupon) => {
+    if (!coupon?._id) return;
+
+    const confirmed = window.confirm(
+      `Vas a borrar el cupón ${coupon.code}. Esto lo va a dejar inactivo y vencido para que no se pueda volver a usar.`,
+    );
+
+    if (!confirmed) return;
+
+    await handleSaveCoupon(coupon._id, {
+      isActive: false,
+      expiresAt: new Date().toISOString(),
+    });
+  };
+
   const handleSave = async (userId) => {
     const draft = drafts[userId];
     if (!draft || !secret.trim()) return;
@@ -1190,18 +1205,28 @@ export default function SubscriptionAdmin() {
                         </p>
                       ) : null}
                     </div>
-                    <button
-                      type="button"
-                      className={styles.secondaryInlineButton}
-                      onClick={() =>
-                        handleSaveCoupon(coupon._id, {
-                          isActive: !coupon.isActive,
-                        })
-                      }
-                      disabled={savingCouponId === coupon._id}
-                    >
-                      {coupon.isActive ? 'Desactivar' : 'Activar'}
-                    </button>
+                    <div className={styles.couponActions}>
+                      <button
+                        type="button"
+                        className={styles.secondaryInlineButton}
+                        onClick={() =>
+                          handleSaveCoupon(coupon._id, {
+                            isActive: !coupon.isActive,
+                          })
+                        }
+                        disabled={savingCouponId === coupon._id}
+                      >
+                        {coupon.isActive ? 'Desactivar' : 'Activar'}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.deleteInlineButton}
+                        onClick={() => handleDeleteCoupon(coupon)}
+                        disabled={savingCouponId === coupon._id}
+                      >
+                        Borrar
+                      </button>
+                    </div>
                   </div>
                   <p className={styles.couponMeta}>
                     Usos: {coupon.redemptionCount}

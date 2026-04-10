@@ -939,7 +939,7 @@ const makeStyles = (theme: Theme) =>
     paymentInfoBadge: {
       marginTop: 10,
       alignSelf: 'flex-start',
-      borderRadius: 999,
+      borderRadius: 12,
       paddingHorizontal: 10,
       paddingVertical: 7,
       borderWidth: 1,
