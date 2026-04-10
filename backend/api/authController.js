@@ -30,6 +30,7 @@ import {
   normalizeCouponCode,
   resolvePlanPricingForSubscription,
 } from "../services/subscriptionPricingService.js";
+import { normalizeShopClosedDays } from "../utils/shopClosures.js";
 
 const PASSWORD_RESET_EXPIRY_MS = 15 * 60 * 1000;
 const SUBSCRIPTION_CURRENCY_ID = String(
@@ -755,6 +756,23 @@ function sanitizeNotificationSettingsInput(input) {
   return { updates, hasAnyField };
 }
 
+function sanitizeShopClosedDaysInput(input) {
+  if (!input || typeof input !== "object") {
+    return { updates: {}, hasAnyField: false };
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(input, "shopClosedDays")) {
+    return { updates: {}, hasAnyField: false };
+  }
+
+  return {
+    updates: {
+      shopClosedDays: normalizeShopClosedDays(input.shopClosedDays),
+    },
+    hasAnyField: true,
+  };
+}
+
 async function buildAvailableSlug(baseValue) {
   const base = baseValue || "barberia";
   let candidate = base;
@@ -1257,6 +1275,38 @@ export async function updateNotificationSettings(req, res, next) {
 
     return res.json({
       message: "Notificaciones guardadas correctamente",
+      user: userDoc.toJSON(),
+    });
+  } catch (err) {
+    if (err instanceof Error) {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
+}
+
+export async function updateShopClosedDays(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    const userDoc = await UserModel.findById(userId);
+    if (!userDoc || userDoc.isActive === false) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    const { updates, hasAnyField } = sanitizeShopClosedDaysInput(req.body ?? {});
+    if (!hasAnyField) {
+      return res.status(400).json({ error: "No llegaron cambios de cierre para guardar." });
+    }
+
+    userDoc.shopClosedDays = updates.shopClosedDays;
+    await userDoc.save();
+
+    return res.json({
+      message: "Los cierres del local se guardaron correctamente.",
       user: userDoc.toJSON(),
     });
   } catch (err) {

@@ -795,7 +795,7 @@ function RegisterEmployed({ navigation, route }: Props) {
         includeBase64: true,
         maxWidth: 320,
         maxHeight: 320,
-        quality: 0.55,
+        quality: 0.5,
       });
 
       if (result.didCancel) return;

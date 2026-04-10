@@ -201,6 +201,7 @@ function BookingForm({ shopSlug, onNotFound }) {
   const [selectedBarberSchedule, setSelectedBarberSchedule] = useState(null);
   const [paymentResultMessage, setPaymentResultMessage] = useState("");
   const [shopUnavailable, setShopUnavailable] = useState(false);
+  const [closedDayNotice, setClosedDayNotice] = useState("");
 
   const currentDuration =
     selectedService?.durationMinutes ?? SLOT_INTERVAL_MINUTES;
@@ -398,6 +399,14 @@ function BookingForm({ shopSlug, onNotFound }) {
         selectedBarber,
         formatDateParam(selectedDate),
       );
+      if (res?.shopClosure?.isClosed) {
+        setClosedDayNotice(
+          res.shopClosure.message ||
+            "Este día el local permanecerá cerrado. Elegí otro turno disponible.",
+        );
+      } else {
+        setClosedDayNotice("");
+      }
       const busy = new Set();
       if (res?.appointments) {
         res.appointments.forEach((app) => {
@@ -436,6 +445,7 @@ function BookingForm({ shopSlug, onNotFound }) {
   useEffect(() => {
     if (!selectedBarber) {
       setSelectedBarberSchedule(null);
+      setClosedDayNotice("");
     }
   }, [selectedBarber]);
 
@@ -842,6 +852,16 @@ function BookingForm({ shopSlug, onNotFound }) {
               <p style={{ color: "#666", fontSize: 14 }}>
                 Cargando horarios...
               </p>
+            ) : closedDayNotice ? (
+              <div className={styles.noScheduleMessage}>
+                <p>
+                  <strong>Barbería cerrada este día</strong>
+                </p>
+                <p>{closedDayNotice}</p>
+                <p className={styles.subtitleError}>
+                  Elegí otra fecha para reservar tu turno.
+                </p>
+              </div>
             ) : horarioGroups.length === 0 ? (
               <div className={styles.noScheduleMessage}>
                 <p>
@@ -888,7 +908,7 @@ function BookingForm({ shopSlug, onNotFound }) {
         <button
           className={styles.submitButton}
           type="submit"
-          disabled={saving || !selectedSlot}
+          disabled={saving || !selectedSlot || Boolean(closedDayNotice)}
         >
           {saving ? "Procesando..." : "Confirmar Reserva"}
         </button>

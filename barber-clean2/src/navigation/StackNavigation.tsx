@@ -18,6 +18,7 @@ import AppearanceSettingsScreen from '../screnn/AppearanceSettingsScreen';
 import ServiceSettingsScreen from '../screnn/ServiceSettingsScreen';
 import PaymentSettingsScreen from '../screnn/PaymentSettingsScreen';
 import NotificationSettingsScreen from '../screnn/NotificationSettingsScreen';
+import ShopClosureSettingsScreen from '../screnn/ShopClosureSettingsScreen';
 import ChangePasswordScreen from '../screnn/ChangePasswordScreen';
 import RecoverPasswordScreen from '../screnn/RecoverPasswordScreen';
 import SettingsScreen from '../screnn/SettingsScreen';
@@ -53,6 +54,7 @@ export type RootStackParamList = {
   'Service-Settings': undefined;
   'Payment-Settings': undefined;
   'Notification-Settings': undefined;
+  'Shop-Closure-Settings': undefined;
   'Subscription-Settings': undefined;
   Plans:
     | {
@@ -110,6 +112,7 @@ export default function StackNavigator({
               <Stack.Screen name="Service-Settings" component={ServiceSettingsScreen} />
               <Stack.Screen name="Payment-Settings" component={PaymentSettingsScreen} />
               <Stack.Screen name="Notification-Settings" component={NotificationSettingsScreen} />
+              <Stack.Screen name="Shop-Closure-Settings" component={ShopClosureSettingsScreen} />
             </>
           ) : null}
         </Stack.Navigator>

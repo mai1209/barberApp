@@ -7,6 +7,10 @@ import admin from "../firebase.js";
 import { sendAppMail } from "../services/mailer.js";
 import { getTimeZoneDayRange, getTimeZoneWeekday } from "../utils/timezone.js";
 import {
+  resolveShopClosureForDate,
+  serializeShopClosure,
+} from "../utils/shopClosures.js";
+import {
   isReminderRunAuthorized,
   processAppointmentReminders,
 } from "../services/reminderService.js";
@@ -247,6 +251,16 @@ export async function createAppointment(req, res, next) {
 
     const barber = await BarberModel.findById(barberId).lean();
     if (!barber) return res.status(404).json({ error: "Barbero no encontrado" });
+    const ownerDoc = await UserModel.findById(ownerId)
+      .select({ shopClosedDays: 1 })
+      .lean();
+    const shopClosure = resolveShopClosureForDate(ownerDoc, startTime);
+    if (shopClosure) {
+      return res.status(400).json({
+        error: shopClosure.message,
+        closedDay: serializeShopClosure(shopClosure),
+      });
+    }
 
     // 1. VALIDACIÓN DÍA LABORAL (usar horario local de la barbería)
     const dayOfWeek = getTimeZoneWeekday(startTime);

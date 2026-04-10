@@ -34,6 +34,10 @@ function resolveActiveRoute(routeName?: string): MainRoute | undefined {
   if (
     routeName === 'Settings' ||
     routeName === 'Appearance-Settings' ||
+    routeName === 'Service-Settings' ||
+    routeName === 'Payment-Settings' ||
+    routeName === 'Notification-Settings' ||
+    routeName === 'Shop-Closure-Settings' ||
     routeName === 'Change-Password' ||
     routeName === 'Recover-Password'
   ) {

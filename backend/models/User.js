@@ -78,6 +78,16 @@ const notificationSettingsSchema = new mongoose.Schema(
   },
 );
 
+const shopClosedDaySchema = new mongoose.Schema(
+  {
+    date: { type: String, required: true, trim: true },
+    message: { type: String, default: "", trim: true, maxlength: 220 },
+  },
+  {
+    _id: false,
+  },
+);
+
 const subscriptionSchema = new mongoose.Schema(
   {
     plan: {
@@ -338,6 +348,10 @@ const userSchema = new mongoose.Schema(
     notificationSettings: {
       type: notificationSettingsSchema,
       default: () => ({}),
+    },
+    shopClosedDays: {
+      type: [shopClosedDaySchema],
+      default: [],
     },
     subscription: {
       type: subscriptionSchema,

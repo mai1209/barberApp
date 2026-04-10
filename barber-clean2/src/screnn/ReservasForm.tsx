@@ -193,6 +193,7 @@ function ReservasForm({ navigation }: any) {
   const [selectedBarberSchedule, setSelectedBarberSchedule] =
     useState<ResolvedBarberSchedule | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const [closedDayNotice, setClosedDayNotice] = useState('');
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   useEffect(() => {
@@ -241,6 +242,12 @@ function ReservasForm({ navigation }: any) {
           selectedDate.getMonth() + 1,
         ).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
         const res = await fetchBarberAppointments(selectedBarber!, dateStr);
+        setClosedDayNotice(
+          res.shopClosure?.isClosed
+            ? res.shopClosure.message ||
+                'Este día el local permanecerá cerrado. Elegí otro turno disponible.'
+            : '',
+        );
         const blocked = new Set<string>();
         const blockStep = 30; // bloquear en intervalos de 30 min para todos los turnos
         res.appointments.forEach(a => {
@@ -278,6 +285,7 @@ function ReservasForm({ navigation }: any) {
   useEffect(() => {
     if (!selectedBarber) {
       setSelectedBarberSchedule(null);
+      setClosedDayNotice('');
     }
   }, [selectedBarber]);
 
@@ -390,6 +398,10 @@ function ReservasForm({ navigation }: any) {
   const handleSubmit = async () => {
     if (!customerName.trim() || !selectedSlot) {
       Alert.alert('Error', 'Por favor ingresa tu nombre y elige un horario.');
+      return;
+    }
+    if (closedDayNotice) {
+      Alert.alert('Barbería cerrada', closedDayNotice);
       return;
     }
     if (!paymentMethod) {
@@ -747,7 +759,22 @@ function ReservasForm({ navigation }: any) {
                 </View>
               </View>
 
-              {!isWorkDay ? (
+              {closedDayNotice ? (
+                <View style={styles.notWorkingBox}>
+                  <Text style={styles.notWorkingIcon}>🔒</Text>
+                  <Text style={styles.notWorkingText}>LA BARBERIA ESTARA CERRADA ESTE DIA</Text>
+                  <Text
+                    style={{
+                      color: hexToRgba(theme.primary, 0.56),
+                      fontSize: 12,
+                      marginTop: 5,
+                      textAlign: 'center',
+                    }}
+                  >
+                    {closedDayNotice}
+                  </Text>
+                </View>
+              ) : !isWorkDay ? (
                 <View style={styles.notWorkingBox}>
                   <Text style={styles.notWorkingIcon}>🚫</Text>
                   <Text style={styles.notWorkingText}>
@@ -783,10 +810,10 @@ function ReservasForm({ navigation }: any) {
             <Pressable
               style={[
                 styles.submitBtn,
-                (!paymentMethod || saving) && styles.submitBtnDisabled,
+                (!paymentMethod || saving || Boolean(closedDayNotice)) && styles.submitBtnDisabled,
               ]}
               onPress={handleSubmit}
-              disabled={saving || !paymentMethod}
+              disabled={saving || !paymentMethod || Boolean(closedDayNotice)}
             >
               {saving ? (
                 <ActivityIndicator color="#fff" />

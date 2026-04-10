@@ -1,5 +1,6 @@
 import { BarberModel } from "../models/Barber.js";
 import { AppointmentModel } from "../models/Appointment.js";
+import { UserModel } from "../models/User.js";
 import { getTimeZoneDayRange, getTimeZoneWeekday } from "../utils/timezone.js";
 import {
   deriveScheduleRange,
@@ -8,6 +9,10 @@ import {
   resolveBarberScheduleForWeekday,
   sanitizeScheduleRange,
 } from "../utils/barberSchedule.js";
+import {
+  resolveShopClosureForDate,
+  serializeShopClosure,
+} from "../utils/shopClosures.js";
 
 function normalizeShift(value) {
   if (value == null) return undefined;
@@ -225,6 +230,13 @@ export async function listBarberAppointments(req, res, next) {
     }).lean();
     if (!barber)
       return res.status(404).json({ error: "Barbero no encontrado" });
+    const ownerDoc = await UserModel.findById(ownerId)
+      .select({ shopClosedDays: 1 })
+      .lean();
+    const shopClosure = resolveShopClosureForDate(
+      ownerDoc,
+      effectiveDate || date || new Date(),
+    );
 
     // Buscamos los turnos ya ocupados para ese día
     const appointments = await AppointmentModel.find({
@@ -246,7 +258,10 @@ export async function listBarberAppointments(req, res, next) {
     // Enviamos el barbero CON sus workDays limpios
     return res.json({
       barber: serializeBarber(barber),
-      resolvedSchedule,
+      resolvedSchedule: shopClosure
+        ? { scheduleRange: null, scheduleRanges: [] }
+        : resolvedSchedule,
+      shopClosure: serializeShopClosure(shopClosure),
       appointments,
     });
   } catch (err) {

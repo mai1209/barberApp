@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import {
   BellRing,
+  CalendarDays,
   ChevronRight,
   CreditCard,
   Crown,
@@ -149,6 +150,15 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
           label="Notificaciones y recordatorios"
           description="Push al barbero y mail recordatorio al cliente el día del turno."
           onPress={() => navigation.navigate('Notification-Settings')}
+          theme={theme}
+          styles={styles}
+        />
+        <View style={styles.separator} />
+        <MenuItem
+          icon={CalendarDays}
+          label="Cerrar barbería por día"
+          description="Bloqueá una fecha puntual para que la web no tome turnos."
+          onPress={() => navigation.navigate('Shop-Closure-Settings')}
           theme={theme}
           styles={styles}
         />

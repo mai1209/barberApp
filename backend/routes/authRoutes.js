@@ -22,6 +22,7 @@ import {
   updateNotificationSettings,
   updatePlanPricingAdmin,
   updateOwnSubscriptionSettings,
+  updateShopClosedDays,
   updateSubscriptionCouponAdmin,
   updateSubscriptionUser,
   updateThemeConfig,
@@ -51,6 +52,7 @@ router.put("/password", requireAuth, updatePassword);
 router.put("/theme", requireAuth, updateThemeConfig);
 router.put("/payment-settings", requireAuth, updatePaymentSettings);
 router.put("/notification-settings", requireAuth, updateNotificationSettings);
+router.put("/shop-closed-days", requireAuth, updateShopClosedDays);
 router.put("/subscription-settings", requireAuth, updateOwnSubscriptionSettings);
 router.post("/test-mail", requireAuth, sendTestMail);
 router.post("/save-push-token", requireAuth, savePushToken);

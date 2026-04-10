@@ -14,6 +14,11 @@ import {
 import { getTimeZoneDayRange, getTimeZoneWeekday } from "../utils/timezone.js";
 import { resolveBarberScheduleForWeekday } from "../utils/barberSchedule.js";
 import {
+  normalizeShopClosedDays,
+  resolveShopClosureForDate,
+  serializeShopClosure,
+} from "../utils/shopClosures.js";
+import {
   buildMercadoPagoSubscriptionReturnUrls,
   buildMercadoPagoSubscriptionWebhookUrl,
   createMercadoPagoSystemPreapproval,
@@ -104,6 +109,7 @@ function sanitizeShop(shop) {
       mercadoPagoConnectionStatus:
         paymentSettings.mercadoPagoConnectionStatus || "disconnected",
     },
+    shopClosedDays: normalizeShopClosedDays(shop.shopClosedDays),
   };
 }
 
@@ -626,6 +632,10 @@ export async function publicBarberAppointments(req, res, next) {
     }).lean();
     if (!barber)
       return res.status(404).json({ error: "Barbero no encontrado" });
+    const shopClosure = resolveShopClosureForDate(
+      shop,
+      effectiveDate || req.query.date || new Date(),
+    );
     const appointments = await AppointmentModel.find({
       owner: ownerId,
       barber: barberId,
@@ -645,7 +655,10 @@ export async function publicBarberAppointments(req, res, next) {
     return res.json({
       shop: sanitizeShop(shop),
       barber: sanitizeBarber(barber),
-      resolvedSchedule,
+      resolvedSchedule: shopClosure
+        ? { scheduleRange: null, scheduleRanges: [] }
+        : resolvedSchedule,
+      shopClosure: serializeShopClosure(shopClosure),
       appointments: appointments.map(sanitizeAppointment),
     });
   } catch (err) {
@@ -684,6 +697,13 @@ export async function publicCreateAppointment(req, res, next) {
     if (!barber)
       return res.status(404).json({ error: "Barbero no encontrado" });
     const appointmentDate = new Date(startTime);
+    const shopClosure = resolveShopClosureForDate(shop, appointmentDate);
+    if (shopClosure) {
+      return res.status(400).json({
+        error: shopClosure.message,
+        closedDay: serializeShopClosure(shopClosure),
+      });
+    }
     const barberWorkDays = (barber.workDays || []).map(Number);
 
     if (barberWorkDays.length > 0 && !barberWorkDays.includes(getTimeZoneWeekday(appointmentDate))) {

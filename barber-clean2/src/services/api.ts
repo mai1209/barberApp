@@ -224,6 +224,17 @@ export type NotificationSettings = {
   customerSameDayEmailEnabled?: boolean;
 };
 
+export type ShopClosedDay = {
+  date: string;
+  message?: string | null;
+};
+
+export type ShopClosureInfo = {
+  isClosed: boolean;
+  date: string;
+  message: string;
+};
+
 export type SubscriptionSettings = {
   renewalMode?: 'manual' | 'automatic';
   mercadoPagoPreapprovalId?: string | null;
@@ -273,6 +284,14 @@ export function updatePaymentSettings(payload: PaymentSettings) {
 
 export function updateNotificationSettings(payload: NotificationSettings) {
   return request<{ message: string; user: any }>("/api/auth/notification-settings", {
+    method: "PUT",
+    body: payload,
+    auth: true,
+  });
+}
+
+export function updateShopClosedDays(payload: { shopClosedDays: ShopClosedDay[] }) {
+  return request<{ message: string; user: any }>("/api/auth/shop-closed-days", {
     method: "PUT",
     body: payload,
     auth: true,
@@ -583,6 +602,7 @@ export function fetchBarberAppointments(barberId: string, date?: string) {
       scheduleRanges?: { label: string; start: string; end: string }[];
       source?: string;
     };
+    shopClosure?: ShopClosureInfo | null;
     appointments: Appointment[];
   }>(`/api/barbers/${barberId}/appointments${query}`, { auth: true });
 }
