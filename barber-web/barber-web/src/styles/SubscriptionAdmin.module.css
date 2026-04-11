@@ -709,6 +709,39 @@
   font-size: 0.9rem;
 }
 
+.couponEditGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.couponEditActions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.primaryInlineButton {
+  border: 1px solid rgba(255, 20, 147, 0.28);
+  background: rgba(255, 20, 147, 0.16);
+  color: #fff;
+  border-radius: 14px;
+  min-height: 38px;
+  padding: 0 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.primaryInlineButton:hover {
+  border-color: rgba(255, 20, 147, 0.5);
+  background: rgba(255, 20, 147, 0.24);
+  transform: translateY(-1px);
+}
+
 @media (max-width: 900px) {
   .toolbar {
     grid-template-columns: 1fr;
@@ -718,6 +751,7 @@
   .summaryGrid,
   .controls,
   .couponCreateGrid,
+  .couponEditGrid,
   .referralGrid {
     grid-template-columns: 1fr;
   }

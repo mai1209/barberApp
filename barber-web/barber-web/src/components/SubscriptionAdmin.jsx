@@ -126,6 +126,25 @@ function getCouponDiscountLabel(coupon) {
   return `${Number(coupon?.discountPercent || 0).toLocaleString('es-AR')}% OFF`;
 }
 
+function buildCouponEditDraft(coupon) {
+  return {
+    expiresAt: formatDateInputValue(coupon?.expiresAt),
+    maxRedemptions:
+      coupon?.maxRedemptions != null && coupon?.maxRedemptions !== ''
+        ? String(coupon.maxRedemptions)
+        : '',
+    isActive: Boolean(coupon?.isActive),
+    internalNote: coupon?.internalNote || '',
+  };
+}
+
+function isCouponExpired(coupon) {
+  if (!coupon?.expiresAt) return false;
+  const expiresAt = new Date(coupon.expiresAt);
+  if (Number.isNaN(expiresAt.getTime())) return false;
+  return expiresAt.getTime() < Date.now();
+}
+
 function getSubscriptionDiscountLabel(subscription) {
   if (!subscription?.couponCode) return '';
 
@@ -260,6 +279,8 @@ export default function SubscriptionAdmin() {
   const [coupons, setCoupons] = useState([]);
   const [savingCouponId, setSavingCouponId] = useState(null);
   const [creatingCoupon, setCreatingCoupon] = useState(false);
+  const [editingCouponId, setEditingCouponId] = useState(null);
+  const [couponEditDraft, setCouponEditDraft] = useState(null);
   const [couponDraft, setCouponDraft] = useState({
     code: '',
     plan: '',
@@ -508,6 +529,13 @@ export default function SubscriptionAdmin() {
     }));
   };
 
+  const handleCouponEditDraftChange = (field, value) => {
+    setCouponEditDraft((current) => ({
+      ...(current || {}),
+      [field]: value,
+    }));
+  };
+
   const handleCreateCoupon = async () => {
     if (!secret.trim()) {
       setError('Ingresá el secret de administración para guardar cupones.');
@@ -581,6 +609,7 @@ export default function SubscriptionAdmin() {
         current.map((coupon) => (coupon._id === couponId ? response.coupon : coupon)),
       );
       setSuccess('Cupón actualizado correctamente.');
+      return response;
     } catch (err) {
       setError(err.message || 'No pudimos actualizar el cupón.');
     } finally {
@@ -601,6 +630,34 @@ export default function SubscriptionAdmin() {
       isActive: false,
       expiresAt: new Date().toISOString(),
     });
+  };
+
+  const handleStartEditCoupon = (coupon) => {
+    setEditingCouponId(coupon._id);
+    setCouponEditDraft(buildCouponEditDraft(coupon));
+    setError('');
+    setSuccess('');
+  };
+
+  const handleCancelEditCoupon = () => {
+    setEditingCouponId(null);
+    setCouponEditDraft(null);
+  };
+
+  const handleSubmitEditCoupon = async (coupon) => {
+    if (!coupon?._id || !couponEditDraft) return;
+
+    const response = await handleSaveCoupon(coupon._id, {
+      expiresAt: couponEditDraft.expiresAt || null,
+      maxRedemptions: couponEditDraft.maxRedemptions || null,
+      isActive: Boolean(couponEditDraft.isActive),
+      internalNote: couponEditDraft.internalNote || '',
+    });
+
+    if (response?.coupon) {
+      setEditingCouponId(null);
+      setCouponEditDraft(null);
+    }
   };
 
   const handleSave = async (userId) => {
@@ -1182,6 +1239,8 @@ export default function SubscriptionAdmin() {
             <div className={styles.couponList}>
               {coupons.map((coupon) => {
                 const durationBadge = getCouponDurationBadge(coupon);
+                const expired = isCouponExpired(coupon);
+                const isEditingCoupon = editingCouponId === coupon._id;
 
                 return (
                 <article key={coupon._id} className={styles.couponCard}>
@@ -1206,6 +1265,18 @@ export default function SubscriptionAdmin() {
                       ) : null}
                     </div>
                     <div className={styles.couponActions}>
+                      <button
+                        type="button"
+                        className={styles.secondaryInlineButton}
+                        onClick={() =>
+                          isEditingCoupon
+                            ? handleCancelEditCoupon()
+                            : handleStartEditCoupon(coupon)
+                        }
+                        disabled={savingCouponId === coupon._id}
+                      >
+                        {isEditingCoupon ? 'Cancelar' : 'Editar'}
+                      </button>
                       <button
                         type="button"
                         className={styles.secondaryInlineButton}
@@ -1236,8 +1307,68 @@ export default function SubscriptionAdmin() {
                       : coupon.benefitDurationType === 'one_time'
                         ? 'solo primer pago'
                         : `durante ${coupon.benefitDurationValue || 0} meses`} · Válido hasta:{' '}
-                    {formatDate(coupon.expiresAt)} · {coupon.isActive ? 'Activo' : 'Inactivo'}
+                    {formatDate(coupon.expiresAt)} · {expired ? 'Vencido' : coupon.isActive ? 'Activo' : 'Inactivo'}
                   </p>
+                  {isEditingCoupon ? (
+                    <div className={styles.couponEditGrid}>
+                      <label className={styles.priceField}>
+                        <span>Válido hasta</span>
+                        <input
+                          type="date"
+                          value={couponEditDraft?.expiresAt || ''}
+                          onChange={(e) => handleCouponEditDraftChange('expiresAt', e.target.value)}
+                          className={styles.priceInput}
+                        />
+                      </label>
+                      <label className={styles.priceField}>
+                        <span>Máx. usos</span>
+                        <input
+                          type="number"
+                          value={couponEditDraft?.maxRedemptions || ''}
+                          onChange={(e) =>
+                            handleCouponEditDraftChange('maxRedemptions', e.target.value)
+                          }
+                          className={styles.priceInput}
+                          placeholder="Opcional"
+                        />
+                      </label>
+                      <label className={styles.priceField}>
+                        <span>Activo</span>
+                        <select
+                          value={couponEditDraft?.isActive ? 'true' : 'false'}
+                          onChange={(e) =>
+                            handleCouponEditDraftChange('isActive', e.target.value === 'true')
+                          }
+                          className={styles.priceInput}
+                        >
+                          <option value="true">Sí</option>
+                          <option value="false">No</option>
+                        </select>
+                      </label>
+                      <label className={`${styles.priceField} ${styles.couponNoteField}`}>
+                        <span>Nota interna</span>
+                        <input
+                          type="text"
+                          value={couponEditDraft?.internalNote || ''}
+                          onChange={(e) =>
+                            handleCouponEditDraftChange('internalNote', e.target.value)
+                          }
+                          className={styles.priceInput}
+                          placeholder="Motivo, extensión, corrección, etc."
+                        />
+                      </label>
+                      <div className={styles.couponEditActions}>
+                        <button
+                          type="button"
+                          className={styles.primaryInlineButton}
+                          onClick={() => handleSubmitEditCoupon(coupon)}
+                          disabled={savingCouponId === coupon._id}
+                        >
+                          Guardar cambios
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                   {coupon.internalNote ? (
                     <p className={styles.couponMeta}>{coupon.internalNote}</p>
                   ) : null}

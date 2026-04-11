@@ -260,10 +260,9 @@ function createStyles(theme: Theme) {
     grid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 6,
     },
     dayCell: {
-      width: '13.3%',
+      width: '14.2857%',
       aspectRatio: 1,
       borderRadius: 14,
       alignItems: 'center',
@@ -271,6 +270,7 @@ function createStyles(theme: Theme) {
       backgroundColor: '#202127',
       borderWidth: 1,
       borderColor: '#2B2E38',
+      marginBottom: 6,
     },
     dayCellEmpty: {
       opacity: 0,

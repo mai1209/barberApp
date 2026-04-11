@@ -24,6 +24,7 @@ import { saveUserProfile } from '../services/authStorage';
 
 const DEFAULT_MESSAGE =
   'Este día el local permanecerá cerrado. Elegí otro turno disponible.';
+const SHOP_TZ = 'America/Argentina/Cordoba';
 
 function normalizeDate(value: string) {
   const text = String(value ?? '').trim();
@@ -36,12 +37,12 @@ function normalizeMessage(value: string) {
 
 function formatDateLabel(value: string) {
   if (!normalizeDate(value)) return value;
-  const [year, month, day] = value.split('-').map(Number);
-  const date = new Date(year, month - 1, day, 12, 0, 0, 0);
+  const date = new Date(`${value}T12:00:00`);
   return new Intl.DateTimeFormat('es-AR', {
     weekday: 'long',
     day: '2-digit',
     month: 'long',
+    timeZone: SHOP_TZ,
   }).format(date);
 }
 
@@ -51,11 +52,16 @@ function sortClosedDays(list: ShopClosedDay[]) {
 
 function buildQuickDate(offsetDays: number) {
   const base = new Date();
-  base.setHours(12, 0, 0, 0);
   base.setDate(base.getDate() + offsetDays);
-  const year = base.getFullYear();
-  const month = String(base.getMonth() + 1).padStart(2, '0');
-  const day = String(base.getDate()).padStart(2, '0');
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: SHOP_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(base);
+  const year = parts.find(part => part.type === 'year')?.value ?? '0000';
+  const month = parts.find(part => part.type === 'month')?.value ?? '00';
+  const day = parts.find(part => part.type === 'day')?.value ?? '00';
   return `${year}-${month}-${day}`;
 }
 
