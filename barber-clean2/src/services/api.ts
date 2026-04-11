@@ -34,7 +34,7 @@ const DEV_CANDIDATES = isAndroid
   : [`http://${LAN_IP}:3002`];
 
 
-const PROD_API_URL = "https://barber-app-zeta-one.vercel.app";
+const PROD_API_URL = "https://api.barberappbycodex.com";
 
 
 let resolvedDevBaseUrl: string | null = null;

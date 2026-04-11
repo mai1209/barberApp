@@ -15,6 +15,13 @@ const app = express();
 // Activamos todas las protecciones escudo de seguridad
 app.use(helmet());
 
+function getEnvAllowedOrigins() {
+  return String(process.env.ALLOWED_WEB_ORIGINS || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function isPrivateDevOrigin(origin) {
   if (!origin) return true;
 
@@ -50,6 +57,11 @@ function isAllowedWebOrigin(origin) {
   try {
     const parsed = new URL(origin);
     const { hostname, protocol } = parsed;
+    const normalizedOrigin = parsed.origin;
+
+    if (getEnvAllowedOrigins().includes(normalizedOrigin)) {
+      return true;
+    }
 
     if (protocol === "http:" && (hostname === "localhost" || hostname === "127.0.0.1")) {
       return true;
@@ -123,9 +135,11 @@ app.use(errorHandler);
 
 export default app;
 
-if (process.env.NODE_ENV !== 'production') {
+// En Oracle/VM necesitamos abrir un puerto HTTP real.
+// En Vercel solo exportamos `app` para que lo maneje la plataforma.
+if (!process.env.VERCEL) {
   const PORT = Number(process.env.PORT ?? 3002);
   app.listen(PORT, () => {
-    console.log(`🚀 Servidor local corriendo en http://localhost:${PORT}`);
+    console.log(`🚀 Servidor corriendo en http://0.0.0.0:${PORT}`);
   });
 }
