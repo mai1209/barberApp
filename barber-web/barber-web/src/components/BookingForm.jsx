@@ -26,7 +26,7 @@ const minutesToLabel = (totalMinutes) => {
 
 const SLOT_INTERVAL_MINUTES = 30;
 const SHOP_TZ = "America/Argentina/Cordoba";
-const DEFAULT_BOOKING_BANNER = "/logo.png";
+const DEFAULT_BOOKING_BANNER = "/logoBarber.png";
 
 function formatTimeInShopTZ(value) {
   const parts = new Intl.DateTimeFormat("es-AR", {
@@ -782,6 +782,11 @@ function BookingForm({ shopSlug, onNotFound }) {
                 </div>
               ))}
             </div>
+            <p className={styles.paymentMethodNotice}>
+              Algunas tarjetas prepagas pueden ser rechazadas por Mercado Pago.
+              Si pasa, intentá con saldo en tu cuenta de Mercado Pago, otra
+              tarjeta o elegí pagar en el local.
+            </p>
           </div>
         ) : null}
 

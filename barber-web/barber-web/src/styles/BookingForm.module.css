@@ -316,6 +316,17 @@
   color: #f1c4df;
 }
 
+.paymentMethodNotice {
+  margin: 12px 2px 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 138, 0, 0.22);
+  background: rgba(255, 138, 0, 0.08);
+  color: #f0cf9d;
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
 .infoicon {
   width: 10px;
   height: 10px;

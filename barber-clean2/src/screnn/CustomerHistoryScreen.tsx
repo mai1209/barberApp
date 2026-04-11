@@ -1555,7 +1555,7 @@ const makeStyles = (theme: Theme) =>
     },
     paymentButtonCash: {
       backgroundColor: 'rgba(91, 227, 139, 0.18)',
-      borderColor: 'rgba(91, 227, 139, 0.42)',
+      borderColor: 'rgba(91, 227, 139, 1)',
     },
     paymentButtonTransfer: {
       backgroundColor: hexToRgba(theme.primary, 0.18),
@@ -1567,7 +1567,7 @@ const makeStyles = (theme: Theme) =>
       fontWeight: '800',
     },
     paymentButtonTextActive: {
-      color: '#08110B',
+      color: '#fff',
     },
     resultsHeader: {
       flexDirection: 'column',
