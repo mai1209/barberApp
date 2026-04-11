@@ -16,10 +16,12 @@ import {
   Image,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { CalendarDays } from 'lucide-react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { Barber, createBarber, fetchBarbers, updateBarber } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
+import DateSelectModal from '../components/DateSelectModal';
 
 const hexToRgba = (hex: string, alpha: number) => {
   const sanitized = hex.replace('#', '');
@@ -176,6 +178,7 @@ function RegisterEmployed({ navigation, route }: Props) {
   const [barberClosedDays, setBarberClosedDays] = useState<BarberClosedDay[]>([]);
   const [closedDateInput, setClosedDateInput] = useState('');
   const [closedMessageInput, setClosedMessageInput] = useState('');
+  const [isClosedDateModalVisible, setIsClosedDateModalVisible] = useState(false);
   const [selectedOverrideDay, setSelectedOverrideDay] = useState<number | null>(null);
   const [multiEditMode, setMultiEditMode] = useState(false);
   const [multiEditDays, setMultiEditDays] = useState<number[]>([]);
@@ -1421,14 +1424,24 @@ function RegisterEmployed({ navigation, route }: Props) {
                   </Pressable>
                 </View>
 
-                <TextInput
-                  style={styles.input}
-                  placeholder="Fecha YYYY-MM-DD"
-                  placeholderTextColor="#666"
-                  value={closedDateInput}
-                  onChangeText={setClosedDateInput}
-                  autoCapitalize="none"
-                />
+                <Pressable
+                  style={styles.closedDateInput}
+                  onPress={() => setIsClosedDateModalVisible(true)}
+                >
+                  <View style={styles.closedDateInputIcon}>
+                    <CalendarDays size={16} color={theme.primary} />
+                  </View>
+                  <View style={styles.closedDateInputBody}>
+                    <Text style={styles.closedDateInputValue}>
+                      {closedDateInput
+                        ? formatClosedDayLabel(closedDateInput)
+                        : 'Elegir fecha'}
+                    </Text>
+                    <Text style={styles.closedDateInputMeta}>
+                      {closedDateInput || 'Tocá para abrir el calendario'}
+                    </Text>
+                  </View>
+                </Pressable>
                 <TextInput
                   style={[styles.input, styles.closedDaysMessageInput]}
                   placeholder="Motivo o mensaje para mostrar en la reserva"
@@ -1504,6 +1517,17 @@ function RegisterEmployed({ navigation, route }: Props) {
         onConfirm={handlePickerConfirm}
         theme={theme}
         styles={styles}
+      />
+      <DateSelectModal
+        visible={isClosedDateModalVisible}
+        value={closedDateInput || todayDateLabel}
+        title="Elegir fecha no disponible"
+        theme={theme}
+        onClose={() => setIsClosedDateModalVisible(false)}
+        onConfirm={(date) => {
+          setClosedDateInput(date);
+          setIsClosedDateModalVisible(false);
+        }}
       />
     </>
   );
@@ -2096,6 +2120,40 @@ const createStyles = (theme: Theme) =>
       minHeight: 88,
       textAlignVertical: 'top',
       paddingTop: 16,
+    },
+    closedDateInput: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: '#333340',
+      backgroundColor: '#25252D',
+      paddingHorizontal: 14,
+      paddingVertical: 14,
+    },
+    closedDateInputIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: hexToRgba(theme.primary, 0.12),
+    },
+    closedDateInputBody: {
+      flex: 1,
+      gap: 2,
+    },
+    closedDateInputValue: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '800',
+      textTransform: 'capitalize',
+    },
+    closedDateInputMeta: {
+      color: '#9DA4B4',
+      fontSize: 12,
+      fontWeight: '600',
     },
     closedDaysSaveButton: {
       backgroundColor: hexToRgba(theme.primary, 0.16),

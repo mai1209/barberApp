@@ -14,6 +14,7 @@ import {
 import { CalendarDays, LockKeyhole, Trash2 } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
+import DateSelectModal from '../components/DateSelectModal';
 import {
   getCurrentUser,
   type ShopClosedDay,
@@ -76,6 +77,7 @@ export default function ShopClosureSettingsScreen() {
   const [closedDays, setClosedDays] = useState<ShopClosedDay[]>([]);
   const [selectedDate, setSelectedDate] = useState(buildQuickDate(0));
   const [message, setMessage] = useState(DEFAULT_MESSAGE);
+  const [isDateModalVisible, setIsDateModalVisible] = useState(false);
 
   const loadSettings = useCallback(async () => {
     try {
@@ -186,16 +188,24 @@ export default function ShopClosureSettingsScreen() {
           <Text style={styles.sectionDescription}>
             Elegí la fecha y, si querés, dejá un motivo visible para el cliente.
           </Text>
+          <Text style={styles.helperNote}>
+            Si querés bloquear solo a un barbero y no cerrar toda la barbería,
+            andá al perfil del barbero y editá sus días no disponibles.
+          </Text>
 
           <Text style={styles.label}>Fecha</Text>
-          <TextInput
-            value={selectedDate}
-            onChangeText={setSelectedDate}
-            placeholder="AAAA-MM-DD"
-            placeholderTextColor="#6E7585"
-            style={styles.input}
-            autoCapitalize="none"
-          />
+          <Pressable
+            style={styles.dateInput}
+            onPress={() => setIsDateModalVisible(true)}
+          >
+            <View style={styles.dateInputIcon}>
+              <CalendarDays size={16} color={theme.primary} />
+            </View>
+            <View style={styles.dateInputBody}>
+              <Text style={styles.dateInputValue}>{formatDateLabel(selectedDate)}</Text>
+              <Text style={styles.dateInputMeta}>{selectedDate}</Text>
+            </View>
+          </Pressable>
 
           <View style={styles.quickActionsRow}>
             <Pressable
@@ -284,6 +294,18 @@ export default function ShopClosureSettingsScreen() {
           )}
         </View>
       </ScrollView>
+
+      <DateSelectModal
+        visible={isDateModalVisible}
+        value={selectedDate}
+        title="Elegir fecha de cierre"
+        theme={theme}
+        onClose={() => setIsDateModalVisible(false)}
+        onConfirm={(date) => {
+          setSelectedDate(date);
+          setIsDateModalVisible(false);
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -341,6 +363,17 @@ const createStyles = (theme: Theme) =>
       fontSize: 13,
       lineHeight: 18,
     },
+    helperNote: {
+      marginTop: 10,
+      padding: 12,
+      borderRadius: 14,
+      backgroundColor: hexToRgba(theme.primary, 0.08),
+      borderWidth: 1,
+      borderColor: hexToRgba(theme.primary, 0.16),
+      color: '#D6DCE8',
+      fontSize: 12,
+      lineHeight: 18,
+    },
     label: {
       color: hexToRgba(theme.primary, 0.92),
       fontSize: 12,
@@ -358,6 +391,40 @@ const createStyles = (theme: Theme) =>
       paddingHorizontal: 14,
       paddingVertical: 14,
       fontSize: 15,
+    },
+    dateInput: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: 'rgba(110, 117, 133, 0.28)',
+      backgroundColor: 'rgba(255,255,255,0.03)',
+      paddingHorizontal: 14,
+      paddingVertical: 14,
+    },
+    dateInputIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: hexToRgba(theme.primary, 0.12),
+    },
+    dateInputBody: {
+      flex: 1,
+      gap: 2,
+    },
+    dateInputValue: {
+      color: '#fff',
+      fontSize: 15,
+      fontWeight: '700',
+      textTransform: 'capitalize',
+    },
+    dateInputMeta: {
+      color: '#8FA0B8',
+      fontSize: 12,
+      fontWeight: '600',
     },
     textArea: {
       minHeight: 96,
