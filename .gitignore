@@ -33,3 +33,6 @@ yarn-error.log*
 **/firebase-key.json
 **/.env
 .DS_Store
+
+barber-clean2/barberapp-codex-firebase-adminsdk-fbsvc-0ba42efa59.json
+*firebase-adminsdk*.json
