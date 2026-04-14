@@ -563,8 +563,14 @@ export default function SubscriptionAdmin() {
           couponCategory: couponDraft.couponCategory,
           referralOwnerName: couponDraft.referralOwnerName,
           discountType: couponDraft.discountType,
-          discountPercent: couponDraft.discountPercent,
-          discountAmountUsdReference: couponDraft.discountAmountUsdReference,
+          discountPercent:
+            couponDraft.discountType === 'percentage'
+              ? couponDraft.discountPercent
+              : null,
+          discountAmountUsdReference:
+            couponDraft.discountType === 'fixed_usd_reference'
+              ? couponDraft.discountAmountUsdReference
+              : null,
           benefitDurationType: couponDraft.benefitDurationType,
           benefitDurationValue: couponDraft.benefitDurationValue,
           maxRedemptions: couponDraft.maxRedemptions,

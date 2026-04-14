@@ -570,33 +570,44 @@ function sanitizeSubscriptionCouponInput(input, { partial = false } = {}) {
     updates.discountType = rawDiscountType;
   }
 
-  if (
-    (rawDiscountType === "percentage" || (!rawDiscountType && Object.prototype.hasOwnProperty.call(input, "discountPercent"))) &&
-    Object.prototype.hasOwnProperty.call(input, "discountPercent")
-  ) {
+  if (Object.prototype.hasOwnProperty.call(input, "discountPercent")) {
     hasAnyField = true;
-    const discountPercent = Number(input.discountPercent);
-    if (!Number.isFinite(discountPercent) || discountPercent <= 0 || discountPercent > 100) {
-      throw new Error("El descuento del cupón debe estar entre 0 y 100.");
+    const raw = input.discountPercent;
+
+    if (raw == null || String(raw).trim() === "") {
+      if (rawDiscountType === "percentage") {
+        throw new Error("El descuento porcentual del cupón es obligatorio.");
+      }
+      updates.discountPercent = null;
+    } else {
+      const discountPercent = Number(raw);
+      if (!Number.isFinite(discountPercent) || discountPercent <= 0 || discountPercent > 100) {
+        throw new Error("El descuento del cupón debe estar entre 0 y 100.");
+      }
+      updates.discountPercent = Number(discountPercent.toFixed(2));
     }
-    updates.discountPercent = Number(discountPercent.toFixed(2));
   } else if (!partial && rawDiscountType === "percentage") {
     throw new Error("El descuento porcentual del cupón es obligatorio.");
   } else if (rawDiscountType === "fixed_usd_reference") {
     updates.discountPercent = null;
   }
 
-  if (
-    (rawDiscountType === "fixed_usd_reference" ||
-      Object.prototype.hasOwnProperty.call(input, "discountAmountUsdReference")) &&
-    Object.prototype.hasOwnProperty.call(input, "discountAmountUsdReference")
-  ) {
+  if (Object.prototype.hasOwnProperty.call(input, "discountAmountUsdReference")) {
     hasAnyField = true;
-    const discountAmountUsdReference = Number(input.discountAmountUsdReference);
-    if (!Number.isFinite(discountAmountUsdReference) || discountAmountUsdReference <= 0) {
-      throw new Error("El monto fijo del cupón en USD de referencia no es válido.");
+    const raw = input.discountAmountUsdReference;
+
+    if (raw == null || String(raw).trim() === "") {
+      if (rawDiscountType === "fixed_usd_reference") {
+        throw new Error("El monto fijo del cupón en USD de referencia es obligatorio.");
+      }
+      updates.discountAmountUsdReference = null;
+    } else {
+      const discountAmountUsdReference = Number(raw);
+      if (!Number.isFinite(discountAmountUsdReference) || discountAmountUsdReference <= 0) {
+        throw new Error("El monto fijo del cupón en USD de referencia no es válido.");
+      }
+      updates.discountAmountUsdReference = Number(discountAmountUsdReference.toFixed(2));
     }
-    updates.discountAmountUsdReference = Number(discountAmountUsdReference.toFixed(2));
   } else if (!partial && rawDiscountType === "fixed_usd_reference") {
     throw new Error("El monto fijo del cupón en USD de referencia es obligatorio.");
   } else if (rawDiscountType === "percentage") {
