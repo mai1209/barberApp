@@ -23,6 +23,7 @@ type Props = {
 export default function ChangePasswordScreen({ navigation }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const fieldStyles = useMemo(() => createFieldStyles(theme), [theme]);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -90,18 +91,21 @@ export default function ChangePasswordScreen({ navigation }: Props) {
             value={currentPassword}
             onChangeText={setCurrentPassword}
             theme={theme}
+            styles={fieldStyles}
           />
           <PasswordField
             label="Nueva contraseña"
             value={newPassword}
             onChangeText={setNewPassword}
             theme={theme}
+            styles={fieldStyles}
           />
           <PasswordField
             label="Repetir nueva contraseña"
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             theme={theme}
+            styles={fieldStyles}
           />
 
           {!!error && (
@@ -138,36 +142,38 @@ function PasswordField({
   value,
   onChangeText,
   theme,
+  styles,
 }: {
   label: string;
   value: string;
   onChangeText: (value: string) => void;
   theme: Theme;
+  styles: any;
 }) {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
   return (
-    <View style={fieldStyles.container}>
-      <Text style={fieldStyles.label}>{label}</Text>
-      <View style={fieldStyles.inputWrapper}>
-        <Lock size={16} color="#555" style={fieldStyles.iconLeft} />
+    <View style={styles.container}>
+      <Text style={styles.label}>{label}</Text>
+      <View style={styles.inputWrapper}>
+        <Lock size={16} color={theme.textMuted} style={styles.iconLeft} />
         <TextInput
           value={value}
           onChangeText={onChangeText}
           secureTextEntry={!isPasswordVisible}
           placeholder="••••••••"
-          placeholderTextColor="#444"
-          style={fieldStyles.input}
+          placeholderTextColor={theme.placeholder}
+          style={styles.input}
         />
         <Pressable
           onPress={() => setIsPasswordVisible(!isPasswordVisible)}
-          style={fieldStyles.eyeBtn}
+          style={styles.eyeBtn}
           hitSlop={10}
         >
           {isPasswordVisible ? (
             <EyeOff size={20} color={theme.primary} />
           ) : (
-            <Eye size={20} color="#555" />
+            <Eye size={20} color={theme.textMuted} />
           )}
         </Pressable>
       </View>
@@ -175,41 +181,43 @@ function PasswordField({
   );
 }
 
-const fieldStyles = StyleSheet.create({
-  container: {
-    marginBottom: 18,
-  },
-  label: {
-    color: '#888',
-    fontSize: 11,
-    fontWeight: '800',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#121212',
-    borderWidth: 1,
-    borderColor: '#222',
-    borderRadius: 18,
-    paddingHorizontal: 14,
-  },
-  iconLeft: {
-    marginRight: 10,
-  },
-  input: {
-    flex: 1,
-    color: '#FFF',
-    paddingVertical: 14,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  eyeBtn: {
-    padding: 4,
-  },
-});
+function createFieldStyles(theme: Theme) {
+  return StyleSheet.create({
+    container: {
+      marginBottom: 18,
+    },
+    label: {
+      color: theme.textMuted,
+      fontSize: 11,
+      fontWeight: '800',
+      marginBottom: 8,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    inputWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.input,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 18,
+      paddingHorizontal: 14,
+    },
+    iconLeft: {
+      marginRight: 10,
+    },
+    input: {
+      flex: 1,
+      color: theme.textPrimary,
+      paddingVertical: 14,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    eyeBtn: {
+      padding: 4,
+    },
+  });
+}
 
 function createStyles(theme: Theme) {
   return StyleSheet.create({
@@ -239,12 +247,12 @@ function createStyles(theme: Theme) {
       letterSpacing: 2,
     },
     headerTitle: {
-      color: '#FFF',
+      color: theme.textPrimary,
       fontSize: 28,
       fontWeight: '900',
     },
     headerText: {
-      color: '#fff',
+      color: theme.textSecondary,
       fontSize: 14,
       lineHeight: 22,
       marginTop: 10,
@@ -255,7 +263,7 @@ function createStyles(theme: Theme) {
       borderRadius: 30,
       padding: 22,
       borderWidth: 1,
-      borderColor: '#222',
+      borderColor: theme.border,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 10 },
       shadowOpacity: 0.3,
@@ -271,7 +279,7 @@ function createStyles(theme: Theme) {
       marginTop: 10,
     },
     primaryBtnText: {
-      color: '#fff',
+      color: theme.textOnPrimary,
       fontSize: 16,
       fontWeight: '600',
     },

@@ -261,7 +261,7 @@ const createStyles = (theme: Theme) =>
       letterSpacing: 2,
       textTransform: 'uppercase'
     },
-    headerTitle: { color: "#fff", fontSize: 32, fontWeight: "800", marginTop: 5 },
+    headerTitle: { color: theme.textPrimary, fontSize: 32, fontWeight: "800", marginTop: 5 },
 
     mainCard: { 
       marginHorizontal: 15, 
@@ -278,7 +278,7 @@ const createStyles = (theme: Theme) =>
       backgroundColor: theme.card,
       borderRadius: 24,
       borderWidth: 1,
-      borderColor: "#2a2a2a",
+      borderColor: theme.border,
       overflow: 'hidden'
     },
     barberMainAction: {
@@ -302,11 +302,11 @@ const createStyles = (theme: Theme) =>
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: "#1a1a1a",
+      backgroundColor: theme.surfaceAlt,
       alignItems: "center",
       justifyContent: "center",
       borderWidth: 1,
-      borderColor: "#333",
+      borderColor: theme.border,
       overflow: "hidden",
     },
     avatarImage: {
@@ -319,7 +319,7 @@ const createStyles = (theme: Theme) =>
       fontWeight: "800",
     },
     barberName: {
-      color: "#fff",
+      color: theme.textPrimary,
       fontSize: 15,
       fontWeight: "700",
     },
@@ -334,7 +334,7 @@ const createStyles = (theme: Theme) =>
       paddingVertical: 10,
     },
     editBtnText: {
-      color: "#888",
+      color: theme.textMuted,
       fontSize: 12,
       fontWeight: "600",
     },
@@ -354,7 +354,7 @@ const createStyles = (theme: Theme) =>
       elevation: 3,
     },
     openBtnText: {
-      color: "#fff",
+      color: theme.textOnPrimary,
       fontSize: 12,
       fontWeight: "600",
     },

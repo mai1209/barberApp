@@ -99,8 +99,15 @@ function sanitizeShop(shop) {
     name: shop.fullName,
     slug: shop.shopSlug,
     themeConfig: {
+      mode: themeConfig.mode || null,
       primary: themeConfig.primary || null,
       secondary: themeConfig.secondary || null,
+      card: themeConfig.card || null,
+      gradientColors:
+        Array.isArray(themeConfig.gradientColors) &&
+        themeConfig.gradientColors.length === 4
+          ? themeConfig.gradientColors
+          : null,
       logoDataUrl: themeConfig.logoDataUrl || null,
       bannerDataUrl: themeConfig.bannerDataUrl || null,
       mobileBannerDataUrl: themeConfig.mobileBannerDataUrl || null,

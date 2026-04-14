@@ -14,8 +14,8 @@ import {
 import { launchImageLibrary } from 'react-native-image-picker';
 import { ImagePlus, PaintBucket, Sparkles, SwatchBook } from 'lucide-react-native';
 import ColorPickerModal from '../components/ColorPickerModal';
-import { useTheme } from '../context/ThemeContext';
-import type { Theme } from '../context/ThemeContext';
+import { buildThemeFromConfig, useTheme } from '../context/ThemeContext';
+import type { Theme, ThemeMode } from '../context/ThemeContext';
 import { getUserProfile, saveUserProfile } from '../services/authStorage';
 import { updateThemeConfig } from '../services/api';
 
@@ -78,13 +78,48 @@ const GRADIENT_PRESETS = [
     label: 'Cobre barber',
     colors: ['#FED7AA', '#F97316', '#9A3412', '#1A0E08'],
   },
+  {
+    label: 'Negro clasico',
+    colors: ['#2A2A2A', '#161616', '#090909', '#000000'],
+  },
 ];
 
 const GRADIENT_SWATCHES = Array.from(
   new Set(GRADIENT_PRESETS.flatMap(preset => preset.colors)),
 );
 
+const STYLE_PRESETS = [
+  {
+    label: 'Codex base',
+    helper: 'Vuelve al look original de la app.',
+    mode: 'dark' as ThemeMode,
+    primary: '#FF1493',
+    secondary: '#FFFFFF',
+    card: '#343434',
+    gradientColors: ['#F0EAD6', '#343434', '#1B1B1B', '#080808'],
+  },
+  {
+    label: 'Negro clasico',
+    helper: 'Deja la app en negro y blanco sin romper la lectura.',
+    mode: 'dark' as ThemeMode,
+    primary: '#2B2B2B',
+    secondary: '#FFFFFF',
+    card: '#161616',
+    gradientColors: ['#2A2A2A', '#161616', '#090909', '#000000'],
+  },
+  {
+    label: 'Claro editorial',
+    helper: 'Activa fondo claro, paneles blancos y textos oscuros.',
+    mode: 'light' as ThemeMode,
+    primary: '#111111',
+    secondary: '#1F2937',
+    card: '#FFFFFF',
+    gradientColors: ['#FFFFFF', '#F8FAFC', '#EEF2F7', '#E2E8F0'],
+  },
+];
+
 type FormState = {
+  mode: ThemeMode;
   primary: string;
   secondary: string;
   card: string;
@@ -126,6 +161,7 @@ function buildInitialForm(theme: Theme, profile: any): FormState {
       : theme.gradientColors;
 
   return {
+    mode: customTheme.mode === 'light' ? 'light' : theme.mode,
     primary: customTheme.primary ?? theme.primary,
     secondary: customTheme.secondary ?? theme.secondary,
     card: customTheme.card ?? theme.card,
@@ -140,8 +176,8 @@ function buildInitialForm(theme: Theme, profile: any): FormState {
 }
 
 function previewThemeFromForm(form: FormState, fallbackTheme: Theme): Theme {
-  return {
-    ...fallbackTheme,
+  return buildThemeFromConfig(fallbackTheme, {
+    mode: form.mode,
     primary: isValidHexColor(form.primary) ? form.primary : fallbackTheme.primary,
     secondary: isValidHexColor(form.secondary) ? form.secondary : fallbackTheme.secondary,
     card: isValidHexColor(form.card) ? form.card : fallbackTheme.card,
@@ -151,8 +187,8 @@ function previewThemeFromForm(form: FormState, fallbackTheme: Theme): Theme {
       isValidHexColor(form.gradient2) ? form.gradient2 : fallbackTheme.gradientColors[2],
       isValidHexColor(form.gradient3) ? form.gradient3 : fallbackTheme.gradientColors[3],
     ],
-    logo: form.logoDataUrl ? { uri: form.logoDataUrl } : fallbackTheme.logo,
-  };
+    logoDataUrl: form.logoDataUrl,
+  });
 }
 
 type ImageField = 'logoDataUrl' | 'bannerDataUrl' | 'mobileBannerDataUrl';
@@ -259,6 +295,20 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
     }));
   };
 
+  const applyPreset = (preset: (typeof STYLE_PRESETS)[number]) => {
+    setForm(current => ({
+      ...current,
+      mode: preset.mode,
+    }));
+    updateField('primary', preset.primary);
+    updateField('secondary', preset.secondary);
+    updateField('card', preset.card);
+    updateField('gradient0', preset.gradientColors[0]);
+    updateField('gradient1', preset.gradientColors[1]);
+    updateField('gradient2', preset.gradientColors[2]);
+    updateField('gradient3', preset.gradientColors[3]);
+  };
+
   const handlePickImage = async ({
     field,
     maxWidth,
@@ -325,6 +375,7 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
   };
 
   const persistTheme = async (payload: {
+    mode: ThemeMode | null;
     primary: string | null;
     secondary: string | null;
     card: string | null;
@@ -344,6 +395,7 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
     try {
       setSaving(true);
       await persistTheme({
+        mode: form.mode,
         primary: form.primary,
         secondary: form.secondary,
         card: form.card,
@@ -415,6 +467,23 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
             </View>
           </View>
         </View>
+
+        <SectionCard title="Estilos predeterminados" icon={Sparkles} theme={previewTheme}>
+          <Text style={styles.helperText}>
+            Aplicá una base lista para usar y después, si querés, ajustás colores finos.
+          </Text>
+          <ModeField
+            mode={form.mode}
+            onSelect={mode => setForm(current => ({ ...current, mode }))}
+            theme={previewTheme}
+          />
+          <StylePresetField
+            value={[form.mode, form.primary, form.secondary, form.card, form.gradient0, form.gradient1, form.gradient2, form.gradient3]}
+            options={STYLE_PRESETS}
+            theme={previewTheme}
+            onSelect={applyPreset}
+          />
+        </SectionCard>
 
         <SectionCard title="Logo del local" icon={ImagePlus} theme={previewTheme}>
           <Text style={styles.helperText}>
@@ -517,6 +586,7 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
           <ColorSelectorButton
             label="Elegir color"
             value={form.primary}
+            theme={previewTheme}
             onPress={() => setPickerField('primary')}
           />
         </SectionCard>
@@ -528,6 +598,7 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
           <ColorSelectorButton
             label="Elegir color"
             value={form.secondary}
+            theme={previewTheme}
             onPress={() => setPickerField('secondary')}
           />
         </SectionCard>
@@ -539,6 +610,7 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
           <ColorSelectorButton
             label="Elegir color"
             value={form.card}
+            theme={previewTheme}
             onPress={() => setPickerField('card')}
           />
         </SectionCard>
@@ -550,6 +622,7 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
           <GradientPresetField
             value={[form.gradient0, form.gradient1, form.gradient2, form.gradient3]}
             options={GRADIENT_PRESETS}
+            theme={previewTheme}
             onSelect={colors => {
               updateField('gradient0', colors[0]);
               updateField('gradient1', colors[1]);
@@ -570,36 +643,43 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
             <AdvancedColorField
               label="Botones y acentos"
               value={form.primary}
+              theme={previewTheme}
               onPress={() => setPickerField('primary')}
             />
             <AdvancedColorField
               label="Textos destacados"
               value={form.secondary}
+              theme={previewTheme}
               onPress={() => setPickerField('secondary')}
             />
             <AdvancedColorField
               label="Tarjetas y paneles"
               value={form.card}
+              theme={previewTheme}
               onPress={() => setPickerField('card')}
             />
             <AdvancedColorField
               label="Fondo 1"
               value={form.gradient0}
+              theme={previewTheme}
               onPress={() => setPickerField('gradient0')}
             />
             <AdvancedColorField
               label="Fondo 2"
               value={form.gradient1}
+              theme={previewTheme}
               onPress={() => setPickerField('gradient1')}
             />
             <AdvancedColorField
               label="Fondo 3"
               value={form.gradient2}
+              theme={previewTheme}
               onPress={() => setPickerField('gradient2')}
             />
             <AdvancedColorField
               label="Fondo 4"
               value={form.gradient3}
+              theme={previewTheme}
               onPress={() => setPickerField('gradient3')}
             />
           </View>
@@ -666,10 +746,12 @@ function SectionCard({
 function ColorSelectorButton({
   label,
   value,
+  theme,
   onPress,
 }: {
   label: string;
   value: string;
+  theme: Theme;
   onPress: () => void;
 }) {
   return (
@@ -680,10 +762,10 @@ function ColorSelectorButton({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: '#161616',
+        backgroundColor: theme.surfaceAlt,
         borderRadius: 18,
         borderWidth: 1,
-        borderColor: '#2A2A2A',
+        borderColor: theme.border,
         paddingVertical: 14,
         paddingHorizontal: 14,
       }}
@@ -696,13 +778,13 @@ function ColorSelectorButton({
             borderRadius: 10,
             backgroundColor: value,
             borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.16)',
+            borderColor: theme.border,
             marginRight: 12,
           }}
         />
-        <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>{label}</Text>
+        <Text style={{ color: theme.textPrimary, fontSize: 14, fontWeight: '700' }}>{label}</Text>
       </View>
-      <Text style={{ color: '#A9B4C8', fontSize: 12, fontWeight: '700' }}>{value}</Text>
+      <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '700' }}>{value}</Text>
     </Pressable>
   );
 }
@@ -710,10 +792,12 @@ function ColorSelectorButton({
 function GradientPresetField({
   value,
   options,
+  theme,
   onSelect,
 }: {
   value: string[];
   options: Array<{ label: string; colors: string[] }>;
+  theme: Theme;
   onSelect: (value: string[]) => void;
 }) {
   const selectedKey = value.join('|');
@@ -729,12 +813,12 @@ function GradientPresetField({
             style={{
               borderRadius: 18,
               borderWidth: isActive ? 2 : 1,
-              borderColor: isActive ? '#FFFFFF' : 'rgba(255,255,255,0.08)',
+              borderColor: isActive ? theme.primary : theme.border,
               padding: 12,
-              backgroundColor: '#141414',
+              backgroundColor: theme.surfaceAlt,
             }}
           >
-            <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700', marginBottom: 10 }}>
+            <Text style={{ color: theme.textPrimary, fontSize: 13, fontWeight: '700', marginBottom: 10 }}>
               {option.label}
             </Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -752,10 +836,12 @@ function GradientPresetField({
 function AdvancedColorField({
   label,
   value,
+  theme,
   onPress,
 }: {
   label: string;
   value: string;
+  theme: Theme;
   onPress: () => void;
 }) {
   return (
@@ -763,9 +849,9 @@ function AdvancedColorField({
       onPress={onPress}
       style={{
         marginBottom: 12,
-        backgroundColor: '#171717',
+        backgroundColor: theme.surfaceAlt,
         borderWidth: 1,
-        borderColor: '#2B2B2B',
+        borderColor: theme.border,
         borderRadius: 16,
         paddingHorizontal: 16,
         paddingVertical: 14,
@@ -775,10 +861,10 @@ function AdvancedColorField({
       }}
     >
       <View>
-        <Text style={{ color: '#8E8E8E', fontSize: 12, fontWeight: '700', marginBottom: 8 }}>
+        <Text style={{ color: theme.textMuted, fontSize: 12, fontWeight: '700', marginBottom: 8 }}>
           {label}
         </Text>
-        <Text style={{ color: '#F5F5F5', fontSize: 15, fontWeight: '700' }}>{value}</Text>
+        <Text style={{ color: theme.textPrimary, fontSize: 15, fontWeight: '700' }}>{value}</Text>
       </View>
       <View
         style={{
@@ -787,10 +873,156 @@ function AdvancedColorField({
           borderRadius: 12,
           backgroundColor: value,
           borderWidth: 1,
-          borderColor: 'rgba(255,255,255,0.18)',
+          borderColor: theme.border,
         }}
       />
     </Pressable>
+  );
+}
+
+function StylePresetField({
+  value,
+  options,
+  theme,
+  onSelect,
+}: {
+  value: string[];
+  options: Array<{
+    label: string;
+    helper: string;
+    mode: ThemeMode;
+    primary: string;
+    secondary: string;
+    card: string;
+    gradientColors: string[];
+  }>;
+  theme: Theme;
+  onSelect: (preset: (typeof STYLE_PRESETS)[number]) => void;
+}) {
+  const selectedKey = value.join('|');
+
+  return (
+    <View style={{ gap: 10, marginTop: 12 }}>
+      {options.map(option => {
+        const optionKey = [
+          option.mode,
+          option.primary,
+          option.secondary,
+          option.card,
+          ...option.gradientColors,
+        ].join('|');
+        const isActive = optionKey === selectedKey;
+
+        return (
+          <Pressable
+            key={option.label}
+            onPress={() => onSelect(option)}
+            style={{
+              borderRadius: 18,
+              borderWidth: isActive ? 2 : 1,
+              borderColor: isActive ? theme.primary : theme.border,
+              padding: 14,
+              backgroundColor: theme.surfaceAlt,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={{ color: theme.textPrimary, fontSize: 14, fontWeight: '800' }}>
+                  {option.label}
+                </Text>
+                <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 4 }}>
+                  {option.helper}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                <View
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: 6,
+                    backgroundColor: option.primary,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                  }}
+                />
+                <View
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: 6,
+                    backgroundColor: option.secondary,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                  }}
+                />
+                <View
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: 6,
+                    backgroundColor: option.card,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                  }}
+                />
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+              {option.gradientColors.map(color => (
+                <View
+                  key={`${option.label}-${color}`}
+                  style={{ flex: 1, height: 34, borderRadius: 10, backgroundColor: color }}
+                />
+              ))}
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function ModeField({
+  mode,
+  onSelect,
+  theme,
+}: {
+  mode: ThemeMode;
+  onSelect: (mode: ThemeMode) => void;
+  theme: Theme;
+}) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+      {(['dark', 'light'] as ThemeMode[]).map(item => {
+        const active = item === mode;
+        return (
+          <Pressable
+            key={item}
+            onPress={() => onSelect(item)}
+            style={{
+              flex: 1,
+              borderRadius: 16,
+              paddingVertical: 12,
+              paddingHorizontal: 14,
+              borderWidth: 1,
+              borderColor: active ? theme.primary : theme.border,
+              backgroundColor: active ? `${theme.primary}18` : theme.surfaceAlt,
+            }}
+          >
+            <Text
+              style={{
+                color: active ? theme.primary : theme.textPrimary,
+                fontWeight: '800',
+                textAlign: 'center',
+              }}
+            >
+              {item === 'dark' ? 'Modo oscuro' : 'Modo claro'}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -821,13 +1053,13 @@ function createStyles(theme: Theme) {
       letterSpacing: 2,
     },
     headerTitle: {
-      color: '#FFF',
+      color: theme.textPrimary,
       fontSize: 30,
       fontWeight: '800',
       marginTop: 8,
     },
     headerText: {
-      color: '#fff',
+      color: theme.textSecondary,
       fontSize: 14,
       lineHeight: 20,
       marginTop: 8,
@@ -837,7 +1069,7 @@ function createStyles(theme: Theme) {
       borderRadius: 28,
       padding: 20,
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.08)',
+      borderColor: theme.border,
       marginBottom: 16,
     },
     previewEyebrow: {
@@ -856,7 +1088,7 @@ function createStyles(theme: Theme) {
       minHeight: 108,
       borderRadius: 24,
       padding: 16,
-      backgroundColor: '#121212',
+      backgroundColor: theme.surfaceAlt,
     },
     previewHeroBanner: {
       ...StyleSheet.absoluteFillObject,
@@ -865,14 +1097,14 @@ function createStyles(theme: Theme) {
     },
     previewHeroOverlay: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(10,10,14,0.46)',
+      backgroundColor: theme.overlay,
     },
     previewLogo: {
       width: 68,
       height: 68,
       borderRadius: 20,
       marginRight: 14,
-      backgroundColor: 'rgba(255,255,255,0.05)',
+      backgroundColor: theme.surfaceAlt,
       zIndex: 1,
     },
     previewTextWrap: {
@@ -880,12 +1112,12 @@ function createStyles(theme: Theme) {
       zIndex: 1,
     },
     previewTitle: {
-      color: '#FFF',
+      color: theme.textPrimary,
       fontSize: 21,
       fontWeight: '800',
     },
     previewSubtitle: {
-      color: '#C8C8C8',
+      color: theme.textSecondary,
       fontSize: 13,
       marginTop: 4,
     },
@@ -901,16 +1133,16 @@ function createStyles(theme: Theme) {
       paddingVertical: 12,
     },
     previewButtonText: {
-      color: '#fff',
+      color: theme.textOnPrimary,
       fontWeight: '900',
     },
     previewTag: {
       borderRadius: 16,
       paddingHorizontal: 14,
       paddingVertical: 11,
-      backgroundColor: 'rgba(255,255,255,0.06)',
+      backgroundColor: theme.surfaceAlt,
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.07)',
+      borderColor: theme.border,
     },
     previewTagText: {
       fontWeight: '800',
@@ -920,7 +1152,7 @@ function createStyles(theme: Theme) {
       borderRadius: 28,
       padding: 20,
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.08)',
+      borderColor: theme.border,
       marginBottom: 16,
     },
     sectionHeader: {
@@ -934,17 +1166,17 @@ function createStyles(theme: Theme) {
       borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: 'rgba(255,255,255,0.06)',
+      backgroundColor: theme.surfaceAlt,
       marginRight: 10,
     },
     sectionTitle: {
-      color: '#FFF',
+      color: theme.textPrimary,
       fontSize: 18,
       fontWeight: '800',
       flex: 1,
     },
     helperText: {
-      color: '#B8B8B8',
+      color: theme.textSecondary,
       fontSize: 13,
       lineHeight: 18,
     },
@@ -958,9 +1190,9 @@ function createStyles(theme: Theme) {
     logoBox: {
       height: 120,
       borderRadius: 22,
-      backgroundColor: '#161616',
+      backgroundColor: theme.surfaceAlt,
       borderWidth: 1,
-      borderColor: '#2C2C2C',
+      borderColor: theme.border,
       alignItems: 'center',
       justifyContent: 'center',
       marginTop: 14,
@@ -974,9 +1206,9 @@ function createStyles(theme: Theme) {
     bannerBox: {
       height: 150,
       borderRadius: 22,
-      backgroundColor: '#161616',
+      backgroundColor: theme.surfaceAlt,
       borderWidth: 1,
-      borderColor: '#2C2C2C',
+      borderColor: theme.border,
       overflow: 'hidden',
       marginTop: 14,
       marginBottom: 14,
@@ -995,11 +1227,11 @@ function createStyles(theme: Theme) {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#111111',
+      backgroundColor: theme.surfaceAlt,
       paddingHorizontal: 18,
     },
     bannerPlaceholderText: {
-      color: '#8F8F8F',
+      color: theme.textMuted,
       fontSize: 13,
       fontWeight: '700',
       textAlign: 'center',
@@ -1010,39 +1242,39 @@ function createStyles(theme: Theme) {
     },
     secondaryBtn: {
       flex: 1,
-      backgroundColor: 'rgba(255,255,255,0.07)',
+      backgroundColor: theme.surfaceAlt,
       borderRadius: 16,
       paddingVertical: 14,
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.08)',
+      borderColor: theme.border,
     },
     secondaryBtnText: {
-      color: '#FFF',
+      color: theme.textPrimary,
       fontSize: 14,
       fontWeight: '700',
     },
     ghostBtnInline: {
       width: 92,
-      backgroundColor: '#161616',
+      backgroundColor: theme.surfaceAlt,
       borderRadius: 16,
       paddingVertical: 14,
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: '#2A2A2A',
+      borderColor: theme.border,
     },
     advancedToggle: {
-      backgroundColor: '#161616',
+      backgroundColor: theme.surfaceAlt,
       borderRadius: 16,
       paddingVertical: 13,
       paddingHorizontal: 16,
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: '#2A2A2A',
+      borderColor: theme.border,
       marginBottom: 14,
     },
     advancedToggleText: {
-      color: '#E8E8E8',
+      color: theme.textSecondary,
       fontSize: 13,
       fontWeight: '700',
     },
@@ -1050,9 +1282,9 @@ function createStyles(theme: Theme) {
       marginBottom: 12,
       padding: 14,
       borderRadius: 20,
-      backgroundColor: 'rgba(255,255,255,0.03)',
+      backgroundColor: theme.surfaceAlt,
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.06)',
+      borderColor: theme.border,
     },
     primaryBtn: {
       backgroundColor: theme.primary,
@@ -1067,21 +1299,21 @@ function createStyles(theme: Theme) {
       elevation: 12,
     },
     primaryBtnText: {
-      color: '#fff',
+      color: theme.textOnPrimary,
       fontSize: 12,
       fontWeight: '900',
     },
     ghostBtn: {
-      backgroundColor: '#161616',
+      backgroundColor: theme.surfaceAlt,
       borderRadius: 16,
       paddingVertical: 14,
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: '#2A2A2A',
+      borderColor: theme.border,
       marginTop: 2,
     },
     ghostBtnText: {
-      color: '#DDD',
+      color: theme.textSecondary,
       fontSize: 14,
       fontWeight: '700',
     },

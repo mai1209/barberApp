@@ -269,7 +269,7 @@ export default function NotificationSettingsScreen() {
         onPress={handleSave}
       >
         {saving ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={theme.textOnPrimary} />
         ) : (
           <Text style={styles.saveButtonText}>Guardar configuración</Text>
         )}
@@ -299,7 +299,7 @@ function createStyles(theme: Theme) {
       marginBottom: 8,
     },
     title: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 32,
       fontWeight: '800',
     },
@@ -317,7 +317,7 @@ function createStyles(theme: Theme) {
       gap: 14,
     },
     sectionLabel: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 16,
       fontWeight: '800',
     },
@@ -335,9 +335,9 @@ function createStyles(theme: Theme) {
       borderRadius: 16,
       paddingVertical: 14,
       paddingHorizontal: 12,
-      backgroundColor: '#252525',
+      backgroundColor: theme.input,
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: theme.border,
       alignItems: 'center',
     },
     toggleChipActive: {
@@ -359,9 +359,9 @@ function createStyles(theme: Theme) {
     },
     optionChip: {
       borderRadius: 14,
-      backgroundColor: '#252525',
+      backgroundColor: theme.input,
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: theme.border,
       paddingVertical: 12,
       paddingHorizontal: 14,
     },
@@ -389,7 +389,7 @@ function createStyles(theme: Theme) {
       opacity: 0.7,
     },
     saveButtonText: {
-      color: theme.secondary,
+      color: theme.textOnPrimary,
       fontSize: 15,
       fontWeight: '800',
     },

@@ -36,6 +36,7 @@ export default function RecoverPasswordScreen({
 }) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const fieldStyles = useMemo(() => createFieldStyles(theme), [theme]);
 
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -139,6 +140,7 @@ export default function RecoverPasswordScreen({
         <View style={styles.card}>
           <BaseField
             label="Mail de la cuenta"
+            styles={fieldStyles}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -153,10 +155,10 @@ export default function RecoverPasswordScreen({
             disabled={sending}
           >
             {sending ? (
-              <ActivityIndicator color="#FFF" />
+              <ActivityIndicator color={theme.textPrimary} />
             ) : (
               <>
-                <Send size={16} color="#FFF" style={{ marginRight: 8 }} />
+                <Send size={16} color={theme.textPrimary} style={{ marginRight: 8 }} />
                 <Text style={styles.secondaryBtnText}>
                   {hasRequestedCode
                     ? 'Reenviar código'
@@ -174,6 +176,7 @@ export default function RecoverPasswordScreen({
 
           <BaseField
             label="Código de verificación"
+            styles={fieldStyles}
             value={code}
             onChangeText={setCode}
             keyboardType="number-pad"
@@ -187,6 +190,7 @@ export default function RecoverPasswordScreen({
             onChangeText={setNewPassword}
             placeholder="••••••••"
             theme={theme}
+            styles={fieldStyles}
           />
 
           <PasswordField
@@ -195,6 +199,7 @@ export default function RecoverPasswordScreen({
             onChangeText={setConfirmPassword}
             placeholder="••••••••"
             theme={theme}
+            styles={fieldStyles}
           />
 
           {!!error && (
@@ -222,16 +227,16 @@ export default function RecoverPasswordScreen({
 
 // --- COMPONENTES INTERNOS ---
 
-function BaseField({ label, icon: Icon, ...props }: any) {
+function BaseField({ label, icon: Icon, styles, ...props }: any) {
   return (
-    <View style={fStyles.container}>
-      <Text style={fStyles.label}>{label}</Text>
-      <View style={fStyles.inputWrapper}>
-        <Icon size={16} color="#555" style={fStyles.iconLeft} />
+    <View style={styles.container}>
+      <Text style={styles.label}>{label}</Text>
+      <View style={styles.inputWrapper}>
+        <Icon size={16} color={styles.iconColor} style={styles.iconLeft} />
         <TextInput
           {...props}
-          placeholderTextColor="#444"
-          style={fStyles.input}
+          placeholderTextColor={styles.placeholderColor}
+          style={styles.input}
         />
       </View>
     </View>
@@ -244,26 +249,27 @@ function PasswordField({
   onChangeText,
   placeholder,
   theme,
+  styles,
 }: any) {
   const [visible, setVisible] = useState(false);
   return (
-    <View style={fStyles.container}>
-      <Text style={fStyles.label}>{label}</Text>
-      <View style={fStyles.inputWrapper}>
-        <Lock size={16} color="#555" style={fStyles.iconLeft} />
+    <View style={styles.container}>
+      <Text style={styles.label}>{label}</Text>
+      <View style={styles.inputWrapper}>
+        <Lock size={16} color={styles.iconColor} style={styles.iconLeft} />
         <TextInput
           value={value}
           onChangeText={onChangeText}
           secureTextEntry={!visible}
           placeholder={placeholder}
-          placeholderTextColor="#444"
-          style={fStyles.input}
+          placeholderTextColor={styles.placeholderColor}
+          style={styles.input}
         />
         <Pressable onPress={() => setVisible(!visible)} hitSlop={10}>
           {visible ? (
             <EyeOff size={20} color={theme.primary} />
           ) : (
-            <Eye size={20} color="#555" />
+            <Eye size={20} color={styles.iconColor} />
           )}
         </Pressable>
       </View>
@@ -271,36 +277,38 @@ function PasswordField({
   );
 }
 
-// --- ESTILOS ---
-
-const fStyles = StyleSheet.create({
-  container: { marginBottom: 16 },
-  label: {
-    color: '#888',
-    fontSize: 11,
-    fontWeight: '800',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#121212',
-    borderWidth: 1,
-    borderColor: '#222',
-    borderRadius: 18,
-    paddingHorizontal: 14,
-  },
-  iconLeft: { marginRight: 10 },
-  input: {
-    flex: 1,
-    color: '#FFF',
-    paddingVertical: 14,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-});
+function createFieldStyles(theme: Theme) {
+  return {
+    container: { marginBottom: 16 },
+    label: {
+      color: theme.textMuted,
+      fontSize: 11,
+      fontWeight: '800' as const,
+      marginBottom: 8,
+      textTransform: 'uppercase' as const,
+      letterSpacing: 1,
+    },
+    inputWrapper: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      backgroundColor: theme.input,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 18,
+      paddingHorizontal: 14,
+    },
+    iconLeft: { marginRight: 10 },
+    input: {
+      flex: 1,
+      color: theme.textPrimary,
+      paddingVertical: 14,
+      fontSize: 15,
+      fontWeight: '600' as const,
+    },
+    iconColor: theme.textMuted,
+    placeholderColor: theme.placeholder,
+  };
+}
 
 function createStyles(theme: Theme) {
   return StyleSheet.create({
@@ -324,34 +332,34 @@ function createStyles(theme: Theme) {
       fontWeight: '900',
       letterSpacing: 2,
     },
-    headerTitle: { color: '#FFF', fontSize: 28, fontWeight: '900' },
-    headerText: { color: '#fff', fontSize: 14, lineHeight: 22, marginTop: 8 },
+    headerTitle: { color: theme.textPrimary, fontSize: 28, fontWeight: '900' },
+    headerText: { color: theme.textSecondary, fontSize: 14, lineHeight: 22, marginTop: 8 },
     card: {
       backgroundColor: theme.card,
       borderRadius: 30,
       padding: 22,
       borderWidth: 1,
-      borderColor: '#222',
+      borderColor: theme.border,
     },
     secondaryBtn: {
-      backgroundColor: '#1A1A1A',
+      backgroundColor: theme.surfaceAlt,
       borderRadius: 16,
       paddingVertical: 14,
       alignItems: 'center',
       justifyContent: 'center',
       flexDirection: 'row',
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: theme.border,
     },
-    secondaryBtnText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+    secondaryBtnText: { color: theme.textPrimary, fontSize: 13, fontWeight: '700' },
     separator: {
       flexDirection: 'row',
       alignItems: 'center',
       marginVertical: 20,
       gap: 10,
     },
-    separatorLine: { flex: 1, height: 1, backgroundColor: '#222' },
-    separatorText: { color: '#444', fontSize: 10, fontWeight: '900' },
+    separatorLine: { flex: 1, height: 1, backgroundColor: theme.border },
+    separatorText: { color: theme.textMuted, fontSize: 10, fontWeight: '900' },
     primaryBtn: {
       backgroundColor: theme.primary,
       borderRadius: 18,
@@ -360,7 +368,7 @@ function createStyles(theme: Theme) {
       justifyContent: 'center',
       marginTop: 10,
     },
-    primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+    primaryBtnText: { color: theme.textOnPrimary, fontSize: 16, fontWeight: '600' },
     errorContainer: {
       backgroundColor: 'rgba(255, 141, 141, 0.1)',
       padding: 12,

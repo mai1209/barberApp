@@ -22,6 +22,7 @@ import ShopClosureSettingsScreen from '../screnn/ShopClosureSettingsScreen';
 import ChangePasswordScreen from '../screnn/ChangePasswordScreen';
 import RecoverPasswordScreen from '../screnn/RecoverPasswordScreen';
 import SettingsScreen from '../screnn/SettingsScreen';
+import UsageGuideScreen from '../screnn/UsageGuideScreen';
 import PlansScreen from '../screnn/PlansScreen';
 import SubscriptionSettingsScreen from '../screnn/SubscriptionSettingsScreen';
 import ScreenGradient from '../components/ScreenGradient';
@@ -56,6 +57,7 @@ export type RootStackParamList = {
   'Notification-Settings': undefined;
   'Shop-Closure-Settings': undefined;
   'Subscription-Settings': undefined;
+  'Usage-Guide': undefined;
   Plans:
     | {
         fromRegistration?: boolean;
@@ -108,6 +110,7 @@ export default function StackNavigator({
               <Stack.Screen name="Owner-Metrics" component={OwnerMetricsScreen} />
               <Stack.Screen name="Customer-History" component={CustomerHistoryScreen} />
               <Stack.Screen name="Settings" component={SettingsScreen} />
+              <Stack.Screen name="Usage-Guide" component={UsageGuideScreen} />
               <Stack.Screen name="Appearance-Settings" component={AppearanceSettingsScreen} />
               <Stack.Screen name="Service-Settings" component={ServiceSettingsScreen} />
               <Stack.Screen name="Payment-Settings" component={PaymentSettingsScreen} />

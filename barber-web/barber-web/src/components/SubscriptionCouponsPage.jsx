@@ -31,6 +31,10 @@ function getCouponDurationLabel(subscription) {
     return 'Solo primer pago';
   }
 
+  if (subscription?.couponBenefitDurationType === 'days') {
+    return `Durante ${subscription?.couponBenefitDurationValue || 0} dias`;
+  }
+
   if (subscription?.couponBenefitDurationType === 'months') {
     return `Durante ${subscription?.couponBenefitDurationValue || 0} meses`;
   }

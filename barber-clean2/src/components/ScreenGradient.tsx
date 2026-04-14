@@ -7,6 +7,7 @@ function BrownScreenGradient() {
   const { theme } = useTheme();
   const [c0, c1, c2, c3] = theme.gradientColors;
   const base = c0 ?? theme.background;
+  const isLight = theme.mode === 'light';
 
   return (
     <View
@@ -31,8 +32,8 @@ function BrownScreenGradient() {
           cy="14%"
           rx="160"
           ry="150"
-          fill="#7A2A1A"
-          opacity="0.16"
+          fill={isLight ? '#FFFFFF' : '#7A2A1A'}
+          opacity={isLight ? '0.35' : '0.16'}
         />
 
         {/* Glow inferior */}
@@ -41,8 +42,8 @@ function BrownScreenGradient() {
           cy="84%"
           rx="230"
           ry="200"
-          fill="#4D190E"
-          opacity="0.18"
+          fill={isLight ? '#CBD5E1' : '#4D190E'}
+          opacity={isLight ? '0.28' : '0.18'}
         />
 
         {/* Sombra central */}
@@ -51,8 +52,8 @@ function BrownScreenGradient() {
           cy="50%"
           rx="320"
           ry="240"
-          fill="#000000"
-          opacity="0.4"
+          fill={isLight ? '#94A3B8' : '#000000'}
+          opacity={isLight ? '0.18' : '0.4'}
         />
       </Svg>
     </View>

@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 
 const themeConfigSchema = new mongoose.Schema(
   {
+    mode: { type: String, enum: ["dark", "light"], default: null },
     primary: { type: String, trim: true, default: null },
     secondary: { type: String, trim: true, default: null },
     card: { type: String, trim: true, default: null },
@@ -142,7 +143,7 @@ const subscriptionSchema = new mongoose.Schema(
     },
     couponBenefitDurationType: {
       type: String,
-      enum: ["forever", "one_time", "months", null],
+      enum: ["forever", "one_time", "days", "months", null],
       default: null,
     },
     couponBenefitDurationValue: {
@@ -192,7 +193,7 @@ const subscriptionSchema = new mongoose.Schema(
     },
     pendingCouponBenefitDurationType: {
       type: String,
-      enum: ["forever", "one_time", "months", null],
+      enum: ["forever", "one_time", "days", "months", null],
       default: null,
     },
     pendingCouponBenefitDurationValue: {

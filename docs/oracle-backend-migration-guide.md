@@ -710,7 +710,96 @@ No son necesariamente lo mismo. Hay que mirar que secret espera exactamente cada
 
 ---
 
-## 16. Errores reales que aparecieron en este proceso
+## 16. Push notifications: error real y solucion final
+
+Despues de dejar Oracle operativo, aparecio un problema puntual:
+
+- los turnos web se guardaban
+- el backend respondia bien
+- el usuario tenia `pushToken` guardado
+- pero la notificacion push instantanea no llegaba al telefono
+
+### Prueba que confirmo el problema
+
+Se hizo una prueba manual en Oracle enviando una push directamente al token:
+
+```bash
+cd /home/ubuntu/barberApp/backend
+node --input-type=module -e 'import "dotenv/config"; import admin from "./firebase.js"; const resp = await admin.messaging().send({ token: "TOKEN_REAL", notification: { title: "Prueba push Oracle", body: "Si ves esto, Firebase y el token están bien." }, android: { priority: "high" } }); console.log(resp);'
+```
+
+Firebase devolvio:
+
+```text
+FirebaseMessagingError: SenderId mismatch
+code: 'messaging/mismatched-credential'
+```
+
+### Causa real
+
+La app movil estaba registrada en un proyecto Firebase, pero el backend estaba usando una service account de otro proyecto.
+
+App movil:
+
+- proyecto: `barberapp-codex`
+- sender id: `856164090518`
+
+Backend Oracle al principio:
+
+- usaba `firebase-key.json` de otro proyecto (`growth-219b1`)
+
+Eso hace que Firebase rechace cualquier envio push hacia tokens emitidos por la app.
+
+### Como se detecto
+
+Se verifico:
+
+- `pushToken` del usuario existia en Mongo
+- `notificationSettings` estaban activas
+- el backend intentaba enviar la push
+- Firebase rechazaba el envio por credenciales cruzadas
+
+### Solucion aplicada
+
+Se descargo desde Firebase Console la service account correcta del proyecto:
+
+- `barberapp-codex`
+
+Archivo descargado:
+
+- `barberapp-codex-firebase-adminsdk-fbsvc-0ba42efa59.json`
+
+Luego se reemplazo en Oracle el archivo del backend:
+
+```bash
+scp /Users/maidev/Projects/appBarberiaOrion/barber-clean2/barberapp-codex-firebase-adminsdk-fbsvc-0ba42efa59.json ubuntu@147.15.76.141:/home/ubuntu/barberApp/backend/firebase-key.json
+```
+
+Y despues:
+
+```bash
+ssh ubuntu@147.15.76.141
+chmod 600 /home/ubuntu/barberApp/backend/firebase-key.json
+sudo systemctl restart barber-backend
+```
+
+### Validacion final correcta
+
+Despues del reemplazo:
+
+- la prueba manual de push funciono
+- la push instantanea de turno web llego al telefono
+
+Conclusion:
+
+- la infraestructura de Oracle estaba bien
+- el problema no era el token
+- el problema no era la app
+- el problema era usar Admin SDK de Firebase del proyecto equivocado
+
+---
+
+## 17. Errores reales que aparecieron en este proceso
 
 ### Error A: deploy viejo en Vercel
 
@@ -774,9 +863,22 @@ Causa:
 
 - faltaba instalar / activar la version nueva
 
+### Error G: Firebase Admin del proyecto equivocado
+
+Sintoma:
+
+- los turnos web se guardaban
+- el usuario tenia `pushToken`
+- pero no llegaban las push
+
+Causa:
+
+- `firebase-key.json` del backend pertenecia a otro proyecto Firebase
+- Firebase devolvia `SenderId mismatch`
+
 ---
 
-## 17. Checklist final resumida
+## 18. Checklist final resumida
 
 ### Codigo local
 
@@ -788,6 +890,7 @@ Causa:
 - [ ] `git pull`
 - [ ] `.env` final correcto
 - [ ] `ALLOWED_WEB_ORIGINS` cargado
+- [ ] `firebase-key.json` del proyecto Firebase correcto (`barberapp-codex`)
 - [ ] `sudo systemctl restart barber-backend`
 - [ ] `sudo systemctl restart caddy`
 
@@ -814,10 +917,11 @@ Causa:
 - [ ] subir version
 - [ ] generar nuevo AAB/APK
 - [ ] publicar update
+- [ ] probar recepcion de push instantanea desde turno web
 
 ---
 
-## 18. Comandos utiles de soporte
+## 19. Comandos utiles de soporte
 
 ### Estado del backend
 
@@ -849,9 +953,16 @@ curl http://147.15.76.141:3002/
 curl https://api.barberappbycodex.com/
 ```
 
+### Validar push manual
+
+```bash
+cd /home/ubuntu/barberApp/backend
+node --input-type=module -e 'import "dotenv/config"; import admin from "./firebase.js"; const resp = await admin.messaging().send({ token: "TOKEN_REAL", notification: { title: "Prueba push Oracle", body: "Si ves esto, Firebase y el token están bien." }, android: { priority: "high" } }); console.log(resp);'
+```
+
 ---
 
-## 19. Recomendacion tecnica final
+## 20. Recomendacion tecnica final
 
 La arquitectura correcta para este proyecto hoy es esta:
 
@@ -866,7 +977,7 @@ El punto critico era sacar el backend de Vercel para evitar deploys inconsistent
 
 ---
 
-## 20. Archivo PDF final
+## 21. Archivo PDF final
 
 Este documento tambien fue exportado como PDF para tenerlo como guia operativa.
 

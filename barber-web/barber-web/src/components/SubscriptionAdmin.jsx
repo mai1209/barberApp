@@ -105,6 +105,13 @@ function getCouponDurationBadge(coupon) {
     };
   }
 
+  if (coupon?.benefitDurationType === 'days') {
+    return {
+      label: `${coupon?.benefitDurationValue || 0} dias`,
+      className: styles.couponBadgeMonths,
+    };
+  }
+
   if (coupon?.benefitDurationType === 'months') {
     return {
       label: `${coupon?.benefitDurationValue || 0} meses`,
@@ -1168,18 +1175,21 @@ export default function SubscriptionAdmin() {
                 >
                   <option value="forever">Permanente</option>
                   <option value="one_time">Solo primer pago</option>
+                  <option value="days">Durante X dias</option>
                   <option value="months">Durante X meses</option>
                 </select>
               </label>
-              {couponDraft.benefitDurationType === 'months' ? (
+              {couponDraft.benefitDurationType === 'days' || couponDraft.benefitDurationType === 'months' ? (
                 <label className={styles.priceField}>
-                  <span>Cuántos meses</span>
+                  <span>
+                    {couponDraft.benefitDurationType === 'days' ? 'Cuántos dias' : 'Cuántos meses'}
+                  </span>
                   <input
                     type="number"
                     value={couponDraft.benefitDurationValue}
                     onChange={(e) => handleCouponDraftChange('benefitDurationValue', e.target.value)}
                     className={styles.priceInput}
-                    placeholder="12"
+                    placeholder={couponDraft.benefitDurationType === 'days' ? '14' : '12'}
                   />
                 </label>
               ) : null}
@@ -1306,6 +1316,8 @@ export default function SubscriptionAdmin() {
                       ? 'permanente'
                       : coupon.benefitDurationType === 'one_time'
                         ? 'solo primer pago'
+                        : coupon.benefitDurationType === 'days'
+                          ? `durante ${coupon.benefitDurationValue || 0} dias`
                         : `durante ${coupon.benefitDurationValue || 0} meses`} · Válido hasta:{' '}
                     {formatDate(coupon.expiresAt)} · {expired ? 'Vencido' : coupon.isActive ? 'Activo' : 'Inactivo'}
                   </p>

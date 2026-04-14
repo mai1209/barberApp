@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import {
   BellRing,
+  BookOpen,
   CalendarDays,
   ChevronRight,
   CreditCard,
@@ -65,15 +66,14 @@ function MenuItem({
         </Text>
         <Text style={styles.itemDescription}>{description}</Text>
       </View>
-      <ChevronRight size={18} color="#6E7585" />
+      <ChevronRight size={18} color={theme?.textMuted || '#6E7585'} />
     </Pressable>
   );
 }
 
 export default function SettingsScreen({ navigation }: { navigation: any }) {
-  // 1. Extraemos theme y applyUserTheme
   const { theme, applyUserTheme } = useTheme();
-  const styles = createStyles();
+  const styles = createStyles(theme);
 
   const handleLogout = async () => {
     Alert.alert(
@@ -212,6 +212,15 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
       <Text style={styles.sectionLabel}>Soporte</Text>
       <View style={styles.groupCard}>
         <MenuItem
+          icon={BookOpen}
+          label="Manual de uso"
+          description="Guía simple para arrancar, configurar y compartir tu sistema."
+          onPress={() => navigation.navigate('Usage-Guide')}
+          theme={theme}
+          styles={styles}
+        />
+        <View style={styles.separator} />
+        <MenuItem
           icon={Mail}
           label="Comunicate con soporte"
           description="Abrí un mail y te ayudamos con la configuración."
@@ -238,11 +247,11 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
 }
 
 // Función centralizada de estilos para evitar duplicados
-function createStyles() {
+function createStyles(theme: any) {
   return StyleSheet.create({
     screen: {
       flex: 1,
-      backgroundColor: '#121212',
+      backgroundColor: theme.background,
     },
     scrollContent: {
       paddingTop: Platform.OS === 'ios' ? 72 : 28,
@@ -256,17 +265,17 @@ function createStyles() {
       marginBottom: 18,
     },
     title: {
-      color: '#FFFFFF',
+      color: theme.textPrimary,
       fontSize: 34,
       fontWeight: '800',
     },
     subtitle: {
-      color: '#98A2B3',
+      color: theme.textSecondary,
       fontSize: 14,
       marginTop: 6,
     },
     sectionLabel: {
-      color: '#6E7585',
+      color: theme.textMuted,
       fontSize: 12,
       fontWeight: '700',
       textTransform: 'uppercase',
@@ -274,10 +283,10 @@ function createStyles() {
       marginTop: 6,
     },
     groupCard: {
-      backgroundColor: '#1c1c1c',
+      backgroundColor: theme.card,
       borderRadius: 18,
       borderWidth: 1,
-      borderColor: 'rgba(110, 117, 133, 0.24)',
+      borderColor: theme.border,
       marginBottom: 20,
       overflow: 'hidden',
     },
@@ -289,7 +298,7 @@ function createStyles() {
     },
     menuItemPressed: {
       opacity: 0.82,
-      backgroundColor: 'rgba(255,255,255,0.02)',
+      backgroundColor: theme.surfaceAlt,
     },
     iconWrap: {
       width: 36,
@@ -297,7 +306,7 @@ function createStyles() {
       borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#8b8b8b22',
+      backgroundColor: theme.surfaceAlt,
       marginRight: 12,
     },
     iconWrapDanger: {
@@ -308,7 +317,7 @@ function createStyles() {
       paddingRight: 12,
     },
     itemLabel: {
-      color: '#F5F7FB',
+      color: theme.textPrimary,
       fontSize: 16,
       fontWeight: '700',
     },
@@ -316,14 +325,14 @@ function createStyles() {
       color: '#FFD0D0',
     },
     itemDescription: {
-      color: '#95A0B5',
+      color: theme.textSecondary,
       fontSize: 12,
       marginTop: 4,
       lineHeight: 17,
     },
     separator: {
       height: 1,
-      backgroundColor: 'rgba(255,255,255,0.05)',
+      backgroundColor: theme.border,
       marginLeft: 64,
     },
   });

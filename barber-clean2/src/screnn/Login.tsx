@@ -167,6 +167,16 @@ function Login({ navigation }: any) {
             </Pressable>
 
             <Pressable
+              onPress={() => navigation.navigate('Recover-Password')}
+              style={styles.recoverBtn}
+            >
+              <Text style={styles.recoverText}>
+                ¿Olvidaste tu contraseña?{' '}
+                <Text style={styles.recoverTextBold}>Recuperarla</Text>
+              </Text>
+            </Pressable>
+
+            <Pressable
               onPress={() => navigation.navigate('Register')}
               style={styles.registerBtn}
             >
@@ -248,6 +258,9 @@ const createStyles = (theme: Theme | typeof AUTH_THEME) =>
       marginTop: 10,
     },
     loginBtnText: { color: '#fff', fontSize: 18, fontWeight: '800' },
+    recoverBtn: { marginTop: 16, alignItems: 'center' },
+    recoverText: { color: '#666', fontSize: 14 },
+    recoverTextBold: { color: theme.primary, fontWeight: '700' },
     registerBtn: { marginTop: 25, alignItems: 'center' },
     registerText: { color: '#666', fontSize: 14 },
     registerTextBold: { color: '#fff', fontWeight: '700' },

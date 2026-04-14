@@ -359,7 +359,7 @@ const makeStyles = (theme: Theme) =>
       letterSpacing: 3,
     },
     headerTitle: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 24,
       fontWeight: '900',
     },
@@ -385,7 +385,7 @@ const makeStyles = (theme: Theme) =>
       gap: 6,
     },
     filterHeaderText: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 13,
       fontWeight: '600',
     },
@@ -393,9 +393,9 @@ const makeStyles = (theme: Theme) =>
       paddingHorizontal: 12,
       paddingVertical: 6,
       borderRadius: 10,
-      backgroundColor: '#151515',
+      backgroundColor: theme.surfaceAlt,
       borderWidth: 1,
-      borderColor: '#252525',
+      borderColor: theme.border,
     },
     annualChipActive: {
       backgroundColor: hexToRgba(theme.primary, 0.1),
@@ -419,7 +419,7 @@ const makeStyles = (theme: Theme) =>
       borderRadius: 14,
       backgroundColor: theme.card,
       borderWidth: 1,
-      borderColor: '#222',
+      borderColor: theme.border,
       alignItems: 'center',
     },
     monthBoxActive: {
@@ -427,7 +427,7 @@ const makeStyles = (theme: Theme) =>
       backgroundColor: hexToRgba(theme.primary, 0.05),
     },
     monthText: {
-      color: '#555',
+      color: theme.textMuted,
       fontSize: 13,
       fontWeight: '800',
     },
@@ -466,7 +466,7 @@ const makeStyles = (theme: Theme) =>
       marginBottom: 15,
     },
     heroPeriod: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 12,
       fontWeight: '700',
       textTransform: 'uppercase',
@@ -474,7 +474,7 @@ const makeStyles = (theme: Theme) =>
     liveBadge: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#000',
+      backgroundColor: theme.surfaceAlt,
       paddingHorizontal: 10,
       paddingVertical: 5,
       borderRadius: 12,
@@ -487,12 +487,12 @@ const makeStyles = (theme: Theme) =>
       backgroundColor: theme.primary,
     },
     liveText: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 9,
       fontWeight: '900',
     },
     heroValue: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 38,
       fontWeight: '900',
       marginBottom: 20,
@@ -504,7 +504,7 @@ const makeStyles = (theme: Theme) =>
       alignItems: 'center',
       gap: 15,
       borderTopWidth: 1,
-      borderTopColor: '#252525',
+      borderTopColor: theme.border,
       paddingTop: 15,
     },
     heroMetric: {
@@ -513,7 +513,7 @@ const makeStyles = (theme: Theme) =>
       gap: 6,
     },
     heroMetricText: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 13,
       fontWeight: '700',
       opacity: 0.8,
@@ -521,7 +521,7 @@ const makeStyles = (theme: Theme) =>
     heroDivider: {
       width: 1,
       height: 15,
-      backgroundColor: '#333',
+      backgroundColor: theme.border,
     },
 
     // Payment Row
@@ -536,7 +536,7 @@ const makeStyles = (theme: Theme) =>
       borderRadius: 22,
       padding: 16,
       borderWidth: 1,
-      borderColor: '#222',
+      borderColor: theme.border,
       flexDirection: 'row',
       gap: 12,
       alignItems: 'center',
@@ -549,18 +549,18 @@ const makeStyles = (theme: Theme) =>
       justifyContent: 'center',
     },
     paymentLabel: {
-      color: '#777',
+      color: theme.textMuted,
       fontSize: 11,
       fontWeight: '700',
     },
     paymentValue: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 14,
       fontWeight: '800',
       marginTop: 2,
     },
     paymentSub: {
-      color: '#555',
+      color: theme.textMuted,
       fontSize: 10,
       fontWeight: '600',
     },
@@ -573,7 +573,7 @@ const makeStyles = (theme: Theme) =>
       marginBottom: 15,
     },
     sectionTitle: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 18,
       fontWeight: '900',
     },
@@ -585,7 +585,7 @@ const makeStyles = (theme: Theme) =>
       borderRadius: 20,
       padding: 16,
       borderWidth: 1,
-      borderColor: '#222',
+      borderColor: theme.border,
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
@@ -594,11 +594,11 @@ const makeStyles = (theme: Theme) =>
       width: 24,
       height: 24,
       borderRadius: 8,
-      backgroundColor: '#1a1a1a',
+      backgroundColor: theme.surfaceAlt,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: theme.border,
     },
     rankText: {
       color: theme.primary,
@@ -611,12 +611,12 @@ const makeStyles = (theme: Theme) =>
       gap: 12,
     },
     barberNameText: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 15,
       fontWeight: '800',
     },
     barberSubText: {
-      color: '#666',
+      color: theme.textMuted,
       fontSize: 11,
       fontWeight: '600',
     },
@@ -624,7 +624,7 @@ const makeStyles = (theme: Theme) =>
       alignItems: 'flex-end',
     },
     barberRevenue: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 15,
       fontWeight: '900',
     },
@@ -634,7 +634,7 @@ const makeStyles = (theme: Theme) =>
       marginTop: 4,
     },
     miniSplitText: {
-      color: '#444',
+      color: theme.textMuted,
       fontSize: 9,
       fontWeight: '700',
     },

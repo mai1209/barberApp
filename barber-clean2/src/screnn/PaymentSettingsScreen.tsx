@@ -60,7 +60,8 @@ function normalizeFormFromUser(user: any): FormState {
 }
 
 export default function PaymentSettingsScreen() {
-  const { theme } = useTheme(); // Obtenemos el tema dinámico
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -204,6 +205,7 @@ export default function PaymentSettingsScreen() {
           value={form.cashEnabled}
           onValueChange={(v: boolean) => setForm(c => ({ ...c, cashEnabled: v }))}
           theme={theme}
+          styles={styles}
         />
         <View style={styles.separator} />
         <RowSwitch
@@ -214,22 +216,23 @@ export default function PaymentSettingsScreen() {
             setForm(c => ({ ...c, advancePaymentEnabled: v }))
           }
           theme={theme}
+          styles={styles}
         />
 
         {form.advancePaymentEnabled && (
           <View style={styles.nestedBlock}>
             <Text style={styles.blockLabel}>Modo de cobro</Text>
             <View style={styles.segmentRow}>
-              <SegmentButton label="Seña" active={form.advanceMode === 'deposit'} onPress={() => setForm(c => ({ ...c, advanceMode: 'deposit' }))} theme={theme} />
-              <SegmentButton label="Total" active={form.advanceMode === 'full'} onPress={() => setForm(c => ({ ...c, advanceMode: 'full' }))} theme={theme} />
+              <SegmentButton label="Seña" active={form.advanceMode === 'deposit'} onPress={() => setForm(c => ({ ...c, advanceMode: 'deposit' }))} theme={theme} styles={styles} />
+              <SegmentButton label="Total" active={form.advanceMode === 'full'} onPress={() => setForm(c => ({ ...c, advanceMode: 'full' }))} theme={theme} styles={styles} />
             </View>
 
             {form.advanceMode === 'deposit' && (
               <>
                 <Text style={styles.blockLabel}>Tipo de seña</Text>
                 <View style={styles.segmentRow}>
-                  <SegmentButton label="Porcentaje" active={form.advanceType === 'percent'} onPress={() => setForm(c => ({ ...c, advanceType: 'percent' }))} theme={theme} />
-                  <SegmentButton label="Fijo" active={form.advanceType === 'fixed'} onPress={() => setForm(c => ({ ...c, advanceType: 'fixed' }))} theme={theme} />
+                  <SegmentButton label="Porcentaje" active={form.advanceType === 'percent'} onPress={() => setForm(c => ({ ...c, advanceType: 'percent' }))} theme={theme} styles={styles} />
+                  <SegmentButton label="Fijo" active={form.advanceType === 'fixed'} onPress={() => setForm(c => ({ ...c, advanceType: 'fixed' }))} theme={theme} styles={styles} />
                 </View>
                 <TextInput
                   style={[styles.input, { borderColor: theme.primary + '44' }]}
@@ -293,6 +296,7 @@ export default function PaymentSettingsScreen() {
               active={false}
               onPress={handleConnectMercadoPago}
               theme={theme}
+              styles={styles}
               containerStyle={styles.actionButton}
             />
             <SegmentButton
@@ -300,6 +304,7 @@ export default function PaymentSettingsScreen() {
               active={false}
               onPress={loadSettings}
               theme={theme}
+              styles={styles}
               containerStyle={styles.actionButton}
             />
             {form.mercadoPagoConnectionStatus === 'connected' ? (
@@ -308,6 +313,7 @@ export default function PaymentSettingsScreen() {
                 active={false}
                 onPress={handleDisconnectMercadoPago}
                 theme={theme}
+                styles={styles}
                 containerStyle={styles.actionButton}
               />
             ) : null}
@@ -327,7 +333,7 @@ export default function PaymentSettingsScreen() {
 }
 
 // Sub-componentes con Theme
-function RowSwitch({ label, description, value, onValueChange, theme }: any) {
+function RowSwitch({ label, description, value, onValueChange, theme, styles }: any) {
   return (
     <View style={styles.rowSwitch}>
       <View style={styles.rowSwitchBody}>
@@ -344,7 +350,7 @@ function RowSwitch({ label, description, value, onValueChange, theme }: any) {
   );
 }
 
-function SegmentButton({ label, active, onPress, theme, containerStyle }: any) {
+function SegmentButton({ label, active, onPress, theme, containerStyle, styles }: any) {
   return (
     <Pressable
       onPress={onPress}
@@ -359,22 +365,22 @@ function SegmentButton({ label, active, onPress, theme, containerStyle }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#121212' },
+const createStyles = (theme: any) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: theme.background },
   scrollContent: { paddingTop: Platform.OS === 'ios' ? 72 : 28, paddingHorizontal: 20, paddingBottom: 140 },
-  loadingWrap: { flex: 1, backgroundColor: '#121212', alignItems: 'center', justifyContent: 'center' },
+  loadingWrap: { flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center' },
   header: { marginBottom: 18 },
-  title: { color: '#FFFFFF', fontSize: 34, fontWeight: '800' },
-  subtitle: { color: '#98A2B3', fontSize: 14, marginTop: 6 },
+  title: { color: theme.textPrimary, fontSize: 34, fontWeight: '800' },
+  subtitle: { color: theme.textSecondary, fontSize: 14, marginTop: 6 },
   errorText: { color: '#FF8D8D', fontSize: 13, marginBottom: 12 },
-  card: { backgroundColor: '#1C1C1C', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(110, 117, 133, 0.24)', padding: 16, marginBottom: 18 },
+  card: { backgroundColor: theme.card, borderRadius: 18, borderWidth: 1, borderColor: theme.border, padding: 16, marginBottom: 18 },
   rowSwitch: { flexDirection: 'row', alignItems: 'center' },
   rowSwitchBody: { flex: 1 },
-  rowSwitchLabel: { color: '#F5F7FB', fontSize: 16, fontWeight: '700' },
-  rowSwitchDescription: { color: '#95A0B5', fontSize: 12, marginTop: 4 },
-  separator: { height: 1, backgroundColor: 'rgba(255,255,255,0.05)', marginVertical: 16 },
-  nestedBlock: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
-  blockLabel: { color: '#D8DFEA', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', marginBottom: 10 },
+  rowSwitchLabel: { color: theme.textPrimary, fontSize: 16, fontWeight: '700' },
+  rowSwitchDescription: { color: theme.textSecondary, fontSize: 12, marginTop: 4 },
+  separator: { height: 1, backgroundColor: theme.border, marginVertical: 16 },
+  nestedBlock: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: theme.border },
+  blockLabel: { color: theme.textSecondary, fontSize: 11, fontWeight: '800', textTransform: 'uppercase', marginBottom: 10 },
   segmentRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   actionStack: { marginTop: 14, gap: 10 },
   statusNotice: { borderRadius: 14, borderWidth: 1, padding: 14 },
@@ -384,18 +390,18 @@ const styles = StyleSheet.create({
   statusNoticeTitle: { fontSize: 15, fontWeight: '800', marginBottom: 4 },
   statusNoticeTitleConnected: { color: '#66DA92' },
   statusNoticeTitlePending: { color: '#F6C453' },
-  statusNoticeTitleDisconnected: { color: '#D8DFEA' },
+  statusNoticeTitleDisconnected: { color: theme.textPrimary },
   statusNoticeText: { fontSize: 12, lineHeight: 18 },
   statusNoticeTextConnected: { color: '#DFF8E8' },
   statusNoticeTextPending: { color: '#F6E1A9' },
-  statusNoticeTextDisconnected: { color: '#95A0B5' },
-  segmentButton: { minHeight: 40, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: '#343948', backgroundColor: '#111317', alignItems: 'center', justifyContent: 'center' },
+  statusNoticeTextDisconnected: { color: theme.textSecondary },
+  segmentButton: { minHeight: 40, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.input, alignItems: 'center', justifyContent: 'center' },
   actionButton: { width: '100%', minHeight: 48 },
-  segmentButtonText: { color: '#A9B1BF', fontSize: 13, fontWeight: '700' },
-  input: { height: 48, borderRadius: 12, borderWidth: 1, backgroundColor: '#111317', paddingHorizontal: 14, color: '#FFFFFF', marginBottom: 12 },
-  helpText: { color: '#95A0B5', fontSize: 12 },
-  sectionTitle: { color: '#F5F7FB', fontSize: 16, fontWeight: '700', marginBottom: 14 },
+  segmentButtonText: { color: theme.textMuted, fontSize: 13, fontWeight: '700' },
+  input: { height: 48, borderRadius: 12, borderWidth: 1, backgroundColor: theme.input, paddingHorizontal: 14, color: theme.textPrimary, marginBottom: 12 },
+  helpText: { color: theme.textSecondary, fontSize: 12 },
+  sectionTitle: { color: theme.textPrimary, fontSize: 16, fontWeight: '700', marginBottom: 14 },
   saveButton: { height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   saveButtonDisabled: { opacity: 0.6 },
-  saveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  saveButtonText: { color: theme.textOnPrimary, fontSize: 16, fontWeight: '800' },
 });

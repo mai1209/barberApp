@@ -627,7 +627,7 @@ function BarberDashboard({ route, navigation }: Props) {
                 pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
               ]}
             >
-              <Plus size={20} color="#fff" strokeWidth={2} />
+              <Plus size={20} color={theme.textOnPrimary} strokeWidth={2} />
               <Text style={styles.mainActionBtnText}>NUEVO TURNO</Text>
             </Pressable>
 
@@ -783,7 +783,7 @@ const makeStyles = (theme: Theme) =>
       textTransform: 'uppercase',
     },
     headerTitle: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 26,
       fontWeight: '900',
       marginTop: 4,
@@ -800,7 +800,7 @@ const makeStyles = (theme: Theme) =>
       gap: 8,
     },
     mainActionBtnText: {
-      color: '#fff',
+      color: theme.textOnPrimary,
       fontWeight: '800',
       fontSize: 12,
       letterSpacing: 1,
@@ -834,7 +834,7 @@ const makeStyles = (theme: Theme) =>
       justifyContent: 'space-between',
       marginBottom: 14,
     },
-    sectionTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+    sectionTitle: { color: theme.textPrimary, fontSize: 18, fontWeight: '700' },
     todayButton: {
       backgroundColor: hexToRgba(theme.primary, 0.12),
       paddingHorizontal: 12,
@@ -860,7 +860,7 @@ const makeStyles = (theme: Theme) =>
       width: 40,
       height: 40,
       borderRadius: 12,
-      backgroundColor: theme.background,
+      backgroundColor: theme.surfaceAlt,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -870,14 +870,14 @@ const makeStyles = (theme: Theme) =>
       fontWeight: '700',
     },
     dateHeroTextWrap: { flex: 1, alignItems: 'center' },
-    dateHeroTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
-    dateHeroSubtitle: { color: '#8E8E8E', fontSize: 11, fontWeight: '500' },
+    dateHeroTitle: { color: theme.textPrimary, fontSize: 18, fontWeight: '800' },
+    dateHeroSubtitle: { color: theme.textMuted, fontSize: 11, fontWeight: '500' },
     weekStripContent: { paddingHorizontal: 14, paddingTop: 15 },
     weekDayChip: {
       width: 55,
       height: 60,
       borderRadius: 15,
-      backgroundColor: theme.background,
+      backgroundColor: theme.surfaceAlt,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: 8,
@@ -887,9 +887,9 @@ const makeStyles = (theme: Theme) =>
       borderWidth: 1,
       borderColor: theme.primary,
     },
-    weekDayName: { color: '#7A7A7A', fontSize: 10, fontWeight: '700' },
+    weekDayName: { color: theme.textMuted, fontSize: 10, fontWeight: '700' },
     weekDayNameActive: { color: theme.primary },
-    weekDayNumber: { color: '#F2F2F2', fontSize: 16, fontWeight: '800' },
+    weekDayNumber: { color: theme.textPrimary, fontSize: 16, fontWeight: '800' },
     weekDayNumberActive: { color: theme.primary },
 
     // Appointment Card Redesign
@@ -917,7 +917,7 @@ const makeStyles = (theme: Theme) =>
       borderWidth: 1,
       borderColor: hexToRgba(theme.primary, 0.18),
     },
-    timeText: { color: '#FFF', fontSize: 14, fontWeight: '800' },
+    timeText: { color: theme.textPrimary, fontSize: 14, fontWeight: '800' },
     statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
     statusBadgePending: { backgroundColor: hexToRgba(theme.primary, 0.1) },
     statusBadgeDone: { backgroundColor: 'rgba(49, 201, 108, 0.1)' },
@@ -926,13 +926,13 @@ const makeStyles = (theme: Theme) =>
     statusTextDone: { color: '#66DA92' },
     cardBody: { marginBottom: 16 },
     customerNameText: {
-      color: '#FFF',
+      color: theme.textPrimary,
       fontSize: 20,
       fontWeight: '800',
       marginBottom: 6,
     },
     serviceRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-    serviceNameText: { color: '#DDD', fontSize: 14, fontWeight: '600' },
+    serviceNameText: { color: theme.textSecondary, fontSize: 14, fontWeight: '600' },
     dotSeparator: { color: hexToRgba(theme.primary, 0.38), marginHorizontal: 8 },
     durationText: { color: hexToRgba(theme.primary, 0.58), fontSize: 13 },
     phoneSubText: { color: hexToRgba(theme.primary, 0.5), fontSize: 12, fontWeight: '500' },
@@ -956,7 +956,7 @@ const makeStyles = (theme: Theme) =>
       backgroundColor: 'rgba(148, 163, 184, 0.12)',
       borderColor: 'rgba(148, 163, 184, 0.28)',
     },
-    paymentInfoText: { color: '#EDEDED', fontSize: 11, fontWeight: '700' },
+    paymentInfoText: { color: theme.textSecondary, fontSize: 11, fontWeight: '700' },
     cardActions: {
       flexDirection: 'row',
       gap: 10,
@@ -973,8 +973,8 @@ const makeStyles = (theme: Theme) =>
     },
     btnMain: { backgroundColor: theme.primary },
     btnMainText: { color: theme.secondary, fontSize: 13, fontWeight: '800' },
-    btnSec: { backgroundColor: '#222', borderWidth: 1, borderColor: hexToRgba(theme.primary, 0.18) },
-    btnSecText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+    btnSec: { backgroundColor: theme.surfaceAlt, borderWidth: 1, borderColor: hexToRgba(theme.primary, 0.18) },
+    btnSecText: { color: theme.textPrimary, fontSize: 13, fontWeight: '700' },
     swipeAction: {
       width: 90,
       borderRadius: 24,

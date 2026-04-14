@@ -215,7 +215,7 @@ function createStyles(theme: Theme) {
       padding: 18,
     },
     title: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 18,
       fontWeight: '800',
       textAlign: 'center',
@@ -240,7 +240,7 @@ function createStyles(theme: Theme) {
     },
     monthLabel: {
       flex: 1,
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 16,
       fontWeight: '800',
       textAlign: 'center',
@@ -267,9 +267,9 @@ function createStyles(theme: Theme) {
       borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#202127',
+      backgroundColor: theme.surfaceAlt,
       borderWidth: 1,
-      borderColor: '#2B2E38',
+      borderColor: theme.border,
       marginBottom: 6,
     },
     dayCellEmpty: {
@@ -280,7 +280,7 @@ function createStyles(theme: Theme) {
       borderColor: theme.primary,
     },
     dayLabel: {
-      color: '#F3F4F6',
+      color: theme.textPrimary,
       fontSize: 14,
       fontWeight: '700',
     },
@@ -288,7 +288,7 @@ function createStyles(theme: Theme) {
       color: 'transparent',
     },
     dayLabelSelected: {
-      color: '#fff',
+      color: theme.textOnPrimary,
     },
     actions: {
       flexDirection: 'row',
@@ -301,12 +301,12 @@ function createStyles(theme: Theme) {
       borderRadius: 16,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#202127',
+      backgroundColor: theme.surfaceAlt,
       borderWidth: 1,
-      borderColor: '#2B2E38',
+      borderColor: theme.border,
     },
     secondaryButtonText: {
-      color: '#D1D5DB',
+      color: theme.textPrimary,
       fontSize: 14,
       fontWeight: '800',
     },
@@ -319,7 +319,7 @@ function createStyles(theme: Theme) {
       backgroundColor: theme.primary,
     },
     primaryButtonText: {
-      color: '#fff',
+      color: theme.textOnPrimary,
       fontSize: 14,
       fontWeight: '800',
     },

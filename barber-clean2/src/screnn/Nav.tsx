@@ -88,12 +88,12 @@ const NavButton = ({
         <Icon
           size={20}
           strokeWidth={2.5}
-          color={isActive ? '#FFFFFF' : 'rgba(255, 255, 255, 0.5)'}
+          color={isActive ? theme.textOnPrimary : theme.textMuted}
         />
         {isActive && (
           <Animated.Text
             numberOfLines={1}
-            style={[styles.text, { opacity: animValue }]}
+            style={[styles.text, { opacity: animValue, color: theme.textOnPrimary }]}
           >
             {label}
           </Animated.Text>
@@ -116,7 +116,7 @@ function Nav({ currentRouteName, onNavigate }: Props) {
       <View
         style={[
           styles.floatingContainer,
-          { backgroundColor: theme.card, shadowColor: theme.primary },
+          { backgroundColor: theme.card, shadowColor: theme.primary, borderColor: theme.border },
         ]}
       >
         <View style={styles.navInner}>
@@ -154,7 +154,7 @@ function Nav({ currentRouteName, onNavigate }: Props) {
         </View>
       </View>
       <View style={styles.footer}>
-        <Text style={styles.codexText }>
+        <Text style={[styles.codexText, { color: theme.textMuted }]}>
           BarberApp by CODEX®
         </Text>
       </View>
@@ -195,7 +195,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   text: {
-    color: '#fff',
     fontSize: 12, 
     fontWeight: '800',
     marginLeft: 6,
@@ -204,7 +203,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   codexText: {
-    color: '#555',
     fontSize: 9,
     fontWeight: 'bold',
     letterSpacing: 2,

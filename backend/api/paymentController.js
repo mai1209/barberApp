@@ -250,6 +250,33 @@ export function calculateSubscriptionExpiry({ billingCycle, paidAt }) {
   return base;
 }
 
+function calculateCouponBenefitValidUntil({
+  benefitDurationType,
+  benefitDurationValue,
+  appliedAt,
+}) {
+  const safeAppliedAt = new Date(appliedAt);
+  if (Number.isNaN(safeAppliedAt.getTime())) return null;
+
+  if (benefitDurationType === "one_time") {
+    return safeAppliedAt;
+  }
+
+  if (benefitDurationType === "days" && benefitDurationValue > 0) {
+    const validUntil = new Date(safeAppliedAt);
+    validUntil.setDate(validUntil.getDate() + benefitDurationValue);
+    return validUntil;
+  }
+
+  if (benefitDurationType === "months" && benefitDurationValue > 0) {
+    const validUntil = new Date(safeAppliedAt);
+    validUntil.setMonth(validUntil.getMonth() + benefitDurationValue);
+    return validUntil;
+  }
+
+  return null;
+}
+
 async function appointmentHasConfirmedOverlap(appointment) {
   const startTime = new Date(appointment.startTime);
   const durationMinutes = Number(appointment.durationMinutes || 30);
@@ -327,13 +354,11 @@ export async function applyPendingCouponToSubscription({ userDoc, plan, pricing 
   });
 
   const couponAppliedAt = new Date();
-  let couponValidUntil = null;
-  if (pendingBenefitDurationType === "months" && pendingBenefitDurationValue > 0) {
-    couponValidUntil = new Date(couponAppliedAt);
-    couponValidUntil.setMonth(couponValidUntil.getMonth() + pendingBenefitDurationValue);
-  } else if (pendingBenefitDurationType === "one_time") {
-    couponValidUntil = couponAppliedAt;
-  }
+  const couponValidUntil = calculateCouponBenefitValidUntil({
+    benefitDurationType: pendingBenefitDurationType,
+    benefitDurationValue: pendingBenefitDurationValue,
+    appliedAt: couponAppliedAt,
+  });
 
   userDoc.subscription = {
     ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
@@ -346,7 +371,8 @@ export async function applyPendingCouponToSubscription({ userDoc, plan, pricing 
         : null,
     couponBenefitDurationType: pendingBenefitDurationType,
     couponBenefitDurationValue:
-      pendingBenefitDurationType === "months" && pendingBenefitDurationValue > 0
+      ["days", "months"].includes(pendingBenefitDurationType) &&
+      pendingBenefitDurationValue > 0
         ? pendingBenefitDurationValue
         : null,
     couponAppliedAt,
@@ -409,6 +435,16 @@ function shouldClearExistingCouponOnApprovedPayment({ userDoc, paidAt }) {
   }
 
   if (benefitType === "months") {
+    const validUntil = subscription?.couponValidUntil
+      ? new Date(subscription.couponValidUntil)
+      : null;
+    if (!validUntil || Number.isNaN(validUntil.getTime())) {
+      return false;
+    }
+    return validUntil.getTime() < paidAt.getTime();
+  }
+
+  if (benefitType === "days") {
     const validUntil = subscription?.couponValidUntil
       ? new Date(subscription.couponValidUntil)
       : null;

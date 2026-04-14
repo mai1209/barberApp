@@ -818,7 +818,7 @@ function ReservasForm({ navigation }: any) {
               disabled={saving || !paymentMethod || Boolean(closedDayNotice)}
             >
               {saving ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={theme.textOnPrimary} />
               ) : (
                 <Text style={styles.submitBtnText}>Confirmar Reserva</Text>
               )}
@@ -845,7 +845,7 @@ const createStyles = (theme: Theme) =>
       fontWeight: '600',
       textTransform: 'uppercase',
     },
-    headerTitle: { color: '#fff', fontSize: 32, fontWeight: '800' },
+    headerTitle: { color: theme.textPrimary, fontSize: 32, fontWeight: '800' },
     mainCard: {
       marginHorizontal: 15,
       backgroundColor: theme.card,
@@ -865,23 +865,23 @@ const createStyles = (theme: Theme) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      backgroundColor: '#252525',
+      backgroundColor: theme.input,
       borderRadius: 16,
       padding: 16,
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: theme.border,
     },
-    selectorMainText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+    selectorMainText: { color: theme.textPrimary, fontWeight: '600', fontSize: 16 },
     selectorMeta: { color: hexToRgba(theme.primary, 0.54), fontSize: 12, marginTop: 2 },
     arrowIcon: { color: theme.primary, fontSize: 14 },
     input: {
-      backgroundColor: '#252525',
+      backgroundColor: theme.input,
       borderRadius: 16,
       padding: 16,
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 16,
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: theme.border,
       marginBottom: 5,
     },
     inputFocused: { borderColor: theme.primary },
@@ -891,14 +891,14 @@ const createStyles = (theme: Theme) =>
     },
     paymentChip: {
       flex: 1,
-      backgroundColor: '#252525',
+      backgroundColor: theme.input,
       borderRadius: 16,
       paddingVertical: 14,
       paddingHorizontal: 12,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: theme.border,
     },
     paymentChipActive: {
       backgroundColor: hexToRgba(theme.primary, 0.16),
@@ -925,15 +925,15 @@ const createStyles = (theme: Theme) =>
       marginTop: 6,
     },
     paymentUnavailableBox: {
-      backgroundColor: '#252525',
+      backgroundColor: theme.input,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: theme.border,
       padding: 14,
       gap: 6,
     },
     paymentUnavailableTitle: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 14,
       fontWeight: '700',
     },
@@ -947,7 +947,7 @@ const createStyles = (theme: Theme) =>
       width: 54,
       height: 54,
       borderRadius: 27,
-      backgroundColor: '#333',
+      backgroundColor: theme.surfaceAlt,
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 2,
@@ -959,9 +959,9 @@ const createStyles = (theme: Theme) =>
       width: '100%',
       height: '100%',
     },
-    avatarText: { color: '#fff', fontSize: 19, fontWeight: 'bold' },
+    avatarText: { color: theme.textOnPrimary, fontSize: 19, fontWeight: 'bold' },
     barberName: { color: hexToRgba(theme.primary, 0.52), marginTop: 6, fontSize: 14, fontWeight: '600' },
-    barberNameActive: { color: '#fff' },
+    barberNameActive: { color: theme.textPrimary },
     barberSchedule: { color: hexToRgba(theme.primary, 0.35), fontSize: 10, marginTop: 2 },
     dateHeader: {
       flexDirection: 'row',
@@ -978,7 +978,7 @@ const createStyles = (theme: Theme) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
-      backgroundColor: '#252525',
+      backgroundColor: theme.input,
       paddingHorizontal: 8,
       paddingVertical: 6,
       borderRadius: 16,
@@ -997,7 +997,7 @@ const createStyles = (theme: Theme) =>
     },
     navBtn: { color: theme.primary, fontSize: 34, fontWeight: 'bold', lineHeight: 36 },
     dateText: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 16,
       fontWeight: '700',
       textTransform: 'capitalize',
@@ -1010,20 +1010,20 @@ const createStyles = (theme: Theme) =>
     timeChip: {
       width: '22%',
       paddingVertical: 14,
-      backgroundColor: '#252525',
+      backgroundColor: theme.input,
       borderRadius: 12,
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: theme.border,
     },
     timeChipActive: { backgroundColor: theme.primary, borderColor: theme.primary },
     timeChipBooked: {
-      backgroundColor: '#1a1a1a',
-      borderColor: '#2a2a2a',
+      backgroundColor: theme.surfaceAlt,
+      borderColor: theme.border,
       opacity: 0.5,
     },
-    timeText: { color: '#fff', fontWeight: '700' },
-    timeTextBooked: { color: '#444', textDecorationLine: 'line-through' },
+    timeText: { color: theme.textPrimary, fontWeight: '700' },
+    timeTextBooked: { color: theme.textMuted, textDecorationLine: 'line-through' },
     timeDuration: { color: hexToRgba(theme.primary, 0.5), fontSize: 9, marginTop: 2, fontWeight: '600' },
     shiftGroupLabel: {
       color: theme.primary,
@@ -1035,10 +1035,10 @@ const createStyles = (theme: Theme) =>
     },
     notWorkingBox: {
       padding: 30,
-      backgroundColor: '#252525',
+      backgroundColor: theme.surfaceAlt,
       borderRadius: 24,
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: theme.border,
       marginTop: 10,
       alignItems: 'center',
     },
@@ -1064,7 +1064,7 @@ const createStyles = (theme: Theme) =>
       opacity: 0.5,
     },
     submitBtnText: {
-      color: '#fff',
+      color: theme.textOnPrimary,
       fontWeight: '600',
       fontSize: 17,
       textTransform: 'uppercase',
@@ -1081,10 +1081,10 @@ const createStyles = (theme: Theme) =>
       padding: 25,
       maxHeight: '70%',
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: theme.border,
     },
     modalTitle: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 20,
       fontWeight: '800',
       marginBottom: 20,
@@ -1095,9 +1095,9 @@ const createStyles = (theme: Theme) =>
       justifyContent: 'space-between',
       paddingVertical: 18,
       borderBottomWidth: 1,
-      borderBottomColor: '#252525',
+      borderBottomColor: theme.border,
     },
-    serviceItemText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+    serviceItemText: { color: theme.textPrimary, fontSize: 16, fontWeight: '600' },
   });
 
 export default ReservasForm;

@@ -257,7 +257,7 @@ export default function ShopClosureSettingsScreen() {
             disabled={saving}
           >
             {saving ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={theme.textOnPrimary} />
             ) : (
               <Text style={styles.saveButtonText}>Guardar cierre</Text>
             )}
@@ -342,12 +342,12 @@ const createStyles = (theme: Theme) =>
       borderColor: hexToRgba(theme.primary, 0.26),
     },
     title: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 30,
       fontWeight: '800',
     },
     subtitle: {
-      color: '#98A2B3',
+      color: theme.textSecondary,
       fontSize: 14,
       lineHeight: 20,
     },
@@ -360,12 +360,12 @@ const createStyles = (theme: Theme) =>
       gap: 12,
     },
     sectionTitle: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 18,
       fontWeight: '700',
     },
     sectionDescription: {
-      color: '#98A2B3',
+      color: theme.textSecondary,
       fontSize: 13,
       lineHeight: 18,
     },
@@ -376,7 +376,7 @@ const createStyles = (theme: Theme) =>
       backgroundColor: hexToRgba(theme.primary, 0.08),
       borderWidth: 1,
       borderColor: hexToRgba(theme.primary, 0.16),
-      color: '#D6DCE8',
+      color: theme.textSecondary,
       fontSize: 12,
       lineHeight: 18,
     },
@@ -391,9 +391,9 @@ const createStyles = (theme: Theme) =>
     input: {
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: 'rgba(110, 117, 133, 0.28)',
-      backgroundColor: 'rgba(255,255,255,0.03)',
-      color: '#fff',
+      borderColor: theme.border,
+      backgroundColor: theme.input,
+      color: theme.textPrimary,
       paddingHorizontal: 14,
       paddingVertical: 14,
       fontSize: 15,
@@ -404,8 +404,8 @@ const createStyles = (theme: Theme) =>
       gap: 12,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: 'rgba(110, 117, 133, 0.28)',
-      backgroundColor: 'rgba(255,255,255,0.03)',
+      borderColor: theme.border,
+      backgroundColor: theme.input,
       paddingHorizontal: 14,
       paddingVertical: 14,
     },
@@ -422,13 +422,13 @@ const createStyles = (theme: Theme) =>
       gap: 2,
     },
     dateInputValue: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 15,
       fontWeight: '700',
       textTransform: 'capitalize',
     },
     dateInputMeta: {
-      color: '#8FA0B8',
+      color: theme.textMuted,
       fontSize: 12,
       fontWeight: '600',
     },
@@ -475,7 +475,7 @@ const createStyles = (theme: Theme) =>
       opacity: 0.65,
     },
     saveButtonText: {
-      color: '#fff',
+      color: theme.textOnPrimary,
       fontWeight: '800',
       fontSize: 15,
     },
@@ -485,7 +485,7 @@ const createStyles = (theme: Theme) =>
       gap: 12,
       paddingVertical: 12,
       borderBottomWidth: 1,
-      borderBottomColor: 'rgba(110, 117, 133, 0.15)',
+      borderBottomColor: theme.border,
     },
     closedDayIcon: {
       width: 34,
@@ -500,7 +500,7 @@ const createStyles = (theme: Theme) =>
       gap: 3,
     },
     closedDayTitle: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 15,
       fontWeight: '700',
       textTransform: 'capitalize',
@@ -511,7 +511,7 @@ const createStyles = (theme: Theme) =>
       fontWeight: '700',
     },
     closedDayMessage: {
-      color: '#98A2B3',
+      color: theme.textSecondary,
       fontSize: 13,
       lineHeight: 18,
     },
@@ -526,7 +526,7 @@ const createStyles = (theme: Theme) =>
       borderColor: 'rgba(255, 114, 114, 0.18)',
     },
     emptyText: {
-      color: '#98A2B3',
+      color: theme.textSecondary,
       fontSize: 13,
       lineHeight: 19,
     },

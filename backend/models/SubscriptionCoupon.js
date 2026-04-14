@@ -44,7 +44,7 @@ const subscriptionCouponSchema = new mongoose.Schema(
     },
     benefitDurationType: {
       type: String,
-      enum: ["forever", "one_time", "months"],
+      enum: ["forever", "one_time", "days", "months"],
       default: "forever",
     },
     benefitDurationValue: {

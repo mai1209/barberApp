@@ -211,6 +211,17 @@ function sanitizeThemeConfigInput(input) {
   const updates = {};
   let hasAnyField = false;
 
+  if (Object.prototype.hasOwnProperty.call(input, "mode")) {
+    hasAnyField = true;
+    if (input.mode == null || String(input.mode).trim() === "") {
+      updates.mode = null;
+    } else if (input.mode === "dark" || input.mode === "light") {
+      updates.mode = input.mode;
+    } else {
+      throw new Error("El modo del tema debe ser dark o light.");
+    }
+  }
+
   if (Object.prototype.hasOwnProperty.call(input, "primary")) {
     hasAnyField = true;
     const normalized = normalizeHexColor(input.primary);
@@ -595,7 +606,7 @@ function sanitizeSubscriptionCouponInput(input, { partial = false } = {}) {
   if (Object.prototype.hasOwnProperty.call(input, "benefitDurationType")) {
     hasAnyField = true;
     const benefitDurationType = String(input.benefitDurationType ?? "").trim() || "forever";
-    if (!["forever", "one_time", "months"].includes(benefitDurationType)) {
+    if (!["forever", "one_time", "days", "months"].includes(benefitDurationType)) {
       throw new Error("La duración del beneficio no es válida.");
     }
     updates.benefitDurationType = benefitDurationType;
@@ -615,6 +626,32 @@ function sanitizeSubscriptionCouponInput(input, { partial = false } = {}) {
       }
       updates.benefitDurationValue = parsed;
     }
+  }
+
+  const effectiveBenefitDurationType =
+    updates.benefitDurationType ??
+    (partial ? null : "forever");
+  const effectiveBenefitDurationValue = Object.prototype.hasOwnProperty.call(
+    updates,
+    "benefitDurationValue",
+  )
+    ? updates.benefitDurationValue
+    : partial
+      ? undefined
+      : null;
+
+  if (
+    ["days", "months"].includes(effectiveBenefitDurationType) &&
+    !(Number.isInteger(effectiveBenefitDurationValue) && effectiveBenefitDurationValue > 0)
+  ) {
+    throw new Error("Tenés que indicar cuántos días o meses dura el beneficio.");
+  }
+
+  if (
+    ["forever", "one_time"].includes(effectiveBenefitDurationType) &&
+    effectiveBenefitDurationValue !== undefined
+  ) {
+    updates.benefitDurationValue = null;
   }
 
   if (Object.prototype.hasOwnProperty.call(input, "maxRedemptions")) {

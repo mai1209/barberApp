@@ -21,9 +21,11 @@ import {
   Share,
   PanResponder,
   Linking,
+  Modal,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import Clipboard from '@react-native-clipboard/clipboard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
 import {
@@ -33,17 +35,24 @@ import {
 import { hasProPlanAccess } from '../services/planAccess';
 import ProFeatureModal from '../components/ProFeatureModal';
 import {
+  getCurrentUser,
   fetchAppointments,
   Appointment,
+  fetchBarbers,
+  fetchServices,
   updateAppointmentStatus,
   deleteAppointment,
 } from '../services/api';
 import {
+  CheckCircle2,
   TrendingUp,
   Share2,
   Users,
   Clock,
   Scissors,
+  CreditCard,
+  Link2,
+  CircleDashed,
 } from 'lucide-react-native';
 
 type Props = {
@@ -52,6 +61,7 @@ type Props = {
 
 const PUBLIC_BOOKING_BASE = 'https://barberappbycodex.com';
 const PRO_PLAN_URL = 'https://barberappbycodex.com/planes?plan=pro';
+const WELCOME_MODAL_KEY_PREFIX = 'HOME_WELCOME_MODAL_DISMISSED';
 const hexToRgba = (hex: string, alpha: number) => {
   const sanitized = hex.replace('#', '');
   const bigint = parseInt(
@@ -130,6 +140,14 @@ function Home({ navigation }: Props) {
   const [error, setError] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [hasProAccess, setHasProAccess] = useState(false);
+  const [setupSummary, setSetupSummary] = useState({
+    loading: true,
+    serviceCount: 0,
+    barberCount: 0,
+    paymentReady: false,
+    paymentLabel: 'Revisá tus métodos de cobro',
+  });
+  const [welcomeModalVisible, setWelcomeModalVisible] = useState(false);
   const [proModalVariant, setProModalVariant] = useState<
     null | 'metrics' | 'history'
   >(null);
@@ -164,6 +182,81 @@ function Home({ navigation }: Props) {
         month: 'long',
       }).format(selectedDate),
     [selectedDate],
+  );
+
+  const handleCopyLink = useCallback(async () => {
+    if (!shareLink) return;
+    Clipboard.setString(shareLink);
+    try {
+      await Share.share({ message: shareLink });
+    } catch (_e) {}
+    Alert.alert('¡Copiado!', 'El link de turnos se copió al portapapeles.');
+  }, [shareLink]);
+
+  const onboardingItems = useMemo(
+    () => [
+      {
+        key: 'services',
+        title: 'Cargá tus servicios',
+        description:
+          setupSummary.serviceCount > 0
+            ? `${setupSummary.serviceCount} servicio${setupSummary.serviceCount === 1 ? '' : 's'} cargado${setupSummary.serviceCount === 1 ? '' : 's'}.`
+            : 'Definí nombre, duración y precio para que el cliente pueda reservar.',
+        complete: setupSummary.serviceCount > 0,
+        actionLabel: 'Servicios',
+        icon: Scissors,
+        onPress: () => navigation.navigate('Service-Settings'),
+      },
+      {
+        key: 'barbers',
+        title: 'Sumá tus barberos',
+        description:
+          setupSummary.barberCount > 0
+            ? `${setupSummary.barberCount} barbero${setupSummary.barberCount === 1 ? '' : 's'} cargado${setupSummary.barberCount === 1 ? '' : 's'}.`
+            : 'Creá al menos un perfil con horarios para empezar a tomar turnos.',
+        complete: setupSummary.barberCount > 0,
+        actionLabel: 'Barberos',
+        icon: Users,
+        onPress: () => navigation.navigate('List-Barber'),
+      },
+      {
+        key: 'payments',
+        title: 'Configurá cómo cobrás',
+        description: setupSummary.paymentLabel,
+        complete: setupSummary.paymentReady,
+        actionLabel: 'Cobros',
+        icon: CreditCard,
+        onPress: () => navigation.navigate('Payment-Settings'),
+      },
+      {
+        key: 'link',
+        title: 'Compartí tu enlace de turnos',
+        description: shareLink
+          ? 'Tu link ya está listo para copiar y enviarlo a clientes.'
+          : 'Cuando tu local tenga shopSlug, el link queda listo para compartir.',
+        complete: Boolean(shareLink),
+        actionLabel: 'Copiar',
+        icon: Link2,
+        onPress: handleCopyLink,
+      },
+    ],
+    [
+      navigation,
+      setupSummary.serviceCount,
+      setupSummary.barberCount,
+      setupSummary.paymentLabel,
+      setupSummary.paymentReady,
+      shareLink,
+    ],
+  );
+
+  const completedSetupCount = useMemo(
+    () => onboardingItems.filter(item => item.complete).length,
+    [onboardingItems],
+  );
+  const shouldShowSetupCard = useMemo(
+    () => !setupSummary.loading && completedSetupCount < onboardingItems.length,
+    [completedSetupCount, onboardingItems.length, setupSummary.loading],
   );
 
   const weekDays = useMemo(() => {
@@ -205,13 +298,83 @@ function Home({ navigation }: Props) {
     }
   }, []);
 
+  const loadSetupSummary = useCallback(async () => {
+    try {
+      const [servicesRes, barbersRes, currentUserRes] = await Promise.all([
+        fetchServices().catch(() => ({ services: [] })),
+        fetchBarbers().catch(() => ({ barbers: [] })),
+        getCurrentUser().catch(async () => {
+          const storedUser = await getUserProfile();
+          return { user: storedUser };
+        }),
+      ]);
+
+      const paymentSettings = currentUserRes?.user?.paymentSettings ?? {};
+      const cashEnabled = paymentSettings.cashEnabled !== false;
+      const mercadoPagoConnected =
+        paymentSettings.mercadoPagoConnectionStatus === 'connected';
+      const advanceEnabled = Boolean(paymentSettings.advancePaymentEnabled);
+
+      let paymentLabel = 'Revisá tus métodos de cobro.';
+      if (mercadoPagoConnected && advanceEnabled) {
+        paymentLabel = 'Mercado Pago conectado y cobro online activo.';
+      } else if (cashEnabled) {
+        paymentLabel = 'Tenés cobro en el local activo.';
+      }
+
+      setSetupSummary({
+        loading: false,
+        serviceCount: servicesRes?.services?.length ?? 0,
+        barberCount: barbersRes?.barbers?.length ?? 0,
+        paymentReady: cashEnabled || mercadoPagoConnected,
+        paymentLabel,
+      });
+    } catch (_error) {
+      setSetupSummary(current => ({
+        ...current,
+        loading: false,
+      }));
+    }
+  }, []);
+
+  const handleDismissWelcomeModal = useCallback(async () => {
+    setWelcomeModalVisible(false);
+    const storageKey = `${WELCOME_MODAL_KEY_PREFIX}:${shopSlug || 'default'}`;
+    try {
+      await AsyncStorage.setItem(storageKey, '1');
+    } catch (_error) {}
+  }, [shopSlug]);
+
+  const handleOpenGuideFromModal = useCallback(async () => {
+    await handleDismissWelcomeModal();
+    navigation.navigate('Usage-Guide');
+  }, [handleDismissWelcomeModal, navigation]);
+
   useEffect(() => {
     let isMounted = true;
     (async () => {
-      const storedUser = await getUserProfile<{ fullName?: string }>();
+      const storedUser = await getUserProfile<{
+        fullName?: string;
+        paymentSettings?: any;
+      }>();
       if (isMounted && storedUser) {
         if (storedUser?.fullName) setFullName(storedUser.fullName);
         setHasProAccess(hasProPlanAccess(storedUser));
+        const paymentSettings = storedUser?.paymentSettings ?? {};
+        const cashEnabled = paymentSettings.cashEnabled !== false;
+        const mercadoPagoConnected =
+          paymentSettings.mercadoPagoConnectionStatus === 'connected';
+        const advanceEnabled = Boolean(paymentSettings.advancePaymentEnabled);
+        setSetupSummary(current => ({
+          ...current,
+          paymentReady: cashEnabled || mercadoPagoConnected,
+          paymentLabel:
+            mercadoPagoConnected && advanceEnabled
+              ? 'Mercado Pago conectado y cobro online activo.'
+              : cashEnabled
+                ? 'Tenés cobro en el local activo.'
+                : 'Revisá tus métodos de cobro.',
+        }));
       }
     })();
     return () => {
@@ -220,9 +383,46 @@ function Home({ navigation }: Props) {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+
+    (async () => {
+      if (!shopSlug) return;
+      const storageKey = `${WELCOME_MODAL_KEY_PREFIX}:${shopSlug}`;
+      try {
+        const alreadyDismissed = await AsyncStorage.getItem(storageKey);
+        if (!isMounted) return;
+        if (!alreadyDismissed) {
+          setWelcomeModalVisible(true);
+        }
+      } catch (_error) {
+        if (isMounted) setWelcomeModalVisible(true);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [shopSlug]);
+
+  useEffect(() => {
     return subscribeToUserProfile(user => {
       setHasProAccess(hasProPlanAccess(user));
       setFullName(user?.fullName || '');
+      const paymentSettings = user?.paymentSettings ?? {};
+      const cashEnabled = paymentSettings.cashEnabled !== false;
+      const mercadoPagoConnected =
+        paymentSettings.mercadoPagoConnectionStatus === 'connected';
+      const advanceEnabled = Boolean(paymentSettings.advancePaymentEnabled);
+      setSetupSummary(current => ({
+        ...current,
+        paymentReady: cashEnabled || mercadoPagoConnected,
+        paymentLabel:
+          mercadoPagoConnected && advanceEnabled
+            ? 'Mercado Pago conectado y cobro online activo.'
+            : cashEnabled
+              ? 'Tenés cobro en el local activo.'
+              : 'Revisá tus métodos de cobro.',
+      }));
     });
   }, []);
 
@@ -246,12 +446,13 @@ function Home({ navigation }: Props) {
   useFocusEffect(
     useCallback(() => {
       loadData(false, selectedDateRef.current);
+      loadSetupSummary();
       const intervalId = setInterval(
         () => loadData(true, selectedDateRef.current),
         15000,
       );
       return () => clearInterval(intervalId);
-    }, [loadData]),
+    }, [loadData, loadSetupSummary]),
   );
 
   useEffect(() => {
@@ -264,7 +465,9 @@ function Home({ navigation }: Props) {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    loadData(true, selectedDate);
+    Promise.all([loadData(true, selectedDate), loadSetupSummary()]).finally(
+      () => setRefreshing(false),
+    );
   };
 
   const handleShiftDate = (days: number) =>
@@ -273,15 +476,6 @@ function Home({ navigation }: Props) {
   const handleGoToToday = () => setSelectedDate(new Date());
 
   const greetingName = fullName || 'Barbería';
-
-  const handleCopyLink = async () => {
-    if (!shareLink) return;
-    Clipboard.setString(shareLink);
-    try {
-      await Share.share({ message: shareLink });
-    } catch (_e) {}
-    Alert.alert('¡Copiado!', 'El link de turnos se copió al portapapeles.');
-  };
 
   const handleComplete = async (appointmentId: string) => {
     Alert.alert(
@@ -558,7 +752,7 @@ function Home({ navigation }: Props) {
           <Text style={styles.welcomeText}>¡Hola,</Text>
           <Text style={styles.nameText}>{greetingName}!</Text>
         </View>
-        <Image source={theme.logo} style={styles.logo} resizeMode="contain" />
+        <Image source={theme.logo} style={styles.logo as any} resizeMode="contain" />
       </View>
 
       <ScrollView
@@ -577,7 +771,7 @@ function Home({ navigation }: Props) {
         {shopSlug && (
           <Pressable style={styles.linkCardCompact} onPress={handleCopyLink}>
             <View style={styles.linkIconBox}>
-              <Share2 size={16} color="#FFF" />
+              <Share2 size={16} color={theme.textPrimary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.linkTitleCompact}>Link de autogestión</Text>
@@ -593,6 +787,51 @@ function Home({ navigation }: Props) {
             </View>
           </Pressable>
         )}
+
+        {shouldShowSetupCard ? (
+          <View style={styles.setupCard}>
+            <View style={styles.setupHeader}>
+              <View>
+                <Text style={styles.setupEyebrow}>Primeros pasos</Text>
+                <Text style={styles.setupTitle}>Dejá lista tu barbería</Text>
+                <Text style={styles.setupSubtitle}>
+                  {`${completedSetupCount} de ${onboardingItems.length} pasos completos.`}
+                </Text>
+              </View>
+              <Pressable
+                style={styles.setupGuideButton}
+                onPress={() => navigation.navigate('Usage-Guide')}
+              >
+                <Text style={styles.setupGuideButtonText}>Manual</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.setupList}>
+              {onboardingItems.map(item => {
+                const Icon = item.icon;
+                return (
+                  <View key={item.key} style={styles.setupItem}>
+                    <View style={styles.setupStatusWrap}>
+                      {item.complete ? (
+                        <CheckCircle2 size={18} color={theme.primary} />
+                      ) : (
+                        <CircleDashed size={18} color={theme.textMuted} />
+                      )}
+                    </View>
+                    <View style={styles.setupBody}>
+                      <Text style={styles.setupItemTitle}>{item.title}</Text>
+                      <Text style={styles.setupItemText}>{item.description}</Text>
+                    </View>
+                    <Pressable style={styles.setupActionBtn} onPress={item.onPress}>
+                      <Icon size={14} color={theme.primary} />
+                      <Text style={styles.setupActionText}>{item.actionLabel}</Text>
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
 
         <View style={styles.compactCardsRow}>
           <Pressable
@@ -729,6 +968,40 @@ function Home({ navigation }: Props) {
         onClose={handleCloseProModal}
         onOpenPlan={handleOpenSubscriptionSettings}
       />
+      <Modal
+        visible={welcomeModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={handleDismissWelcomeModal}
+      >
+        <View style={styles.welcomeOverlay}>
+          <View style={styles.welcomeModalCard}>
+            <Text style={styles.welcomeModalEyebrow}>Bienvenida</Text>
+            <Text style={styles.welcomeModalTitle}>
+              Te muestro por dónde empezar
+            </Text>
+            <Text style={styles.welcomeModalText}>
+              Primero cargá tus servicios, después sumá tus barberos, configurá
+              cómo cobrás y por último compartí tu link de turnos. Todo eso
+              queda explicado en el manual.
+            </Text>
+            <View style={styles.welcomeModalActions}>
+              <Pressable
+                style={styles.welcomeSecondaryBtn}
+                onPress={handleDismissWelcomeModal}
+              >
+                <Text style={styles.welcomeSecondaryBtnText}>Más tarde</Text>
+              </Pressable>
+              <Pressable
+                style={styles.welcomePrimaryBtn}
+                onPress={handleOpenGuideFromModal}
+              >
+                <Text style={styles.welcomePrimaryBtnText}>Ver manual</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -761,39 +1034,202 @@ const createStyles = (theme: Theme) =>
       alignItems: 'center',
       justifyContent: 'space-between',
     },
-    welcomeText: { color: '#fff', fontSize: 16, fontWeight: '500' },
-    nameText: { color: '#fff', fontSize: 28, fontWeight: '800' },
+    welcomeText: { color: theme.textPrimary, fontSize: 16, fontWeight: '500' },
+    nameText: { color: theme.textPrimary, fontSize: 28, fontWeight: '800' },
     scrollContent: { paddingHorizontal: 20, paddingBottom: 120 },
 
     // Links y Métricas (Mismo estilo anterior)
     linkCardCompact: {
-      backgroundColor: '#151515',
+      backgroundColor: theme.card,
       borderRadius: 18,
       padding: 12,
       flexDirection: 'row',
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: '#222',
+      borderColor: theme.border,
       marginTop: 20,
       gap: 12,
+    },
+    setupCard: {
+      marginTop: 14,
+      backgroundColor: theme.card,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: theme.border,
+      padding: 16,
+    },
+    setupHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    setupEyebrow: {
+      color: theme.textMuted,
+      fontSize: 10,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    setupTitle: {
+      color: theme.textPrimary,
+      fontSize: 18,
+      fontWeight: '800',
+      marginTop: 4,
+    },
+    setupSubtitle: {
+      color: theme.textSecondary,
+      fontSize: 12,
+      marginTop: 4,
+      lineHeight: 17,
+    },
+    setupGuideButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 12,
+      backgroundColor: theme.surfaceAlt,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    setupGuideButtonText: {
+      color: theme.textPrimary,
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    setupList: {
+      marginTop: 16,
+      gap: 10,
+    },
+    setupItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: theme.surfaceAlt,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.border,
+      padding: 12,
+    },
+    setupStatusWrap: {
+      width: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    setupBody: {
+      flex: 1,
+    },
+    setupItemTitle: {
+      color: theme.textPrimary,
+      fontSize: 13,
+      fontWeight: '800',
+    },
+    setupItemText: {
+      color: theme.textMuted,
+      fontSize: 11,
+      marginTop: 3,
+      lineHeight: 16,
+    },
+    setupActionBtn: {
+      minWidth: 76,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 12,
+      backgroundColor: hexToRgba(theme.primary, 0.12),
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+    },
+    setupActionText: {
+      color: theme.primary,
+      fontSize: 10,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+    },
+    welcomeOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.56)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 20,
+    },
+    welcomeModalCard: {
+      width: '100%',
+      maxWidth: 420,
+      backgroundColor: theme.card,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.border,
+      padding: 22,
+    },
+    welcomeModalEyebrow: {
+      color: theme.textMuted,
+      fontSize: 11,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    welcomeModalTitle: {
+      color: theme.textPrimary,
+      fontSize: 24,
+      fontWeight: '800',
+      marginTop: 8,
+    },
+    welcomeModalText: {
+      color: theme.textSecondary,
+      fontSize: 14,
+      lineHeight: 21,
+      marginTop: 10,
+    },
+    welcomeModalActions: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 20,
+    },
+    welcomePrimaryBtn: {
+      flex: 1,
+      height: 46,
+      borderRadius: 14,
+      backgroundColor: theme.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    welcomePrimaryBtnText: {
+      color: theme.textOnPrimary,
+      fontSize: 13,
+      fontWeight: '800',
+    },
+    welcomeSecondaryBtn: {
+      flex: 1,
+      height: 46,
+      borderRadius: 14,
+      backgroundColor: theme.surfaceAlt,
+      borderWidth: 1,
+      borderColor: theme.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    welcomeSecondaryBtnText: {
+      color: theme.textPrimary,
+      fontSize: 13,
+      fontWeight: '700',
     },
     linkIconBox: {
       width: 34,
       height: 34,
       borderRadius: 10,
-      backgroundColor: '#222',
+      backgroundColor: theme.surfaceAlt,
       alignItems: 'center',
       justifyContent: 'center',
     },
     linkTitleCompact: {
-      color: '#666',
+      color: theme.textMuted,
       fontSize: 10,
       fontWeight: '800',
       textTransform: 'uppercase',
     },
-    linkUrlCompact: { color: '#AAA', fontSize: 13, marginTop: 1 },
+    linkUrlCompact: { color: theme.textSecondary, fontSize: 13, marginTop: 1 },
     linkHelperCompact: {
-      color: '#6F7787',
+      color: theme.textMuted,
       fontSize: 10,
       marginTop: 3,
       lineHeight: 14,
@@ -817,10 +1253,10 @@ const createStyles = (theme: Theme) =>
       paddingVertical: 12,
       paddingHorizontal: 16,
       alignItems: 'center',
-      justifyContent: 'start',
+      justifyContent: 'flex-start',
       gap: 8,
       borderWidth: 1,
-      borderColor: '#2A2A2A',
+      borderColor: theme.border,
       flexDirection: 'row',
     },
     metricsIconBox: {
@@ -831,7 +1267,7 @@ const createStyles = (theme: Theme) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    metricsTitleCompact: { color: '#FFF', fontSize: 13, fontWeight: '800' },
+    metricsTitleCompact: { color: theme.textPrimary, fontSize: 13, fontWeight: '800' },
     dualCompactCardLocked: {
       opacity: 0.82,
       borderColor: hexToRgba(theme.primary, 0.25),
@@ -847,7 +1283,7 @@ const createStyles = (theme: Theme) =>
 
     // Agenda Section
     section: { marginTop: 25 },
-    sectionTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+    sectionTitle: { color: theme.textPrimary, fontSize: 18, fontWeight: '700' },
     agendaTopRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -865,7 +1301,7 @@ const createStyles = (theme: Theme) =>
       backgroundColor: theme.card,
       borderRadius: 24,
       borderWidth: 1,
-      borderColor: '#2A2A2A',
+      borderColor: theme.border,
       paddingVertical: 15,
     },
     dateHeroHeader: {
@@ -877,7 +1313,7 @@ const createStyles = (theme: Theme) =>
       width: 40,
       height: 40,
       borderRadius: 12,
-      backgroundColor: theme.background,
+      backgroundColor: theme.surfaceAlt,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -887,14 +1323,14 @@ const createStyles = (theme: Theme) =>
       fontWeight: '700',
     },
     dateHeroTextWrap: { flex: 1, alignItems: 'center' },
-    dateHeroTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
-    dateHeroSubtitle: { color: '#8E8E8E', fontSize: 11, fontWeight: '500' },
+    dateHeroTitle: { color: theme.textPrimary, fontSize: 18, fontWeight: '800' },
+    dateHeroSubtitle: { color: theme.textMuted, fontSize: 11, fontWeight: '500' },
     weekStripContent: { paddingHorizontal: 14, paddingTop: 15 },
     weekDayChip: {
       width: 55,
       height: 60,
       borderRadius: 15,
-      backgroundColor: theme.background,
+      backgroundColor: theme.surfaceAlt,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: 8,
@@ -904,9 +1340,9 @@ const createStyles = (theme: Theme) =>
       borderWidth: 1,
       borderColor: theme.primary,
     },
-    weekDayName: { color: '#7A7A7A', fontSize: 10, fontWeight: '700' },
+    weekDayName: { color: theme.textMuted, fontSize: 10, fontWeight: '700' },
     weekDayNameActive: { color: theme.primary },
-    weekDayNumber: { color: '#F2F2F2', fontSize: 16, fontWeight: '800' },
+    weekDayNumber: { color: theme.textPrimary, fontSize: 16, fontWeight: '800' },
     weekDayNumberActive: { color: theme.primary },
 
     // NUEVO DISEÑO DE CARD DE TURNO
@@ -915,7 +1351,7 @@ const createStyles = (theme: Theme) =>
       borderRadius: 24,
       padding: 18,
       borderWidth: 1,
-      borderColor: '#2A2A2A',
+      borderColor: theme.border,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.2,
@@ -932,14 +1368,14 @@ const createStyles = (theme: Theme) =>
     timeTag: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#1A1A1A',
+      backgroundColor: theme.surfaceAlt,
       paddingHorizontal: 10,
       paddingVertical: 5,
       borderRadius: 8,
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: theme.border,
     },
-    timeText: { color: '#FFF', fontSize: 14, fontWeight: '800' },
+    timeText: { color: theme.textPrimary, fontSize: 14, fontWeight: '800' },
     statusBadge: {
       paddingHorizontal: 8,
       paddingVertical: 4,
@@ -955,7 +1391,7 @@ const createStyles = (theme: Theme) =>
       marginBottom: 16,
     },
     customerNameText: {
-      color: '#FFF',
+      color: theme.textPrimary,
       fontSize: 20,
       fontWeight: '800',
       marginBottom: 6,
@@ -965,10 +1401,10 @@ const createStyles = (theme: Theme) =>
       alignItems: 'center',
       marginBottom: 8,
     },
-    serviceNameText: { color: '#DDD', fontSize: 14, fontWeight: '600' },
-    dotSeparator: { color: '#555', marginHorizontal: 8 },
-    durationText: { color: '#888', fontSize: 13 },
-    barberSubText: { color: '#777', fontSize: 12, fontWeight: '500' },
+    serviceNameText: { color: theme.textSecondary, fontSize: 14, fontWeight: '600' },
+    dotSeparator: { color: theme.textMuted, marginHorizontal: 8 },
+    durationText: { color: theme.textMuted, fontSize: 13 },
+    barberSubText: { color: theme.textMuted, fontSize: 12, fontWeight: '500' },
     paymentInfoBadge: {
       marginTop: 10,
       alignSelf: 'flex-start',
@@ -989,13 +1425,13 @@ const createStyles = (theme: Theme) =>
       backgroundColor: 'rgba(148, 163, 184, 0.12)',
       borderColor: 'rgba(148, 163, 184, 0.28)',
     },
-    paymentInfoText: { color: '#EDEDED', fontSize: 11, fontWeight: '700' },
+    paymentInfoText: { color: theme.textSecondary, fontSize: 11, fontWeight: '700' },
 
     cardActions: {
       flexDirection: 'row',
       gap: 10,
       borderTopWidth: 1,
-      borderTopColor: '#2A2A2A',
+      borderTopColor: theme.border,
       paddingTop: 16,
     },
     btnAction: {
@@ -1006,9 +1442,9 @@ const createStyles = (theme: Theme) =>
       justifyContent: 'center',
     },
     btnMain: { backgroundColor: theme.primary },
-    btnMainText: { color: '#fff', fontSize: 13, fontWeight: '800' },
-    btnSec: { backgroundColor: '#222', borderWidth: 1, borderColor: '#333' },
-    btnSecText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+    btnMainText: { color: theme.textOnPrimary, fontSize: 13, fontWeight: '800' },
+    btnSec: { backgroundColor: theme.surfaceAlt, borderWidth: 1, borderColor: theme.border },
+    btnSecText: { color: theme.textPrimary, fontSize: 13, fontWeight: '700' },
 
     swipeAction: {
       width: 90,
@@ -1022,13 +1458,13 @@ const createStyles = (theme: Theme) =>
     emptyContainer: {
       padding: 40,
       alignItems: 'center',
-      backgroundColor: '#111',
+      backgroundColor: theme.surfaceAlt,
       borderRadius: 20,
       borderStyle: 'dashed',
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: theme.border,
     },
-    emptyTitle: { color: '#555', fontSize: 14, fontWeight: '600' },
+    emptyTitle: { color: theme.textMuted, fontSize: 14, fontWeight: '600' },
     errorText: { color: '#ff7b7b', textAlign: 'center', marginBottom: 10 },
     logo: { width: 55, height: 55 },
   });
