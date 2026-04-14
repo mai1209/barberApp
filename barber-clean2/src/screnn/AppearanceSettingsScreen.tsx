@@ -118,6 +118,9 @@ const STYLE_PRESETS = [
   },
 ];
 
+const DARK_MODE_PRESET = STYLE_PRESETS[0];
+const LIGHT_MODE_PRESET = STYLE_PRESETS[2];
+
 type FormState = {
   mode: ThemeMode;
   primary: string;
@@ -309,6 +312,10 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
     updateField('gradient3', preset.gradientColors[3]);
   };
 
+  const handleModeSelect = (mode: ThemeMode) => {
+    applyPreset(mode === 'light' ? LIGHT_MODE_PRESET : DARK_MODE_PRESET);
+  };
+
   const handlePickImage = async ({
     field,
     maxWidth,
@@ -445,6 +452,9 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
 
         <View style={styles.previewCard}>
           <Text style={styles.previewEyebrow}>Vista previa</Text>
+          <Text style={styles.previewHelper}>
+            Todo lo que cambies acá se ve antes de guardar.
+          </Text>
           <View style={styles.previewHero}>
             {form.mobileBannerDataUrl ? (
               <Image source={{ uri: form.mobileBannerDataUrl }} style={styles.previewHeroBanner} />
@@ -474,7 +484,7 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
           </Text>
           <ModeField
             mode={form.mode}
-            onSelect={mode => setForm(current => ({ ...current, mode }))}
+            onSelect={handleModeSelect}
             theme={previewTheme}
           />
           <StylePresetField
@@ -1073,12 +1083,18 @@ function createStyles(theme: Theme) {
       marginBottom: 16,
     },
     previewEyebrow: {
-      color: theme.secondary ,
+      color: theme.textMuted,
       fontSize: 11,
       fontWeight: '800',
       letterSpacing: 1.3,
       textTransform: 'uppercase',
       marginBottom: 14,
+    },
+    previewHelper: {
+      color: theme.textSecondary,
+      fontSize: 12,
+      lineHeight: 18,
+      marginBottom: 12,
     },
     previewHero: {
       position: 'relative',
