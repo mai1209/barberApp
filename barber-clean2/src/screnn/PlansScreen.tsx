@@ -241,7 +241,7 @@ const createStyles = (theme: Theme) =>
   StyleSheet.create({
     screen: {
       flex: 1,
-      backgroundColor: '#08080D',
+      backgroundColor: theme.background,
     },
     content: {
       paddingHorizontal: 18,
@@ -262,21 +262,21 @@ const createStyles = (theme: Theme) =>
       textTransform: 'uppercase',
     },
     title: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 28,
       lineHeight: 32,
       fontWeight: '900',
     },
     subtitle: {
-      color: '#959595',
+      color: theme.textSecondary,
       fontSize: 14,
       lineHeight: 20,
     },
     card: {
-      backgroundColor: '#17171E',
+      backgroundColor: theme.card,
       borderRadius: 24,
       borderWidth: 1,
-      borderColor: '#2A2A34',
+      borderColor: theme.border,
       padding: 18,
       gap: 14,
     },
@@ -294,13 +294,13 @@ const createStyles = (theme: Theme) =>
       letterSpacing: 1,
     },
     cardTitle: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 21,
       lineHeight: 26,
       fontWeight: '800',
     },
     cardDescription: {
-      color: '#A9A9B4',
+      color: theme.textSecondary,
       fontSize: 13,
       lineHeight: 19,
     },
@@ -315,7 +315,7 @@ const createStyles = (theme: Theme) =>
       fontWeight: '900',
     },
     priceLabel: {
-      color: '#A9A9B4',
+      color: theme.textMuted,
       fontSize: 13,
       fontWeight: '700',
     },
@@ -336,7 +336,7 @@ const createStyles = (theme: Theme) =>
     },
     featureText: {
       flex: 1,
-      color: '#DFDFE6',
+      color: theme.textSecondary,
       fontSize: 14,
       lineHeight: 20,
     },
@@ -348,7 +348,7 @@ const createStyles = (theme: Theme) =>
       marginTop: 6,
     },
     ctaText: {
-      color: '#fff',
+      color: theme.textOnPrimary,
       fontSize: 15,
       fontWeight: '900',
     },
@@ -358,7 +358,7 @@ const createStyles = (theme: Theme) =>
       alignItems: 'center',
     },
     secondaryCtaText: {
-      color: '#A9A9B4',
+      color: theme.textSecondary,
       fontSize: 14,
       fontWeight: '700',
     },

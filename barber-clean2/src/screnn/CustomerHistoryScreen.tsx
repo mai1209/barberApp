@@ -959,17 +959,17 @@ function CustomerHistoryScreen({ navigation }: Props) {
 
             {hasActiveFilters ? (
               <Pressable style={styles.clearButton} onPress={clearAllFilters}>
-                <X size={13} color="#C8CFDA" />
+                <X size={13} color={theme.textSecondary} />
                 <Text style={styles.clearButtonText}>Limpiar</Text>
               </Pressable>
             ) : null}
           </View>
 
           <View style={styles.searchFieldWrap}>
-            <Search size={16} color="#666" />
+            <Search size={16} color={theme.textMuted} />
             <TextInput
               placeholder="Cliente, teléfono, barbero o servicio"
-              placeholderTextColor="#555"
+              placeholderTextColor={theme.placeholder}
               style={styles.searchField}
               value={searchInput}
               onChangeText={setSearchInput}
@@ -979,7 +979,7 @@ function CustomerHistoryScreen({ navigation }: Props) {
                 style={styles.inlineClearBtn}
                 onPress={() => setSearchInput('')}
               >
-                <X size={12} color="#999" />
+                <X size={12} color={theme.textMuted} />
               </Pressable>
             ) : null}
           </View>
@@ -990,18 +990,21 @@ function CustomerHistoryScreen({ navigation }: Props) {
               value={selectedBarberLabel}
               onPress={() => setActivePicker('barber')}
               styles={styles}
+              theme={theme}
             />
             <SelectControl
               label="Servicio"
               value={selectedServiceLabel}
               onPress={() => setActivePicker('service')}
               styles={styles}
+              theme={theme}
             />
             <SelectControl
               label="Mes"
               value={selectedMonthLabel}
               onPress={() => setActivePicker('month')}
               styles={styles}
+              theme={theme}
               fullWidth
             />
           </View>
@@ -1016,7 +1019,16 @@ function CustomerHistoryScreen({ navigation }: Props) {
             <PaymentFilterButton
               label="Efectivo"
               active={paymentFilter === 'cash'}
-              icon={<Banknote size={14} color={paymentFilter === 'cash' ? '#fff' : theme.primary} />}
+              icon={
+                <Banknote
+                  size={14}
+                  color={
+                    paymentFilter === 'cash'
+                      ? theme.textOnPrimary
+                      : theme.primary
+                  }
+                />
+              }
               onPress={() =>
                 setPaymentFilter(current => (current === 'cash' ? 'all' : 'cash'))
               }
@@ -1026,7 +1038,16 @@ function CustomerHistoryScreen({ navigation }: Props) {
             <PaymentFilterButton
               label="Transferencia"
               active={paymentFilter === 'transfer'}
-              icon={<CreditCard size={14} color={paymentFilter === 'transfer' ? '#fff' : theme.primary} />}
+              icon={
+                <CreditCard
+                  size={14}
+                  color={
+                    paymentFilter === 'transfer'
+                      ? theme.textOnPrimary
+                      : theme.primary
+                  }
+                />
+              }
               onPress={() =>
                 setPaymentFilter(current =>
                   current === 'transfer' ? 'all' : 'transfer',
@@ -1173,7 +1194,7 @@ function CustomerHistoryScreen({ navigation }: Props) {
                 style={styles.modalClose}
                 onPress={() => setActivePicker(null)}
               >
-                <X size={16} color="#B9C0CE" />
+                <X size={16} color={theme.textSecondary} />
               </Pressable>
             </View>
 
@@ -1227,12 +1248,14 @@ function SelectControl({
   value,
   onPress,
   styles,
+  theme,
   fullWidth = false,
 }: {
   label: string;
   value: string;
   onPress: () => void;
   styles: ReturnType<typeof makeStyles>;
+  theme: Theme;
   fullWidth?: boolean;
 }) {
   return (
@@ -1245,7 +1268,7 @@ function SelectControl({
         <Text style={styles.selectValue} numberOfLines={1}>
           {value}
         </Text>
-        <ChevronDown size={15} color="#8E96A8" />
+        <ChevronDown size={15} color={theme.textMuted} />
       </View>
     </Pressable>
   );
@@ -1318,13 +1341,13 @@ const makeStyles = (theme: Theme) =>
   StyleSheet.create({
     screen: {
       flex: 1,
-      backgroundColor: '#08080D',
+      backgroundColor: theme.background,
     },
     headerContainer: {
       paddingHorizontal: 20,
       paddingTop: Platform.OS === 'ios' ? 60 : 28,
       paddingBottom: 16,
-      backgroundColor: '#08080D',
+      backgroundColor: theme.background,
     },
     headerRow: {
       flexDirection: 'row',
@@ -1340,13 +1363,13 @@ const makeStyles = (theme: Theme) =>
       textTransform: 'uppercase',
     },
     headerTitle: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 28,
       fontWeight: '900',
       marginTop: 4,
     },
     headerSubtitle: {
-      color: '#fff',
+      color: theme.textSecondary,
       fontSize: 13,
       lineHeight: 19,
       marginTop: 6,
@@ -1369,10 +1392,10 @@ const makeStyles = (theme: Theme) =>
     },
     paymentBreakdownCard: {
       flex: 1,
-      backgroundColor: '#101115',
+      backgroundColor: theme.card,
       borderRadius: 18,
       borderWidth: 1,
-      borderColor: '#1D1F28',
+      borderColor: theme.border,
       padding: 14,
     },
     paymentBreakdownTop: {
@@ -1382,27 +1405,27 @@ const makeStyles = (theme: Theme) =>
       marginBottom: 10,
     },
     paymentBreakdownLabel: {
-      color: '#CBD2DE',
+      color: theme.textSecondary,
       fontSize: 12,
       fontWeight: '800',
     },
     paymentBreakdownValue: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 16,
       fontWeight: '900',
     },
     paymentBreakdownMeta: {
-      color: '#70788A',
+      color: theme.textMuted,
       fontSize: 11,
       fontWeight: '700',
       marginTop: 4,
     },
     summaryCard: {
       flex: 1,
-      backgroundColor: '#101115',
+      backgroundColor: theme.card,
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: '#1D1F28',
+      borderColor: theme.border,
       padding: 14,
       minHeight: 112,
     },
@@ -1416,7 +1439,7 @@ const makeStyles = (theme: Theme) =>
       marginBottom: 14,
     },
     summaryValue: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 24,
       fontWeight: '900',
     },
@@ -1425,16 +1448,16 @@ const makeStyles = (theme: Theme) =>
       lineHeight: 19,
     },
     summaryLabel: {
-      color: '#70788A',
+      color: theme.textMuted,
       fontSize: 11,
       fontWeight: '700',
       marginTop: 6,
     },
     filtersCard: {
-      backgroundColor: '#101115',
+      backgroundColor: theme.card,
       borderRadius: 22,
       borderWidth: 1,
-      borderColor: '#1D1F28',
+      borderColor: theme.border,
       padding: 16,
       marginBottom: 18,
     },
@@ -1445,7 +1468,7 @@ const makeStyles = (theme: Theme) =>
       marginBottom: 14,
     },
     filtersTitle: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 17,
       fontWeight: '800',
     },
@@ -1462,21 +1485,21 @@ const makeStyles = (theme: Theme) =>
       paddingHorizontal: 10,
       paddingVertical: 8,
       borderRadius: 999,
-      backgroundColor: '#151821',
+      backgroundColor: theme.surfaceAlt,
       borderWidth: 1,
-      borderColor: '#232633',
+      borderColor: theme.border,
     },
     clearButtonText: {
-      color: '#C8CFDA',
+      color: theme.textSecondary,
       fontSize: 12,
       fontWeight: '800',
     },
     searchFieldWrap: {
       height: 50,
       borderRadius: 16,
-      backgroundColor: '#0A0C11',
+      backgroundColor: theme.input,
       borderWidth: 1,
-      borderColor: '#1D1F28',
+      borderColor: theme.border,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
@@ -1485,7 +1508,7 @@ const makeStyles = (theme: Theme) =>
     },
     searchField: {
       flex: 1,
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 14,
     },
     inlineClearBtn: {
@@ -1494,7 +1517,7 @@ const makeStyles = (theme: Theme) =>
       borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#14161D',
+      backgroundColor: theme.surfaceAlt,
     },
     controlsGrid: {
       flexDirection: 'row',
@@ -1503,9 +1526,9 @@ const makeStyles = (theme: Theme) =>
     },
     selectControl: {
       width: '48.5%',
-      backgroundColor: '#0A0C11',
+      backgroundColor: theme.input,
       borderWidth: 1,
-      borderColor: '#1D1F28',
+      borderColor: theme.border,
       borderRadius: 16,
       padding: 12,
     },
@@ -1513,7 +1536,7 @@ const makeStyles = (theme: Theme) =>
       width: '100%',
     },
     selectLabel: {
-      color: '#687083',
+      color: theme.textMuted,
       fontSize: 10,
       fontWeight: '800',
       textTransform: 'uppercase',
@@ -1528,7 +1551,7 @@ const makeStyles = (theme: Theme) =>
     },
     selectValue: {
       flex: 1,
-      color: '#F3F5F8',
+      color: theme.textPrimary,
       fontSize: 13,
       fontWeight: '700',
     },
@@ -1542,16 +1565,16 @@ const makeStyles = (theme: Theme) =>
       height: 40,
       paddingHorizontal: 12,
       borderRadius: 14,
-      backgroundColor: '#0A0C11',
+      backgroundColor: theme.input,
       borderWidth: 1,
-      borderColor: '#1D1F28',
+      borderColor: theme.border,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 2,
     },
     paymentButtonActive: {
-      borderColor: '#343948',
+      borderColor: theme.primary,
     },
     paymentButtonCash: {
       backgroundColor: 'rgba(91, 227, 139, 0.18)',
@@ -1562,12 +1585,12 @@ const makeStyles = (theme: Theme) =>
       borderColor: hexToRgba(theme.primary, 0.42),
     },
     paymentButtonText: {
-      color: '#8E96A8',
+      color: theme.textMuted,
       fontSize: 10,
       fontWeight: '800',
     },
     paymentButtonTextActive: {
-      color: '#fff',
+      color: theme.textOnPrimary,
     },
     resultsHeader: {
       flexDirection: 'column',
@@ -1587,12 +1610,12 @@ const makeStyles = (theme: Theme) =>
       justifyContent: 'flex-start',
     },
     resultsTitle: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 18,
       fontWeight: '900',
     },
     resultsSubtitle: {
-      color: '#727A8D',
+      color: theme.textMuted,
       fontSize: 12,
       marginTop: 4,
     },
@@ -1603,9 +1626,9 @@ const makeStyles = (theme: Theme) =>
       paddingHorizontal: 10,
       paddingVertical: 8,
       borderRadius: 999,
-      backgroundColor: '#101115',
+      backgroundColor: theme.card,
       borderWidth: 1,
-      borderColor: '#1D1F28',
+      borderColor: theme.border,
       alignSelf: 'flex-start',
       maxWidth: '100%',
     },
@@ -1616,17 +1639,17 @@ const makeStyles = (theme: Theme) =>
       borderRadius: 999,
       flexDirection: 'row',
       gap: 8,
-      backgroundColor: '#101115',
+      backgroundColor: theme.card,
       borderWidth: 1,
       borderColor: hexToRgba(theme.primary, 0.4),
       alignItems: 'center',
       justifyContent: 'center',
     },
     exportButtonGhost: {
-      borderColor: '#1D1F28',
+      borderColor: theme.border,
     },
     exportButtonText: {
-      color: '#DDE3EE',
+      color: theme.textSecondary,
       fontSize: 11,
       fontWeight: '800',
     },
@@ -1637,18 +1660,18 @@ const makeStyles = (theme: Theme) =>
       flexShrink: 1,
     },
     tableCard: {
-      backgroundColor: '#101115',
+      backgroundColor: theme.card,
       borderRadius: 22,
       borderWidth: 1,
-      borderColor: '#1D1F28',
+      borderColor: theme.border,
       overflow: 'hidden',
       marginBottom: 10,
     },
     tableHeaderRow: {
       flexDirection: 'row',
-      backgroundColor: '#14161D',
+      backgroundColor: theme.surfaceAlt,
       borderBottomWidth: 1,
-      borderBottomColor: '#1D1F28',
+      borderBottomColor: theme.border,
     },
     tableHeaderCell: {
       paddingHorizontal: 14,
@@ -1656,7 +1679,7 @@ const makeStyles = (theme: Theme) =>
       justifyContent: 'center',
     },
     tableHeaderText: {
-      color: '#7C8496',
+      color: theme.textMuted,
       fontSize: 11,
       fontWeight: '800',
       textTransform: 'uppercase',
@@ -1665,12 +1688,12 @@ const makeStyles = (theme: Theme) =>
     tableRow: {
       flexDirection: 'row',
       borderBottomWidth: 1,
-      borderBottomColor: '#171922',
+      borderBottomColor: theme.border,
       minHeight: 62,
-      backgroundColor: '#101115',
+      backgroundColor: theme.card,
     },
     tableRowAlt: {
-      backgroundColor: '#0D0F14',
+      backgroundColor: theme.surfaceAlt,
     },
     tableCell: {
       paddingHorizontal: 14,
@@ -1681,12 +1704,12 @@ const makeStyles = (theme: Theme) =>
       alignItems: 'flex-end',
     },
     tableCellText: {
-      color: '#9CA5B8',
+      color: theme.textSecondary,
       fontSize: 12,
       fontWeight: '600',
     },
     tableCellTextStrong: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontWeight: '600',
     },
     paymentBadge: {
@@ -1720,22 +1743,22 @@ const makeStyles = (theme: Theme) =>
       fontWeight: '900',
     },
     emptyState: {
-      backgroundColor: '#101115',
+      backgroundColor: theme.card,
       borderRadius: 22,
       borderWidth: 1,
-      borderColor: '#1D1F28',
+      borderColor: theme.border,
       padding: 22,
       alignItems: 'center',
       marginTop: 10,
     },
     emptyTitle: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 16,
       fontWeight: '800',
       textAlign: 'center',
     },
     emptyText: {
-      color: '#727A8D',
+      color: theme.textMuted,
       fontSize: 13,
       lineHeight: 19,
       textAlign: 'center',
@@ -1744,15 +1767,15 @@ const makeStyles = (theme: Theme) =>
     },
     modalOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.55)',
+      backgroundColor: theme.overlay,
       justifyContent: 'flex-end',
       padding: 16,
     },
     modalCard: {
-      backgroundColor: '#111318',
+      backgroundColor: theme.card,
       borderRadius: 24,
       borderWidth: 1,
-      borderColor: '#222632',
+      borderColor: theme.border,
       maxHeight: '72%',
       padding: 16,
     },
@@ -1763,7 +1786,7 @@ const makeStyles = (theme: Theme) =>
       marginBottom: 10,
     },
     modalTitle: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 17,
       fontWeight: '800',
     },
@@ -1771,7 +1794,7 @@ const makeStyles = (theme: Theme) =>
       width: 32,
       height: 32,
       borderRadius: 16,
-      backgroundColor: '#171A22',
+      backgroundColor: theme.surfaceAlt,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -1781,10 +1804,10 @@ const makeStyles = (theme: Theme) =>
     modalOption: {
       paddingVertical: 14,
       borderBottomWidth: 1,
-      borderBottomColor: '#1A1E28',
+      borderBottomColor: theme.border,
     },
     modalOptionText: {
-      color: '#E6EAF1',
+      color: theme.textSecondary,
       fontSize: 14,
       fontWeight: '600',
     },

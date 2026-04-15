@@ -676,7 +676,11 @@ function Home({ navigation }: Props) {
             {appointment.customerName}
           </Text>
           <View style={styles.serviceRow}>
-            <Scissors size={14} color="#888" style={{ marginRight: 6 }} />
+            <Scissors
+              size={14}
+              color={theme.textMuted}
+              style={{ marginRight: 6 }}
+            />
             <Text style={styles.serviceNameText}>{appointment.service}</Text>
             <Text style={styles.dotSeparator}>•</Text>
             <Text style={styles.durationText}>
@@ -684,7 +688,8 @@ function Home({ navigation }: Props) {
             </Text>
           </View>
           <Text style={styles.barberSubText}>
-            Atendido por: <Text style={{ color: '#BBB' }}>{barberName}</Text>
+            Atendido por:{' '}
+            <Text style={{ color: theme.textSecondary }}>{barberName}</Text>
           </Text>
           <View
             style={[
@@ -1454,7 +1459,11 @@ const createStyles = (theme: Theme) =>
       justifyContent: 'center',
       marginLeft: 12,
     },
-    swipeActionText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+    swipeActionText: {
+      color: theme.textOnPrimary,
+      fontSize: 12,
+      fontWeight: '800',
+    },
     emptyContainer: {
       padding: 40,
       alignItems: 'center',

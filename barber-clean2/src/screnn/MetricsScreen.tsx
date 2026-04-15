@@ -511,7 +511,7 @@ const makeStyles = (theme: Theme) =>
       padding: 20,
     },
     errorText: {
-      color: '#FF9191',
+      color: theme.mode === 'light' ? '#C53333' : '#FF9191',
       fontSize: 14,
       fontWeight: '600',
       textAlign: 'center',

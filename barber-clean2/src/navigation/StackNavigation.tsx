@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StyleSheet, View } from 'react-native';
 import type { Barber } from '../services/api';
@@ -26,6 +26,7 @@ import UsageGuideScreen from '../screnn/UsageGuideScreen';
 import PlansScreen from '../screnn/PlansScreen';
 import SubscriptionSettingsScreen from '../screnn/SubscriptionSettingsScreen';
 import ScreenGradient from '../components/ScreenGradient';
+import { useTheme } from '../context/ThemeContext';
 import { navigationRef } from '../../App';
 
 export type RootStackParamList = {
@@ -81,6 +82,9 @@ export default function StackNavigator({
   initialRouteName = 'Login',
   isSubscriptionLocked = false,
 }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme.mode), [theme.mode]);
+
   return (
     <View style={styles.container}>
       <ScreenGradient />
@@ -130,12 +134,13 @@ export default function StackNavigator({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#08080D',
-  },
-  stackContainer: {
-    flex: 1,
-  },
-});
+const createStyles = (mode: 'light' | 'dark') =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: mode === 'light' ? '#F8FAFC' : '#08080D',
+    },
+    stackContainer: {
+      flex: 1,
+    },
+  });

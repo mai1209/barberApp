@@ -239,7 +239,7 @@ export default function PaymentSettingsScreen() {
                   keyboardType="numeric"
                   value={form.advanceValue}
                   onChangeText={v => setForm(c => ({ ...c, advanceValue: v.replace(/[^0-9.]/g, '') }))}
-                  placeholderTextColor="#666"
+                  placeholderTextColor={theme.placeholder}
                 />
               </>
             )}
@@ -372,7 +372,11 @@ const createStyles = (theme: any) => StyleSheet.create({
   header: { marginBottom: 18 },
   title: { color: theme.textPrimary, fontSize: 34, fontWeight: '800' },
   subtitle: { color: theme.textSecondary, fontSize: 14, marginTop: 6 },
-  errorText: { color: '#FF8D8D', fontSize: 13, marginBottom: 12 },
+  errorText: {
+    color: theme.mode === 'light' ? '#C53333' : '#FF8D8D',
+    fontSize: 13,
+    marginBottom: 12,
+  },
   card: { backgroundColor: theme.card, borderRadius: 18, borderWidth: 1, borderColor: theme.border, padding: 16, marginBottom: 18 },
   rowSwitch: { flexDirection: 'row', alignItems: 'center' },
   rowSwitchBody: { flex: 1 },
@@ -386,14 +390,17 @@ const createStyles = (theme: any) => StyleSheet.create({
   statusNotice: { borderRadius: 14, borderWidth: 1, padding: 14 },
   statusNoticeConnected: { backgroundColor: 'rgba(49, 201, 108, 0.12)', borderColor: 'rgba(49, 201, 108, 0.35)' },
   statusNoticePending: { backgroundColor: 'rgba(255, 184, 0, 0.10)', borderColor: 'rgba(255, 184, 0, 0.28)' },
-  statusNoticeDisconnected: { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' },
+  statusNoticeDisconnected: {
+    backgroundColor: theme.mode === 'light' ? 'rgba(15, 23, 42, 0.04)' : 'rgba(255,255,255,0.03)',
+    borderColor: theme.mode === 'light' ? 'rgba(15, 23, 42, 0.10)' : 'rgba(255,255,255,0.08)',
+  },
   statusNoticeTitle: { fontSize: 15, fontWeight: '800', marginBottom: 4 },
-  statusNoticeTitleConnected: { color: '#66DA92' },
-  statusNoticeTitlePending: { color: '#F6C453' },
+  statusNoticeTitleConnected: { color: theme.mode === 'light' ? '#15803D' : '#66DA92' },
+  statusNoticeTitlePending: { color: theme.mode === 'light' ? '#B7791F' : '#F6C453' },
   statusNoticeTitleDisconnected: { color: theme.textPrimary },
   statusNoticeText: { fontSize: 12, lineHeight: 18 },
-  statusNoticeTextConnected: { color: '#DFF8E8' },
-  statusNoticeTextPending: { color: '#F6E1A9' },
+  statusNoticeTextConnected: { color: theme.mode === 'light' ? '#166534' : '#DFF8E8' },
+  statusNoticeTextPending: { color: theme.mode === 'light' ? '#92400E' : '#F6E1A9' },
   statusNoticeTextDisconnected: { color: theme.textSecondary },
   segmentButton: { minHeight: 40, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.input, alignItems: 'center', justifyContent: 'center' },
   actionButton: { width: '100%', minHeight: 48 },

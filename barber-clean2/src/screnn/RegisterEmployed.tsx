@@ -957,7 +957,7 @@ function RegisterEmployed({ navigation, route }: Props) {
                     focusedField === 'name' && styles.inputFocused,
                   ]}
                   placeholder="Nombre y Apellido"
-                  placeholderTextColor="#666"
+                  placeholderTextColor={theme.placeholder}
                   value={fullName}
                   onChangeText={setFullName}
                   onFocus={() => setFocusedField('name')}
@@ -969,7 +969,7 @@ function RegisterEmployed({ navigation, route }: Props) {
                     focusedField === 'email' && styles.inputFocused,
                   ]}
                   placeholder="Email"
-                  placeholderTextColor="#666"
+                  placeholderTextColor={theme.placeholder}
                   keyboardType="email-address"
                   value={email}
                   onChangeText={setEmail}
@@ -982,7 +982,7 @@ function RegisterEmployed({ navigation, route }: Props) {
                     focusedField === 'phone' && styles.inputFocused,
                   ]}
                   placeholder="Tu Teléfono (WhatsApp)"
-                  placeholderTextColor="#666"
+                  placeholderTextColor={theme.placeholder}
                   keyboardType="phone-pad"
                   value={phone}
                   onChangeText={text =>
@@ -1445,7 +1445,7 @@ function RegisterEmployed({ navigation, route }: Props) {
                 <TextInput
                   style={[styles.input, styles.closedDaysMessageInput]}
                   placeholder="Motivo o mensaje para mostrar en la reserva"
-                  placeholderTextColor="#666"
+                  placeholderTextColor={theme.placeholder}
                   value={closedMessageInput}
                   onChangeText={setClosedMessageInput}
                   multiline
@@ -1496,7 +1496,7 @@ function RegisterEmployed({ navigation, route }: Props) {
                   disabled={loading}
                 >
                   {loading ? (
-                    <ActivityIndicator color="#fff" />
+                    <ActivityIndicator color={theme.textOnPrimary} />
                   ) : (
                     <Text style={styles.submitBtnText}>
                       {isEditing ? 'Guardar cambios' : 'Registrar Barbero'}
@@ -1757,7 +1757,7 @@ const createStyles = (theme: Theme) =>
       fontWeight: '700',
       letterSpacing: 2,
     },
-    headerTitle: { color: '#fff', fontSize: 32, fontWeight: '800', marginTop: 5 },
+    headerTitle: { color: theme.textPrimary, fontSize: 32, fontWeight: '800', marginTop: 5 },
     mainCard: {
       marginHorizontal: 15,
       backgroundColor: theme.card,
@@ -1765,24 +1765,24 @@ const createStyles = (theme: Theme) =>
       padding: 24,
       gap: 20,
       borderWidth: 1,
-      borderColor: '#252525',
+      borderColor: theme.border,
     },
     section: { gap: 12 },
     sectionLabel: {
-      color: '#666',
+      color: theme.textMuted,
       fontSize: 11,
       fontWeight: '700',
       textTransform: 'uppercase',
       marginLeft: 4,
     },
     input: {
-      backgroundColor: '#252525',
+      backgroundColor: theme.input,
       borderRadius: 16,
       padding: 16,
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 16,
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: theme.border,
     },
     inputFocused: { borderColor: theme.primary },
     photoPreviewWrap: {
@@ -1794,9 +1794,9 @@ const createStyles = (theme: Theme) =>
       width: 72,
       height: 72,
       borderRadius: 36,
-      backgroundColor: '#252525',
+      backgroundColor: theme.input,
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: theme.border,
       overflow: 'hidden',
       alignItems: 'center',
       justifyContent: 'center',
@@ -1816,7 +1816,7 @@ const createStyles = (theme: Theme) =>
       fontWeight: '700',
     },
     photoRemoveText: {
-      color: '#888',
+      color: theme.textMuted,
       fontSize: 12,
       fontWeight: '600',
     },
@@ -1825,26 +1825,26 @@ const createStyles = (theme: Theme) =>
       width: 38,
       height: 38,
       borderRadius: 19,
-      backgroundColor: '#252525',
+      backgroundColor: theme.input,
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: theme.border,
     },
     dayCircleActive: { backgroundColor: theme.primary, borderColor: theme.primary },
-    dayText: { color: '#888', fontSize: 13, fontWeight: '700' },
-    dayTextActive: { color: '#fff' },
+    dayText: { color: theme.textMuted, fontSize: 13, fontWeight: '700' },
+    dayTextActive: { color: theme.textOnPrimary },
     timeRow: { flexDirection: 'row', gap: 12 },
     timeCard: {
       flex: 1,
-      backgroundColor: '#252525',
+      backgroundColor: theme.input,
       borderRadius: 16,
       padding: 16,
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: theme.border,
     },
-    timeLabel: { color: '#888', fontSize: 11, textTransform: 'uppercase' },
-    timeValue: { color: '#fff', fontSize: 18, fontWeight: '700', marginTop: 4 },
+    timeLabel: { color: theme.textMuted, fontSize: 11, textTransform: 'uppercase' },
+    timeValue: { color: theme.textPrimary, fontSize: 18, fontWeight: '700', marginTop: 4 },
 
     // TURNO CORTADO
     shiftHeader: {
@@ -1856,9 +1856,9 @@ const createStyles = (theme: Theme) =>
       paddingHorizontal: 16,
       paddingVertical: 12,
       borderRadius: 14,
-      backgroundColor: '#24242D',
+      backgroundColor: theme.input,
       borderWidth: 1,
-      borderColor: '#373742',
+      borderColor: theme.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -1867,12 +1867,12 @@ const createStyles = (theme: Theme) =>
       borderColor: theme.primary,
     },
     splitToggleText: {
-      color: '#F4F4F7',
+      color: theme.textPrimary,
       fontSize: 13,
       fontWeight: '800',
       textAlign: 'center',
     },
-    splitToggleTextActive: { color: '#FFFFFF' },
+    splitToggleTextActive: { color: theme.textOnPrimary },
     shiftBlock: { gap: 8 },
     shiftLabel: {
       color: theme.primary,
@@ -1881,7 +1881,7 @@ const createStyles = (theme: Theme) =>
       textTransform: 'uppercase',
       letterSpacing: 1,
     },
-    shiftDivider: { height: 1, backgroundColor: '#252525', marginVertical: 4 },
+    shiftDivider: { height: 1, backgroundColor: theme.border, marginVertical: 4 },
     overrideHeader: {
       flexDirection: 'row',
       alignItems: 'flex-start',
@@ -1889,14 +1889,14 @@ const createStyles = (theme: Theme) =>
       gap: 12,
     },
     overrideHeaderText: {
-      color: '#7C7C7C',
+      color: theme.textSecondary,
       fontSize: 12,
       lineHeight: 18,
       marginTop: 4,
       marginLeft: 4,
     },
     overrideHeaderSubtext: {
-      color: '#6E6E6E',
+      color: theme.textMuted,
       fontSize: 11,
       lineHeight: 16,
       marginTop: 6,
@@ -1909,9 +1909,9 @@ const createStyles = (theme: Theme) =>
     overrideDayChip: {
       minWidth: 110,
       borderRadius: 18,
-      backgroundColor: '#252525',
+      backgroundColor: theme.input,
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: theme.border,
       paddingVertical: 12,
       paddingHorizontal: 14,
       gap: 4,
@@ -1921,7 +1921,7 @@ const createStyles = (theme: Theme) =>
       borderColor: theme.primary,
     },
     overrideDayChipText: {
-      color: '#F5F5F5',
+      color: theme.textPrimary,
       fontSize: 14,
       fontWeight: '800',
     },
@@ -1929,18 +1929,18 @@ const createStyles = (theme: Theme) =>
       color: theme.primary,
     },
     overrideDayChipMeta: {
-      color: '#8D8D8D',
+      color: theme.textMuted,
       fontSize: 11,
       fontWeight: '700',
       textTransform: 'uppercase',
       letterSpacing: 0.6,
     },
     overrideCard: {
-      backgroundColor: '#202020',
+      backgroundColor: theme.surfaceAlt,
       borderRadius: 20,
       padding: 16,
       borderWidth: 1,
-      borderColor: '#2D2D2D',
+      borderColor: theme.border,
       gap: 12,
     },
     overrideSelectionSummary: {
@@ -1953,23 +1953,23 @@ const createStyles = (theme: Theme) =>
       gap: 2,
     },
     overrideSelectionSummaryLabel: {
-      color: '#D7C38A',
+      color: theme.primary,
       fontSize: 11,
       fontWeight: '700',
       letterSpacing: 0.6,
       textTransform: 'uppercase',
     },
     overrideSelectionSummaryValue: {
-      color: '#FFF',
+      color: theme.textPrimary,
       fontSize: 14,
       fontWeight: '700',
     },
     bulkApplyCard: {
       borderRadius: 18,
       padding: 14,
-      backgroundColor: '#18181F',
+      backgroundColor: theme.surfaceAlt,
       borderWidth: 1,
-      borderColor: '#2A2A34',
+      borderColor: theme.border,
       gap: 12,
     },
     bulkApplyHeader: {
@@ -1978,12 +1978,12 @@ const createStyles = (theme: Theme) =>
       gap: 12,
     },
     bulkApplyTitle: {
-      color: '#F4F4F7',
+      color: theme.textPrimary,
       fontSize: 14,
       fontWeight: '800',
     },
     bulkApplyHint: {
-      color: '#8C8C95',
+      color: theme.textMuted,
       fontSize: 12,
       lineHeight: 17,
       marginTop: 4,
@@ -1992,16 +1992,16 @@ const createStyles = (theme: Theme) =>
       paddingHorizontal: 12,
       paddingVertical: 9,
       borderRadius: 14,
-      backgroundColor: '#25252D',
+      backgroundColor: theme.input,
       borderWidth: 1,
-      borderColor: '#333340',
+      borderColor: theme.border,
     },
     bulkApplyToggleActive: {
       backgroundColor: hexToRgba(theme.primary, 0.16),
       borderColor: theme.primary,
     },
     bulkApplyToggleText: {
-      color: '#B4B4BE',
+      color: theme.textSecondary,
       fontSize: 12,
       fontWeight: '800',
     },
@@ -2017,16 +2017,16 @@ const createStyles = (theme: Theme) =>
       paddingHorizontal: 12,
       paddingVertical: 10,
       borderRadius: 14,
-      backgroundColor: '#25252D',
+      backgroundColor: theme.input,
       borderWidth: 1,
-      borderColor: '#333340',
+      borderColor: theme.border,
     },
     bulkApplyDayChipActive: {
       backgroundColor: hexToRgba(theme.primary, 0.16),
       borderColor: theme.primary,
     },
     bulkApplyDayChipText: {
-      color: '#D4D4DB',
+      color: theme.textSecondary,
       fontSize: 12,
       fontWeight: '800',
     },
@@ -2044,7 +2044,7 @@ const createStyles = (theme: Theme) =>
       opacity: 0.45,
     },
     bulkApplyActionText: {
-      color: '#fff',
+      color: theme.textOnPrimary,
       fontSize: 13,
       fontWeight: '900',
     },
@@ -2054,12 +2054,12 @@ const createStyles = (theme: Theme) =>
       gap: 12,
     },
     overrideCardTitle: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 18,
       fontWeight: '800',
     },
     overrideCardHint: {
-      color: '#8A8A8A',
+      color: theme.textMuted,
       fontSize: 12,
       lineHeight:17,
       marginTop: 4,
@@ -2068,9 +2068,9 @@ const createStyles = (theme: Theme) =>
       paddingHorizontal: 12,
       paddingVertical: 10,
       borderRadius: 14,
-      backgroundColor: '#252525',
+      backgroundColor: theme.input,
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: theme.border,
       alignSelf: 'flex-start',
     },
     overrideToggleActive: {
@@ -2078,7 +2078,7 @@ const createStyles = (theme: Theme) =>
       borderColor: theme.primary,
     },
     overrideToggleText: {
-      color: '#A0A0A0',
+      color: theme.textMuted,
       fontSize: 12,
       fontWeight: '800',
     },
@@ -2086,13 +2086,13 @@ const createStyles = (theme: Theme) =>
       color: theme.primary,
     },
     overrideEmptyText: {
-      color: '#757575',
+      color: theme.textMuted,
       fontSize: 13,
       lineHeight: 20,
       marginLeft: 4,
     },
     closedDaysHint: {
-      color: '#8C8C95',
+      color: theme.textMuted,
       fontSize: 12,
       lineHeight: 18,
       marginTop: 2,
@@ -2107,9 +2107,9 @@ const createStyles = (theme: Theme) =>
       paddingHorizontal: 12,
       paddingVertical: 9,
       borderRadius: 14,
-      backgroundColor: '#25252D',
+      backgroundColor: theme.input,
       borderWidth: 1,
-      borderColor: '#333340',
+      borderColor: theme.border,
     },
     closedDaysQuickChipText: {
       color: theme.primary,
@@ -2127,8 +2127,8 @@ const createStyles = (theme: Theme) =>
       gap: 12,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: '#333340',
-      backgroundColor: '#25252D',
+      borderColor: theme.border,
+      backgroundColor: theme.input,
       paddingHorizontal: 14,
       paddingVertical: 14,
     },
@@ -2145,13 +2145,13 @@ const createStyles = (theme: Theme) =>
       gap: 2,
     },
     closedDateInputValue: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 14,
       fontWeight: '800',
       textTransform: 'capitalize',
     },
     closedDateInputMeta: {
-      color: '#9DA4B4',
+      color: theme.textMuted,
       fontSize: 12,
       fontWeight: '600',
     },
@@ -2176,14 +2176,14 @@ const createStyles = (theme: Theme) =>
       flexDirection: 'row',
       gap: 12,
       alignItems: 'flex-start',
-      backgroundColor: '#202127',
+      backgroundColor: theme.surfaceAlt,
       borderRadius: 18,
       borderWidth: 1,
-      borderColor: '#2E303A',
+      borderColor: theme.border,
       padding: 14,
     },
     closedDayItemTitle: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 14,
       fontWeight: '800',
       textTransform: 'capitalize',
@@ -2195,7 +2195,7 @@ const createStyles = (theme: Theme) =>
       marginTop: 4,
     },
     closedDayItemMessage: {
-      color: '#B0B0B8',
+      color: theme.textSecondary,
       fontSize: 12,
       lineHeight: 18,
       marginTop: 6,
@@ -2209,12 +2209,12 @@ const createStyles = (theme: Theme) =>
       borderColor: 'rgba(255, 77, 77, 0.28)',
     },
     closedDayDeleteButtonText: {
-      color: '#FF8A8A',
+      color: theme.mode === 'light' ? '#C53333' : '#FF8A8A',
       fontSize: 12,
       fontWeight: '800',
     },
     closedDaysEmptyText: {
-      color: '#757575',
+      color: theme.textMuted,
       fontSize: 13,
       lineHeight: 20,
     },
@@ -2225,10 +2225,10 @@ const createStyles = (theme: Theme) =>
       paddingVertical: 18,
       alignItems: 'center',
     },
-    submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+    submitBtnText: { color: theme.textOnPrimary, fontSize: 16, fontWeight: '800' },
     modalBackdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.9)',
+      backgroundColor: theme.overlay,
       justifyContent: 'flex-end',
     },
     modalSheet: {
@@ -2244,9 +2244,9 @@ const createStyles = (theme: Theme) =>
       alignItems: 'center',
       marginBottom: 20,
     },
-    modalTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
+    modalTitle: { color: theme.textPrimary, fontSize: 20, fontWeight: '800' },
     timePickerSummary: {
-      backgroundColor: '#252525',
+      backgroundColor: theme.input,
       borderRadius: 20,
       paddingVertical: 16,
       paddingHorizontal: 18,
@@ -2254,14 +2254,14 @@ const createStyles = (theme: Theme) =>
       marginBottom: 16,
     },
     timePickerSummaryLabel: {
-      color: '#8A8A8A',
+      color: theme.textMuted,
       fontSize: 11,
       fontWeight: '700',
       textTransform: 'uppercase',
       letterSpacing: 1,
     },
     timePickerSummaryValue: {
-      color: '#fff',
+      color: theme.textPrimary,
       fontSize: 28,
       fontWeight: '900',
       marginTop: 6,
@@ -2270,7 +2270,7 @@ const createStyles = (theme: Theme) =>
       marginTop: 10,
     },
     timePickerSectionTitle: {
-      color: '#A0A0A0',
+      color: theme.textMuted,
       fontSize: 12,
       fontWeight: '700',
       textTransform: 'uppercase',
@@ -2285,7 +2285,7 @@ const createStyles = (theme: Theme) =>
       flex: 1,
       paddingVertical: 14,
       borderRadius: 16,
-      backgroundColor: '#252525',
+      backgroundColor: theme.input,
       borderWidth: 1,
       borderColor: '#333',
       alignItems: 'center',
@@ -2295,12 +2295,12 @@ const createStyles = (theme: Theme) =>
       borderColor: theme.primary,
     },
     periodChipText: {
-      color: '#C0C0C0',
+      color: theme.textSecondary,
       fontSize: 18,
       fontWeight: '800',
     },
     periodChipTextActive: {
-      color: '#fff',
+      color: theme.textOnPrimary,
     },
     pickerGrid: {
       flexDirection: 'row',
@@ -2311,7 +2311,7 @@ const createStyles = (theme: Theme) =>
       width: '22%',
       paddingVertical: 14,
       borderRadius: 16,
-      backgroundColor: '#252525',
+      backgroundColor: theme.input,
       borderWidth: 1,
       borderColor: '#333',
       alignItems: 'center',
@@ -2321,12 +2321,12 @@ const createStyles = (theme: Theme) =>
       borderColor: theme.primary,
     },
     pickerChipText: {
-      color: '#C0C0C0',
+      color: theme.textSecondary,
       fontSize: 18,
       fontWeight: '800',
     },
     pickerChipTextActive: {
-      color: '#fff',
+      color: theme.textOnPrimary,
     },
     modalActions: { marginTop: 25 },
     modalBtn: {
@@ -2335,7 +2335,7 @@ const createStyles = (theme: Theme) =>
       borderRadius: 16,
       alignItems: 'center',
     },
-    modalBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+    modalBtnText: { color: theme.textOnPrimary, fontWeight: '800', fontSize: 16 },
   });
 
 export default RegisterEmployed;

@@ -226,7 +226,7 @@ function OwnerMetricsScreen({ navigation }: Props) {
               </Text>
               <View style={styles.heroFooter}>
                 <View style={styles.heroMetric}>
-                  <Users size={14} color="#fff" opacity={0.6} />
+                  <Users size={14} color={theme.textSecondary} opacity={0.8} />
                   <Text style={styles.heroMetricText}>
                     {data?.totals.appointmentsCount ?? 0} Turnos
                   </Text>
@@ -245,7 +245,7 @@ function OwnerMetricsScreen({ navigation }: Props) {
                 <View
                   style={[
                     styles.paymentIconWrap,
-                    { backgroundColor: hexToRgba('#1c1c1c1', 0.1) },
+                    { backgroundColor: hexToRgba(theme.primary, 0.12) },
                   ]}
                 >
                   <Banknote size={16} color={theme.primary} />
@@ -265,7 +265,7 @@ function OwnerMetricsScreen({ navigation }: Props) {
                 <View
                   style={[
                     styles.paymentIconWrap,
-                    { backgroundColor: hexToRgba('#1c1c1c1', 0.1) },
+                    { backgroundColor: hexToRgba(theme.primary, 0.12) },
                   ]}
                 >
                   <CreditCard size={16} color={theme.primary} />
@@ -402,7 +402,7 @@ const makeStyles = (theme: Theme) =>
       borderColor: theme.primary,
     },
     annualChipText: {
-      color: '#666',
+      color: theme.textMuted,
       fontSize: 10,
       fontWeight: '800',
     },
@@ -645,7 +645,7 @@ const makeStyles = (theme: Theme) =>
       alignItems: 'center',
     },
     loaderText: {
-      color: '#666',
+      color: theme.textMuted,
       marginTop: 15,
       fontWeight: '600',
     },
@@ -658,7 +658,7 @@ const makeStyles = (theme: Theme) =>
       borderColor: hexToRgba('#ff0000', 0.2),
     },
     errorText: {
-      color: '#ff9191',
+      color: theme.mode === 'light' ? '#C53333' : '#ff9191',
       textAlign: 'center',
       fontSize: 14,
       fontWeight: '600',
