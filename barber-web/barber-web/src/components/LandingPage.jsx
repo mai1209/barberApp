@@ -207,13 +207,14 @@ function LandingPage() {
       {/* NAV */}
       <nav className={styles.nav}>
         <div className={styles.navLogo}>
-          <span className={styles.navLogoScissors}>✂</span>
-          <span className={styles.navLogoText}>BarberAppByCodex</span>
+        <img className={styles.navLogoImg} src="logoBarber.png" alt="logobarber" />
+        <span className={styles.navLogoText}>BarberAppByCodex</span>
         </div>
         <a
           href="https://www.letsbuilditcodex.com/"
           target="_blank"
           rel="noreferrer"
+
         >
           <span className={styles.navBadge}>by CODEX®</span>
         </a>
