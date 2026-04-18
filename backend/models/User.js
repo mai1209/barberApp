@@ -4,6 +4,11 @@ import mongoose from "mongoose";
 const themeConfigSchema = new mongoose.Schema(
   {
     mode: { type: String, enum: ["dark", "light"], default: null },
+    webPreset: {
+      type: String,
+      enum: ["dark", "light", "vintage"],
+      default: null,
+    },
     primary: { type: String, trim: true, default: null },
     secondary: { type: String, trim: true, default: null },
     card: { type: String, trim: true, default: null },

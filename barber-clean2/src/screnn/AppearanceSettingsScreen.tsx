@@ -121,8 +121,29 @@ const STYLE_PRESETS = [
 const DARK_MODE_PRESET = STYLE_PRESETS[0];
 const LIGHT_MODE_PRESET = STYLE_PRESETS[2];
 
+const WEB_STYLE_PRESETS = [
+  {
+    key: 'dark' as const,
+    label: 'Modo oscuro',
+    helper: 'Mantiene la web elegante, intensa y nocturna.',
+  },
+  {
+    key: 'light' as const,
+    label: 'Modo claro',
+    helper: 'Deja la web limpia, clara y más comercial.',
+  },
+  {
+    key: 'vintage' as const,
+    label: 'Modo vintage',
+    helper: 'Usa tonos crema y cobre para una estética clásica.',
+  },
+];
+
+type WebPreset = (typeof WEB_STYLE_PRESETS)[number]['key'];
+
 type FormState = {
   mode: ThemeMode;
+  webPreset: WebPreset;
   primary: string;
   secondary: string;
   card: string;
@@ -165,6 +186,10 @@ function buildInitialForm(theme: Theme, profile: any): FormState {
 
   return {
     mode: customTheme.mode === 'light' ? 'light' : theme.mode,
+    webPreset:
+      customTheme.webPreset === 'light' || customTheme.webPreset === 'vintage'
+        ? customTheme.webPreset
+        : 'dark',
     primary: customTheme.primary ?? theme.primary,
     secondary: customTheme.secondary ?? theme.secondary,
     card: customTheme.card ?? theme.card,
@@ -383,6 +408,7 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
 
   const persistTheme = async (payload: {
     mode: ThemeMode | null;
+    webPreset: WebPreset | null;
     primary: string | null;
     secondary: string | null;
     card: string | null;
@@ -403,6 +429,7 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
       setSaving(true);
       await persistTheme({
         mode: form.mode,
+        webPreset: form.webPreset,
         primary: form.primary,
         secondary: form.secondary,
         card: form.card,
@@ -492,6 +519,18 @@ export default function AppearanceSettingsScreen({ navigation }: { navigation: a
             options={STYLE_PRESETS}
             theme={previewTheme}
             onSelect={applyPreset}
+          />
+        </SectionCard>
+
+        <SectionCard title="Estilo web de reservas" icon={SwatchBook} theme={previewTheme}>
+          <Text style={styles.helperText}>
+            Esto cambia solo la web donde tus clientes reservan turnos. La app no se toca.
+          </Text>
+          <WebPresetField
+            value={form.webPreset}
+            options={WEB_STYLE_PRESETS}
+            theme={previewTheme}
+            onSelect={preset => setForm(current => ({ ...current, webPreset: preset }))}
           />
         </SectionCard>
 
@@ -985,6 +1024,83 @@ function StylePresetField({
                   style={{ flex: 1, height: 34, borderRadius: 10, backgroundColor: color }}
                 />
               ))}
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function WebPresetField({
+  value,
+  options,
+  theme,
+  onSelect,
+}: {
+  value: WebPreset;
+  options: Array<{
+    key: WebPreset;
+    label: string;
+    helper: string;
+  }>;
+  theme: Theme;
+  onSelect: (preset: WebPreset) => void;
+}) {
+  return (
+    <View style={{ gap: 10, marginTop: 12 }}>
+      {options.map(option => {
+        const isActive = option.key === value;
+
+        return (
+          <Pressable
+            key={option.key}
+            onPress={() => onSelect(option.key)}
+            style={{
+              borderRadius: 18,
+              borderWidth: isActive ? 2 : 1,
+              borderColor: isActive ? theme.primary : theme.border,
+              padding: 14,
+              backgroundColor: theme.surfaceAlt,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: theme.textPrimary, fontSize: 14, fontWeight: '800' }}>
+                  {option.label}
+                </Text>
+                <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 4 }}>
+                  {option.helper}
+                </Text>
+              </View>
+              <View
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  borderRadius: 999,
+                  backgroundColor: isActive ? `${theme.primary}18` : theme.input,
+                  borderWidth: 1,
+                  borderColor: isActive ? theme.primary : theme.border,
+                }}
+              >
+                <Text
+                  style={{
+                    color: isActive ? theme.primary : theme.textMuted,
+                    fontSize: 11,
+                    fontWeight: '800',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {isActive ? 'Activo' : 'Usar'}
+                </Text>
+              </View>
             </View>
           </Pressable>
         );

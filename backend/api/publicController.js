@@ -100,6 +100,7 @@ function sanitizeShop(shop) {
     slug: shop.shopSlug,
     themeConfig: {
       mode: themeConfig.mode || null,
+      webPreset: themeConfig.webPreset || null,
       primary: themeConfig.primary || null,
       secondary: themeConfig.secondary || null,
       card: themeConfig.card || null,

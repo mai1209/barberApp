@@ -18,7 +18,7 @@ type ApiError = Error & {
 const LAN_IP = "192.168.100.55"; 
 const ANDROID_EMULATOR_HOST = "10.0.2.2";
 const REQUEST_TIMEOUT_MS = 8000;
-const FORCE_PROD_IN_DEBUG = true; // Útil para probar el comportamiento en producción sin necesidad de un backend local
+const FORCE_PROD_IN_DEBUG = false; // Útil para probar el comportamiento en producción sin necesidad de un backend local
 
 const isAndroid = Platform.OS === "android";
 const isAndroidEmulator = Boolean(
@@ -190,6 +190,7 @@ export function getCurrentUser() {
 
 export type ThemeConfig = {
   mode?: 'dark' | 'light' | null;
+  webPreset?: 'dark' | 'light' | 'vintage' | null;
   primary?: string | null;
   secondary?: string | null;
   card?: string | null;

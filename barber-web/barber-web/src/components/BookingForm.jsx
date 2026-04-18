@@ -27,6 +27,170 @@ const minutesToLabel = (totalMinutes) => {
 const SLOT_INTERVAL_MINUTES = 30;
 const SHOP_TZ = "America/Argentina/Cordoba";
 const DEFAULT_BOOKING_BANNER = "/logoBarber.png";
+const WEB_STYLE_PRESETS = {
+  dark: {
+    "--page-bg": "linear-gradient(180deg, #06070a 0%, #120812 100%)",
+    "--wrapper-shadow": "0 24px 70px rgba(0, 0, 0, 0.30)",
+    "--pink": "#ff1493",
+    "--pink-light": "#ff69b4",
+    "--pink-soft": "rgba(255, 20, 147, 0.08)",
+    "--pink-border": "rgba(255, 20, 147, 0.22)",
+    "--surface": "rgba(15, 15, 18, 0.96)",
+    "--surface-2": "rgba(22, 22, 26, 0.98)",
+    "--surface-3": "rgba(28, 28, 34, 0.98)",
+    "--line": "rgba(255, 255, 255, 0.06)",
+    "--text": "#ffffff",
+    "--text-soft": "#d8d8de",
+    "--text-dim": "#92929c",
+    "--text-faint": "#5f5f69",
+    "--glow-1": "radial-gradient(circle, rgba(255, 20, 147, 0.16) 0%, transparent 72%)",
+    "--glow-2": "radial-gradient(circle, rgba(255, 105, 180, 0.12) 0%, transparent 72%)",
+    "--card-bg": "linear-gradient(180deg, rgba(20, 20, 24, 0.98) 0%, rgba(10, 10, 12, 0.99) 100%)",
+    "--card-shadow": "0 30px 80px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.03)",
+    "--card-grid":
+      "linear-gradient(rgba(255, 20, 147, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 20, 147, 0.04) 1px, transparent 1px)",
+    "--eyebrow-bg": "rgba(255, 20, 147, 0.1)",
+    "--eyebrow-text": "#ffb4d7",
+    "--eyebrow-dot-shadow": "rgba(255, 20, 147, 0.75)",
+    "--focus-bg": "rgba(33, 33, 39, 0.98)",
+    "--focus-ring": "rgba(255, 20, 147, 0.08)",
+    "--hover-line": "rgba(255, 255, 255, 0.12)",
+    "--hover-surface": "rgba(34, 34, 39, 0.98)",
+    "--active-surface":
+      "linear-gradient(180deg, rgba(255, 20, 147, 0.12) 0%, rgba(255, 20, 147, 0.05) 100%)",
+    "--active-shadow": "0 14px 30px rgba(255, 20, 147, 0.12)",
+    "--chip-title": "#f4f4f7",
+    "--chip-title-active": "#ffd6ec",
+    "--chip-helper-active": "#f1c4df",
+    "--warning-border": "rgba(255, 138, 0, 0.22)",
+    "--warning-bg": "rgba(255, 138, 0, 0.08)",
+    "--warning-text": "#f0cf9d",
+    "--avatar-bg": "rgba(255, 255, 255, 0.06)",
+    "--active-button-gradient": "linear-gradient(135deg, #ff1493 0%, #c0007a 100%)",
+    "--active-button-shadow": "0 12px 24px rgba(255, 20, 147, 0.25)",
+    "--muted-on-accent": "rgba(255, 255, 255, 0.72)",
+    "--empty-card-bg": "linear-gradient(180deg, rgba(29, 29, 34, 0.96) 0%, rgba(20, 20, 24, 0.98) 100%)",
+    "--submit-gradient": "linear-gradient(135deg, #ff1493 0%, #c0007a 100%)",
+    "--submit-shadow": "0 18px 34px rgba(255, 20, 147, 0.28)",
+    "--submit-shadow-hover": "0 22px 42px rgba(255, 20, 147, 0.34)",
+    "--submit-disabled-bg": "#252525",
+    "--submit-disabled-text": "#4c4c56",
+    "--modal-backdrop": "rgba(0, 0, 0, 0.82)",
+    "--modal-card-bg": "linear-gradient(180deg, rgba(19, 19, 23, 0.98) 0%, rgba(11, 11, 13, 1) 100%)",
+    "--modal-close-bg": "rgba(255, 255, 255, 0.06)",
+    "--modal-close-bg-hover": "rgba(255, 255, 255, 0.12)",
+    "--service-active-meta": "rgba(255, 171, 214, 0.88)",
+  },
+  light: {
+    "--page-bg": "linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%)",
+    "--wrapper-shadow": "0 24px 60px rgba(15, 23, 42, 0.08)",
+    "--pink": "#1f2937",
+    "--pink-light": "#64748b",
+    "--pink-soft": "rgba(31, 41, 55, 0.08)",
+    "--pink-border": "rgba(31, 41, 55, 0.18)",
+    "--surface": "rgba(255, 255, 255, 0.96)",
+    "--surface-2": "rgba(248, 250, 252, 0.98)",
+    "--surface-3": "rgba(255, 255, 255, 0.98)",
+    "--line": "rgba(15, 23, 42, 0.10)",
+    "--text": "#0f172a",
+    "--text-soft": "#1f2937",
+    "--text-dim": "#64748b",
+    "--text-faint": "#94a3b8",
+    "--glow-1": "radial-gradient(circle, rgba(148, 163, 184, 0.18) 0%, transparent 72%)",
+    "--glow-2": "radial-gradient(circle, rgba(203, 213, 225, 0.22) 0%, transparent 72%)",
+    "--card-bg": "linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 1) 100%)",
+    "--card-shadow": "0 24px 60px rgba(15, 23, 42, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.8)",
+    "--card-grid":
+      "linear-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px)",
+    "--eyebrow-bg": "rgba(15, 23, 42, 0.05)",
+    "--eyebrow-text": "#334155",
+    "--eyebrow-dot-shadow": "rgba(31, 41, 55, 0.18)",
+    "--focus-bg": "rgba(255, 255, 255, 1)",
+    "--focus-ring": "rgba(31, 41, 55, 0.10)",
+    "--hover-line": "rgba(15, 23, 42, 0.16)",
+    "--hover-surface": "rgba(248, 250, 252, 1)",
+    "--active-surface":
+      "linear-gradient(180deg, rgba(31, 41, 55, 0.10) 0%, rgba(31, 41, 55, 0.05) 100%)",
+    "--active-shadow": "0 14px 30px rgba(15, 23, 42, 0.10)",
+    "--chip-title": "#0f172a",
+    "--chip-title-active": "#0f172a",
+    "--chip-helper-active": "#334155",
+    "--warning-border": "rgba(180, 83, 9, 0.18)",
+    "--warning-bg": "rgba(245, 158, 11, 0.08)",
+    "--warning-text": "#92400e",
+    "--avatar-bg": "rgba(15, 23, 42, 0.05)",
+    "--active-button-gradient": "linear-gradient(135deg, #111827 0%, #334155 100%)",
+    "--active-button-shadow": "0 12px 24px rgba(15, 23, 42, 0.18)",
+    "--muted-on-accent": "rgba(255, 255, 255, 0.78)",
+    "--empty-card-bg": "linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(241, 245, 249, 1) 100%)",
+    "--submit-gradient": "linear-gradient(135deg, #111827 0%, #334155 100%)",
+    "--submit-shadow": "0 18px 34px rgba(15, 23, 42, 0.16)",
+    "--submit-shadow-hover": "0 22px 42px rgba(15, 23, 42, 0.22)",
+    "--submit-disabled-bg": "#e5e7eb",
+    "--submit-disabled-text": "#94a3b8",
+    "--modal-backdrop": "rgba(15, 23, 42, 0.35)",
+    "--modal-card-bg": "linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(248, 250, 252, 1) 100%)",
+    "--modal-close-bg": "rgba(15, 23, 42, 0.06)",
+    "--modal-close-bg-hover": "rgba(15, 23, 42, 0.12)",
+    "--service-active-meta": "#475569",
+  },
+  vintage: {
+    "--page-bg": "linear-gradient(180deg, #f7efe2 0%, #ead7bb 100%)",
+    "--wrapper-shadow": "0 24px 60px rgba(98, 67, 44, 0.12)",
+    "--pink": "#8b5e34",
+    "--pink-light": "#b88a5f",
+    "--pink-soft": "rgba(139, 94, 52, 0.10)",
+    "--pink-border": "rgba(139, 94, 52, 0.24)",
+    "--surface": "rgba(248, 241, 228, 0.96)",
+    "--surface-2": "rgba(242, 231, 214, 0.98)",
+    "--surface-3": "rgba(255, 249, 238, 0.98)",
+    "--line": "rgba(107, 70, 42, 0.12)",
+    "--text": "#3e2b1f",
+    "--text-soft": "#5b3f2b",
+    "--text-dim": "#8b6a54",
+    "--text-faint": "#b59a83",
+    "--glow-1": "radial-gradient(circle, rgba(184, 138, 95, 0.20) 0%, transparent 72%)",
+    "--glow-2": "radial-gradient(circle, rgba(222, 196, 160, 0.24) 0%, transparent 72%)",
+    "--card-bg": "linear-gradient(180deg, rgba(255, 250, 241, 0.98) 0%, rgba(244, 233, 216, 1) 100%)",
+    "--card-shadow": "0 26px 60px rgba(98, 67, 44, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.65)",
+    "--card-grid":
+      "linear-gradient(rgba(139, 94, 52, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(139, 94, 52, 0.05) 1px, transparent 1px)",
+    "--eyebrow-bg": "rgba(139, 94, 52, 0.10)",
+    "--eyebrow-text": "#7a4b24",
+    "--eyebrow-dot-shadow": "rgba(139, 94, 52, 0.22)",
+    "--focus-bg": "rgba(255, 252, 247, 1)",
+    "--focus-ring": "rgba(139, 94, 52, 0.10)",
+    "--hover-line": "rgba(107, 70, 42, 0.18)",
+    "--hover-surface": "rgba(249, 241, 228, 1)",
+    "--active-surface":
+      "linear-gradient(180deg, rgba(139, 94, 52, 0.14) 0%, rgba(139, 94, 52, 0.06) 100%)",
+    "--active-shadow": "0 14px 30px rgba(139, 94, 52, 0.12)",
+    "--chip-title": "#4a3323",
+    "--chip-title-active": "#6d4020",
+    "--chip-helper-active": "#8b6a54",
+    "--warning-border": "rgba(146, 64, 14, 0.18)",
+    "--warning-bg": "rgba(251, 191, 36, 0.10)",
+    "--warning-text": "#7c4a16",
+    "--avatar-bg": "rgba(139, 94, 52, 0.08)",
+    "--active-button-gradient": "linear-gradient(135deg, #8b5e34 0%, #6d4020 100%)",
+    "--active-button-shadow": "0 12px 24px rgba(139, 94, 52, 0.24)",
+    "--muted-on-accent": "rgba(255, 244, 230, 0.82)",
+    "--empty-card-bg": "linear-gradient(180deg, rgba(255, 249, 238, 0.98) 0%, rgba(244, 233, 216, 1) 100%)",
+    "--submit-gradient": "linear-gradient(135deg, #8b5e34 0%, #6d4020 100%)",
+    "--submit-shadow": "0 18px 34px rgba(139, 94, 52, 0.22)",
+    "--submit-shadow-hover": "0 22px 42px rgba(139, 94, 52, 0.28)",
+    "--submit-disabled-bg": "#d8c7b4",
+    "--submit-disabled-text": "#8f7a64",
+    "--modal-backdrop": "rgba(62, 43, 31, 0.40)",
+    "--modal-card-bg": "linear-gradient(180deg, rgba(255, 250, 241, 0.99) 0%, rgba(244, 233, 216, 1) 100%)",
+    "--modal-close-bg": "rgba(139, 94, 52, 0.08)",
+    "--modal-close-bg-hover": "rgba(139, 94, 52, 0.16)",
+    "--service-active-meta": "#8b6a54",
+  },
+};
+
+const getWebStylePreset = (preset) =>
+  WEB_STYLE_PRESETS[preset] || WEB_STYLE_PRESETS.dark;
 
 function formatTimeInShopTZ(value) {
   const parts = new Intl.DateTimeFormat("es-AR", {
@@ -293,6 +457,10 @@ function BookingForm({ shopSlug, onNotFound }) {
     shopInfo?.themeConfig?.mobileBannerDataUrl ||
     shopInfo?.themeConfig?.bannerDataUrl ||
     DEFAULT_BOOKING_BANNER;
+  const webStyleVars = useMemo(
+    () => getWebStylePreset(shopInfo?.themeConfig?.webPreset),
+    [shopInfo?.themeConfig?.webPreset],
+  );
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -590,7 +758,8 @@ function BookingForm({ shopSlug, onNotFound }) {
 
   // 6. RENDER
   return (
-    <section className={styles.wrapper}>
+    <section className={styles.wrapper} style={webStyleVars}>
+      <div className={styles.pageBackdrop} aria-hidden="true" />
       {paymentResultMessage ? (
         <div
           style={{

@@ -15,6 +15,7 @@ import { getCurrentUser } from '../services/api';
 
 export type ThemeConfig = {
   mode?: ThemeMode | null;
+  webPreset?: 'dark' | 'light' | 'vintage' | null;
   primary?: string | null;
   secondary?: string | null;
   card?: string | null;

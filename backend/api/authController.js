@@ -222,6 +222,21 @@ function sanitizeThemeConfigInput(input) {
     }
   }
 
+  if (Object.prototype.hasOwnProperty.call(input, "webPreset")) {
+    hasAnyField = true;
+    if (input.webPreset == null || String(input.webPreset).trim() === "") {
+      updates.webPreset = null;
+    } else if (
+      input.webPreset === "dark" ||
+      input.webPreset === "light" ||
+      input.webPreset === "vintage"
+    ) {
+      updates.webPreset = input.webPreset;
+    } else {
+      throw new Error("El estilo web debe ser dark, light o vintage.");
+    }
+  }
+
   if (Object.prototype.hasOwnProperty.call(input, "primary")) {
     hasAnyField = true;
     const normalized = normalizeHexColor(input.primary);
