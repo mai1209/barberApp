@@ -235,7 +235,7 @@ export async function listAppointments(req, res, next) {
 // CREAR TURNO (Público desde Web/App)
 export async function createAppointment(req, res, next) {
   try {
-    const ownerId = req.user?.id; // Puede ser undefined en reserva pública
+    const ownerId = req.user?.ownerId || req.user?.id; // Puede ser undefined en reserva pública
     const {
       barberId,
       durationMinutes = 30,
@@ -463,8 +463,12 @@ export async function runAppointmentReminders(req, res, next) {
 
 export async function getAppointmentMetrics(req, res, next) {
   try {
-    const ownerId = req.user.id;
-    const barberId = req.query.barberId ? String(req.query.barberId) : null;
+    const ownerId = req.user.ownerId || req.user.id;
+    const requestedBarberId = req.query.barberId ? String(req.query.barberId) : null;
+    const barberId =
+      req.user?.role === "barber"
+        ? req.user?.barberId || null
+        : requestedBarberId;
     const period = buildMetricsRange(req.query);
 
     const filter = {
@@ -476,6 +480,14 @@ export async function getAppointmentMetrics(req, res, next) {
     if (barberId) {
       if (!mongoose.Types.ObjectId.isValid(barberId)) {
         return res.status(400).json({ error: "Barbero inválido" });
+      }
+
+      if (
+        req.user?.role === "barber" &&
+        req.user?.barberId &&
+        String(req.user.barberId) !== String(barberId)
+      ) {
+        return res.status(403).json({ error: "Solo podés ver tus métricas." });
       }
 
       filter.barber = barberId;
@@ -566,7 +578,7 @@ export async function getAppointmentMetrics(req, res, next) {
 
 export async function getCurrentMonthOverview(req, res, next) {
   try {
-    const ownerId = req.user.id;
+    const ownerId = req.user.ownerId || req.user.id;
     const period = buildMetricsRange(req.query);
 
     const [appointments, activeServices, activeBarbers] = await Promise.all([
@@ -662,7 +674,7 @@ export async function getCurrentMonthOverview(req, res, next) {
 
 export async function getCustomerHistory(req, res, next) {
   try {
-    const ownerId = req.user.id;
+    const ownerId = req.user.ownerId || req.user.id;
     const period = buildMetricsRange(req.query);
     const search = String(req.query.search ?? "").trim();
     const paymentMethod = String(req.query.paymentMethod ?? "").trim();
@@ -822,7 +834,7 @@ export async function updateAppointmentStatus(req, res, next) {
 // LISTAR SERVICIOS
 export async function listServices(req, res, next) {
   try {
-    const ownerId = req.user.id;
+    const ownerId = req.user.ownerId || req.user.id;
     const services = await ServiceModel.find({
       owner: ownerId,
       isActive: true,

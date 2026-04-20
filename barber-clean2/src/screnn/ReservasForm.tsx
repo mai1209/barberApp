@@ -213,18 +213,21 @@ function ReservasForm({ navigation, route }: any) {
     async function load() {
       try {
         const storedUser = await getUserProfile<any>();
-        const [resB, resS, currentUserRes] = await Promise.all([
-          fetchBarbers(),
-          fetchServices(),
-          getCurrentUser().catch(() => null),
-        ]);
+        const currentUserRes = await getCurrentUser().catch(() => null);
         const authUser = currentUserRes?.user ?? storedUser ?? null;
         const nextIsBarberUser = resolveUserRole(authUser) === 'barber';
         const ownBarberId = routeBarberId || authUser?.barberId || null;
-        const availableBarbers =
+        const [resS, barberResponse, resB] = await Promise.all([
+          fetchServices(),
           nextIsBarberUser && ownBarberId
-            ? (resB.barbers || []).filter((barber: Barber) => barber._id === ownBarberId)
-            : resB.barbers || [];
+            ? fetchBarberAppointments(ownBarberId, formatDateInShopTZ(new Date())).catch(() => null)
+            : Promise.resolve(null),
+          !nextIsBarberUser ? fetchBarbers() : Promise.resolve(null),
+        ]);
+        const availableBarbers =
+          nextIsBarberUser && barberResponse?.barber
+            ? [barberResponse.barber]
+            : resB?.barbers || [];
 
         setIsBarberUser(nextIsBarberUser);
         setIsBarberSelectionLocked(nextIsBarberUser || routeLockBarber);

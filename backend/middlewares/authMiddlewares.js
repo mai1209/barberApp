@@ -21,6 +21,24 @@ export async function requireAuth(req, res, next) {
       return res.status(401).json({ error: "Usuario no autorizado" });
     }
 
+    let subscription = {
+      plan: user.subscription?.plan || "basic",
+      status: user.subscription?.status || "trial",
+    };
+
+    if (normalizeAppRole(user.role) === "barber" && user.shopOwnerId) {
+      const ownerUser = await UserModel.findById(user.shopOwnerId)
+        .select({ subscription: 1, isActive: 1 })
+        .lean();
+
+      if (ownerUser && ownerUser.isActive !== false) {
+        subscription = {
+          plan: ownerUser.subscription?.plan || subscription.plan,
+          status: ownerUser.subscription?.status || subscription.status,
+        };
+      }
+    }
+
     req.user = {
       id: user._id.toString(),
       ownerId: resolveEffectiveOwnerId(user),
@@ -29,10 +47,7 @@ export async function requireAuth(req, res, next) {
       fullName: user.fullName,
       barberId: user.barberId ? user.barberId.toString() : null,
       shopOwnerId: user.shopOwnerId ? user.shopOwnerId.toString() : null,
-      subscription: {
-        plan: user.subscription?.plan || "basic",
-        status: user.subscription?.status || "trial",
-      },
+      subscription,
     };
 
     return next();
