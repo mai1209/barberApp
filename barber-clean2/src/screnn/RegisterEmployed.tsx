@@ -15,10 +15,13 @@ import {
   Modal,
   Image,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
 import { CalendarDays } from 'lucide-react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { Barber, createBarber, fetchBarbers, updateBarber } from '../services/api';
+import {
+  Barber,
+  createBarber,
+  updateBarber,
+} from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
 import DateSelectModal from '../components/DateSelectModal';
@@ -137,6 +140,28 @@ const normalizeClosedDayMessage = (value?: string | null) => {
   return text.slice(0, 220);
 };
 
+const formatLastAccessLabel = (value?: string | null) => {
+  if (!value) return 'Nunca ingresó';
+
+  try {
+    return new Date(value).toLocaleString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch (_error) {
+    return 'Sin dato';
+  }
+};
+
+const resolveAccessStateLabel = (loginAccess?: Barber['loginAccess']) => {
+  if (!loginAccess?.enabled) return 'Sin acceso';
+  if (loginAccess?.lastLoginAt) return 'Activo';
+  return 'Nunca ingresó';
+};
+
 function formatClosedDayLabel(value: string) {
   const normalized = normalizeClosedDayDate(value);
   if (!normalized) return value;
@@ -232,28 +257,9 @@ function RegisterEmployed({ navigation, route }: Props) {
     }
   }, [barberToEdit]);
 
-  const syncLatestBarber = useCallback(async () => {
-    if (!routeBarber?._id) return;
-    try {
-      const res = await fetchBarbers();
-      const latest =
-        res.barbers?.find(item => item._id === routeBarber._id) ?? null;
-      if (latest) {
-        setBarberToEdit(latest);
-      }
-    } catch (_err) {
-    }
-  }, [routeBarber?._id]);
-
   useEffect(() => {
     setBarberToEdit(routeBarber);
   }, [routeBarber]);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      syncLatestBarber();
-    }, [syncLatestBarber]),
-  );
 
   useEffect(() => {
     selectedDaysRef.current = selectedDays;
@@ -838,29 +844,35 @@ function RegisterEmployed({ navigation, route }: Props) {
         isActive: true,
       };
 
+      let savedBarber: Barber;
+
       if (isEditing && barberToEdit?._id) {
         const response = await updateBarber(barberToEdit._id, payload);
-        Alert.alert('Perfil actualizado', 'Los cambios del barbero ya quedaron guardados.', [
-          {
-            text: 'Volver',
-            onPress: () => {
-              navigation.replace('Barber-Home', {
-                barberId: response.barber._id,
-                barberName: response.barber.fullName,
-                barber: response.barber,
-              });
-            },
-          },
-        ]);
-        return;
+        savedBarber = response.barber;
+      } else {
+        const response = await createBarber(payload);
+        savedBarber = response.barber;
       }
 
-      await createBarber(payload);
+      const successMessage = isEditing
+        ? 'Los cambios del barbero ya quedaron guardados.'
+        : 'Nuevo barbero registrado.';
 
-      Alert.alert('¡Éxito!', 'Nuevo barbero registrado.', [
+      Alert.alert('¡Éxito!', successMessage, [
         {
-          text: 'Ver lista',
-          onPress: () => navigation.navigate('List-Barber'),
+          text: isEditing ? 'Volver' : 'Ver lista',
+          onPress: () => {
+            if (isEditing) {
+              navigation.replace('Barber-Home', {
+                barberId: savedBarber._id,
+                barberName: savedBarber.fullName,
+                barber: savedBarber,
+              });
+              return;
+            }
+
+            navigation.navigate('List-Barber');
+          },
         },
       ]);
     } catch (err: any) {
@@ -991,6 +1003,50 @@ function RegisterEmployed({ navigation, route }: Props) {
                   onFocus={() => setFocusedField('phone')}
                   onBlur={() => setFocusedField(null)}
                 />
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Acceso del barbero a la app</Text>
+                <Text style={styles.sectionHelper}>
+                  El acceso del barbero ahora se administra en una pantalla separada
+                  para no mezclar credenciales con horarios y perfil.
+                </Text>
+                {isEditing ? (
+                  <>
+                    <View style={styles.accessSummaryCard}>
+                      <Text style={styles.sectionHelperMuted}>
+                        Estado: {resolveAccessStateLabel(barberToEdit?.loginAccess)}
+                      </Text>
+                      <Text style={styles.sectionHelperMuted}>
+                        Último acceso:{' '}
+                        {formatLastAccessLabel(barberToEdit?.loginAccess?.lastLoginAt)}
+                      </Text>
+                      <Text style={styles.sectionHelperMuted}>
+                        Email:{' '}
+                        {barberToEdit?.loginAccess?.email?.trim() || 'Sin acceso creado'}
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={() => {
+                        if (!barberToEdit) return;
+                        navigation.navigate('Barber-Access', { barber: barberToEdit });
+                      }}
+                      style={({ pressed }) => [
+                        styles.accessManageButton,
+                        pressed && styles.accessManageButtonPressed,
+                      ]}
+                    >
+                      <Text style={styles.accessManageButtonText}>
+                        Gestionar acceso del barbero
+                      </Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  <Text style={styles.sectionHelperMuted}>
+                    Guardá primero el barbero. Después podés crearle el acceso desde
+                    la pantalla de gestión.
+                  </Text>
+                )}
               </View>
 
               {/* DÍAS */}
@@ -1774,6 +1830,45 @@ const createStyles = (theme: Theme) =>
       fontWeight: '700',
       textTransform: 'uppercase',
       marginLeft: 4,
+    },
+    sectionHelper: {
+      color: theme.textSecondary,
+      fontSize: 13,
+      lineHeight: 19,
+      marginHorizontal: 4,
+    },
+    sectionHelperMuted: {
+      color: theme.textMuted,
+      fontSize: 12,
+      lineHeight: 18,
+      marginHorizontal: 4,
+    },
+    accessSummaryCard: {
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.surfaceAlt,
+      padding: 14,
+      gap: 6,
+    },
+    accessManageButton: {
+      marginTop: 4,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: hexToRgba(theme.primary, 0.28),
+      backgroundColor: hexToRgba(theme.primary, 0.1),
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    accessManageButtonPressed: {
+      opacity: 0.82,
+    },
+    accessManageButtonText: {
+      color: theme.primary,
+      fontSize: 13,
+      fontWeight: '800',
     },
     input: {
       backgroundColor: theme.input,

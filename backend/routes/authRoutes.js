@@ -3,6 +3,7 @@ import {
   confirmPasswordRecovery,
   createSubscriptionCheckout,
   createSubscriptionCouponAdmin,
+  disableBarberAccess,
   disconnectMercadoPago,
   getMailDebug,
   getPlanPricingAdmin,
@@ -22,13 +23,14 @@ import {
   updateNotificationSettings,
   updatePlanPricingAdmin,
   updateOwnSubscriptionSettings,
+  upsertBarberAccess,
   updateShopClosedDays,
   updateSubscriptionCouponAdmin,
   updateSubscriptionUser,
   updateThemeConfig,
 } from "../api/authController.js";
 import { savePushToken } from "../api/authController.js";
-import { requireAuth } from "../middlewares/authMiddlewares.js";
+import { requireAdminRole, requireAuth } from "../middlewares/authMiddlewares.js";
 import { requireAdminPanelSecret } from "../middlewares/adminPanelMiddleware.js";
 
 const router = Router();
@@ -54,6 +56,8 @@ router.put("/payment-settings", requireAuth, updatePaymentSettings);
 router.put("/notification-settings", requireAuth, updateNotificationSettings);
 router.put("/shop-closed-days", requireAuth, updateShopClosedDays);
 router.put("/subscription-settings", requireAuth, updateOwnSubscriptionSettings);
+router.post("/barber-access", requireAuth, requireAdminRole, upsertBarberAccess);
+router.delete("/barber-access/:barberId", requireAuth, requireAdminRole, disableBarberAccess);
 router.post("/test-mail", requireAuth, sendTestMail);
 router.post("/save-push-token", requireAuth, savePushToken);
 router.get("/admin/subscriptions", requireAdminPanelSecret, listSubscriptionUsers);

@@ -1,5 +1,6 @@
 import { verifyAccessToken } from "../token/jwtManager.js";
 import { UserModel } from "../models/User.js";
+import { normalizeAppRole, resolveEffectiveOwnerId } from "../utils/userRoles.js";
 
 export async function requireAuth(req, res, next) {
   try {
@@ -22,9 +23,12 @@ export async function requireAuth(req, res, next) {
 
     req.user = {
       id: user._id.toString(),
+      ownerId: resolveEffectiveOwnerId(user),
       email: user.email,
-      role: user.role,
+      role: normalizeAppRole(user.role),
       fullName: user.fullName,
+      barberId: user.barberId ? user.barberId.toString() : null,
+      shopOwnerId: user.shopOwnerId ? user.shopOwnerId.toString() : null,
       subscription: {
         plan: user.subscription?.plan || "basic",
         status: user.subscription?.status || "trial",
@@ -35,6 +39,14 @@ export async function requireAuth(req, res, next) {
   } catch (err) {
     return next(err);
   }
+}
+
+export function requireAdminRole(req, res, next) {
+  if (normalizeAppRole(req.user?.role) !== "admin") {
+    return res.status(403).json({ error: "Solo el administrador puede usar esta función." });
+  }
+
+  return next();
 }
 
 export function requireProSubscription(req, res, next) {

@@ -25,7 +25,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Appointment,
   Barber,
-  fetchBarbers,
   fetchBarberAppointments,
   updateAppointmentStatus,
   deleteAppointment,
@@ -35,6 +34,7 @@ import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
 import type { RootStackParamList } from '../navigation/StackNavigation';
 import { hasProPlanAccess } from '../services/planAccess';
+import { resolveUserRole } from '../services/subscriptionAccess';
 import ProFeatureModal from '../components/ProFeatureModal';
 import {
   Pencil,
@@ -155,8 +155,12 @@ function getPaymentSnapshot(appointment: Appointment) {
 function BarberDashboard({ route, navigation }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const [authUser, setAuthUser] = useState<any | null>(null);
   const { barberId, barberName, barber: initialBarber } = route.params ?? {};
-  const activeBarberId = barberId ?? initialBarber?._id ?? null;
+  const activeBarberId = barberId ?? initialBarber?._id ?? authUser?.barberId ?? null;
+  const resolvedBarberName =
+    barberName ?? initialBarber?.fullName ?? authUser?.fullName ?? 'Mi Agenda';
+  const isBarberUser = resolveUserRole(authUser) === 'barber';
 
   const [date, setDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -182,6 +186,7 @@ function BarberDashboard({ route, navigation }: Props) {
     (async () => {
       const storedUser = await getUserProfile();
       if (mounted) {
+        setAuthUser(storedUser);
         setHasProAccess(hasProPlanAccess(storedUser));
       }
     })();
@@ -192,6 +197,7 @@ function BarberDashboard({ route, navigation }: Props) {
 
   useEffect(() => {
     return subscribeToUserProfile(user => {
+      setAuthUser(user);
       setHasProAccess(hasProPlanAccess(user));
     });
   }, []);
@@ -256,10 +262,7 @@ function BarberDashboard({ route, navigation }: Props) {
 
     try {
       setLoading(true);
-      const [appointmentsRes, barbersRes] = await Promise.all([
-        fetchBarberAppointments(activeBarberId, dateParam),
-        fetchBarbers(),
-      ]);
+      const appointmentsRes = await fetchBarberAppointments(activeBarberId, dateParam);
 
       setAppointments(
         appointmentsRes.appointments.filter(
@@ -267,9 +270,7 @@ function BarberDashboard({ route, navigation }: Props) {
         ),
       );
       setBarberProfile(
-        barbersRes.barbers.find((item: Barber) => item._id === activeBarberId) ??
-          initialBarber ??
-          null,
+        appointmentsRes.barber ?? initialBarber ?? null,
       );
       setError('');
     } catch (err: any) {
@@ -315,7 +316,7 @@ function BarberDashboard({ route, navigation }: Props) {
     navigation.navigate('Register-Employed', {
       barber: {
         _id: activeBarberId,
-        fullName: barberName ?? 'Barbero',
+        fullName: resolvedBarberName,
         workDays: [],
       },
     });
@@ -470,7 +471,7 @@ function BarberDashboard({ route, navigation }: Props) {
               prev.filter(app => app._id !== appointmentId),
             );
             const message = buildCancellationMessage({
-              shopName: barberName || 'la barbería',
+              shopName: resolvedBarberName || 'la barbería',
               customerName: appointment.customerName,
               service: appointment.service,
               startTime: appointment.startTime,
@@ -616,12 +617,17 @@ function BarberDashboard({ route, navigation }: Props) {
           <Image style={styles.logo} source={theme.logo} />
           <Text style={styles.headerSubtitle}>BARBER DASHBOARD</Text>
           <Text style={styles.headerTitle}>
-            {barberProfile?.fullName || barberName || 'Mi Agenda'}
+            {barberProfile?.fullName || resolvedBarberName}
           </Text>
 
           <View style={styles.headerActionsContainer}>
             <Pressable
-              onPress={() => navigation.navigate('Reservas')}
+              onPress={() =>
+                navigation.navigate('Reservas', {
+                  barberId: isBarberUser ? activeBarberId ?? undefined : undefined,
+                  lockBarber: isBarberUser,
+                })
+              }
               style={({ pressed }) => [
                 styles.mainActionBtn,
                 pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
@@ -632,27 +638,29 @@ function BarberDashboard({ route, navigation }: Props) {
             </Pressable>
 
             <View style={styles.secondaryActionsRow}>
-              <Pressable
-                onPress={handleEditProfile}
-                style={({ pressed }) => [
-                  styles.secondaryActionBtn,
-                  pressed && { backgroundColor: hexToRgba(theme.primary, 0.2) },
-                ]}
-              >
-                <Pencil size={14} color={theme.primary} />
-                <Text style={styles.secondaryActionText}>Editar Perfil</Text>
-              </Pressable>
-
+              {!isBarberUser ? (
                 <Pressable
-                  onPress={() =>
-                    hasProAccess
-                      ? navigation.navigate('Metrics', {
-                          barberId: activeBarberId ?? undefined,
-                          barberName:
-                            barberProfile?.fullName || barberName || 'Mi Agenda',
-                        })
-                      : handleProFeaturePress()
-                  }
+                  onPress={handleEditProfile}
+                  style={({ pressed }) => [
+                    styles.secondaryActionBtn,
+                    pressed && { backgroundColor: hexToRgba(theme.primary, 0.2) },
+                  ]}
+                >
+                  <Pencil size={14} color={theme.primary} />
+                  <Text style={styles.secondaryActionText}>Editar Perfil</Text>
+                </Pressable>
+              ) : null}
+
+              <Pressable
+                onPress={() =>
+                  hasProAccess
+                    ? navigation.navigate('Metrics', {
+                        barberId: activeBarberId ?? undefined,
+                        barberName:
+                          barberProfile?.fullName || resolvedBarberName,
+                      })
+                    : handleProFeaturePress()
+                }
                 style={({ pressed }) => [
                   styles.secondaryActionBtn,
                   !hasProAccess && styles.secondaryActionBtnLocked,

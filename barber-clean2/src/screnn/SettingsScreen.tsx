@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Linking,
@@ -23,7 +23,13 @@ import {
   Scissors,
 } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
-import { removeToken, removeUserProfile } from '../services/authStorage';
+import {
+  getUserProfile,
+  removeToken,
+  removeUserProfile,
+  subscribeToUserProfile,
+} from '../services/authStorage';
+import { resolveUserRole } from '../services/subscriptionAccess';
 
 const SUPPORT_EMAIL = 'barberappbycodex@gmail.com';
 
@@ -74,6 +80,29 @@ function MenuItem({
 export default function SettingsScreen({ navigation }: { navigation: any }) {
   const { theme, applyUserTheme } = useTheme();
   const styles = createStyles(theme);
+  const [currentUser, setCurrentUser] = useState<any | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      const storedUser = await getUserProfile();
+      if (mounted) {
+        setCurrentUser(storedUser);
+      }
+    })();
+
+    const unsubscribe = subscribeToUserProfile(user => {
+      setCurrentUser(user);
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  const isBarberUser = resolveUserRole(currentUser) === 'barber';
 
   const handleLogout = async () => {
     Alert.alert(
@@ -127,25 +156,6 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
       <Text style={styles.sectionLabel}>Preferencias</Text>
       <View style={styles.groupCard}>
         <MenuItem
-          icon={Palette}
-          label="Personalizar aspecto"
-          description="Logo, colores de botones, textos destacados, tarjetas y fondo."
-          onPress={() => navigation.navigate('Appearance-Settings')}
-          theme={theme}
-          styles={styles}
-        />
-        <View style={styles.separator} />
-        <MenuItem
-          icon={Scissors}
-          label="Cargar servicios"
-          description="Cargá, editá o sacá los servicios que ofrece tu local."
-          onPress={() => navigation.navigate('Service-Settings')}
-          theme={theme}
-          styles={styles}
-        />
-
-        <View style={styles.separator} />
-        <MenuItem
           icon={BellRing}
           label="Notificaciones y recordatorios"
           description="Push al barbero y mail recordatorio al cliente el día del turno."
@@ -153,42 +163,70 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
           theme={theme}
           styles={styles}
         />
-        <View style={styles.separator} />
-        <MenuItem
-          icon={CalendarDays}
-          label="Cerrar barbería por día"
-          description="Bloqueá una fecha puntual para que la web no tome turnos."
-          onPress={() => navigation.navigate('Shop-Closure-Settings')}
-          theme={theme}
-          styles={styles}
-        />
+        {!isBarberUser ? (
+          <>
+            <View style={styles.separator} />
+            <MenuItem
+              icon={Palette}
+              label="Personalizar aspecto"
+              description="Logo, colores de botones, textos destacados, tarjetas y fondo."
+              onPress={() => navigation.navigate('Appearance-Settings')}
+              theme={theme}
+              styles={styles}
+            />
+            <View style={styles.separator} />
+            <MenuItem
+              icon={Scissors}
+              label="Cargar servicios"
+              description="Cargá, editá o sacá los servicios que ofrece tu local."
+              onPress={() => navigation.navigate('Service-Settings')}
+              theme={theme}
+              styles={styles}
+            />
+            <View style={styles.separator} />
+            <MenuItem
+              icon={CalendarDays}
+              label="Cerrar barbería por día"
+              description="Bloqueá una fecha puntual para que la web no tome turnos."
+              onPress={() => navigation.navigate('Shop-Closure-Settings')}
+              theme={theme}
+              styles={styles}
+            />
+          </>
+        ) : null}
       </View>
 
-      <Text style={styles.sectionLabel}>Cobros</Text>
-      <View style={styles.groupCard}>
-        <MenuItem
-          icon={CreditCard}
-          label="Configurar cobros"
-          description="Efectivo, seña online y estado de Mercado Pago."
-          onPress={() => navigation.navigate('Payment-Settings')}
-          theme={theme}
-          styles={styles}
-        />
-      </View>
+      {!isBarberUser ? (
+        <>
+          <Text style={styles.sectionLabel}>Cobros</Text>
+          <View style={styles.groupCard}>
+            <MenuItem
+              icon={CreditCard}
+              label="Configurar cobros"
+              description="Efectivo, seña online y estado de Mercado Pago."
+              onPress={() => navigation.navigate('Payment-Settings')}
+              theme={theme}
+              styles={styles}
+            />
+          </View>
 
-      <Text style={styles.sectionLabel}>Plan</Text>
-      <View style={styles.groupCard}>
-        <MenuItem
-          icon={Crown}
-          label="Plan y suscripción"
-          description="Estado del plan, vencimiento y comparación de opciones."
-          onPress={() => navigation.navigate('Subscription-Settings')}
-          theme={theme}
-          styles={styles}
-        />
-      </View>
+          <Text style={styles.sectionLabel}>Plan</Text>
+          <View style={styles.groupCard}>
+            <MenuItem
+              icon={Crown}
+              label="Plan y suscripción"
+              description="Estado del plan, vencimiento y comparación de opciones."
+              onPress={() => navigation.navigate('Subscription-Settings')}
+              theme={theme}
+              styles={styles}
+            />
+          </View>
+        </>
+      ) : null}
 
-      <Text style={styles.sectionLabel}>Seguridad y cuenta</Text>
+      <Text style={styles.sectionLabel}>
+        {isBarberUser ? 'Cuenta' : 'Seguridad y cuenta'}
+      </Text>
       <View style={styles.groupCard}>
         <MenuItem
           icon={KeyRound}

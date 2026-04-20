@@ -384,6 +384,12 @@ export type Barber = {
     scheduleRanges?: { label: string; start: string; end: string }[];
   }[];
   workDays?: number[];
+  loginAccess?: {
+    enabled: boolean;
+    userId?: string | null;
+    email?: string | null;
+    lastLoginAt?: string | null;
+  };
 };
 
 export type ServiceOption = {
@@ -585,6 +591,39 @@ export function updateBarber(
   return request<{ barber: Barber }>(`/api/barbers/${barberId}`, {
     method: "PUT",
     body: payload,
+    auth: true,
+  });
+}
+
+export function upsertBarberAccess(payload: {
+  barberId: string;
+  email: string;
+  password?: string;
+}) {
+  return request<{
+    message: string;
+    barberAccess: {
+      enabled: boolean;
+      userId?: string | null;
+      email?: string | null;
+      barberId: string;
+    };
+  }>("/api/auth/barber-access", {
+    method: "POST",
+    body: payload,
+    auth: true,
+  });
+}
+
+export function disableBarberAccess(barberId: string) {
+  return request<{
+    message: string;
+    barberAccess: {
+      enabled: false;
+      barberId: string;
+    };
+  }>(`/api/auth/barber-access/${barberId}`, {
+    method: "DELETE",
     auth: true,
   });
 }

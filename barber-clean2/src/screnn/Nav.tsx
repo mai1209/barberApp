@@ -11,20 +11,42 @@ import {
 import { House, Plus, UserRound, Settings } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
+import type { AppRole } from '../services/subscriptionAccess';
 
-type MainRoute = 'Home' | 'List-Barber' | 'Reservas' | 'Settings';
+type MainRoute = 'Home' | 'Barber-Home' | 'List-Barber' | 'Reservas' | 'Settings';
 
 type Props = {
   currentRouteName?: string;
+  role?: AppRole;
   onNavigate: (routeName: any) => void;
 };
 
 const HIDDEN_ROUTES = new Set(['Login', 'Register', 'Plans', 'Subscription-Settings']);
 
-function resolveActiveRoute(routeName?: string): MainRoute | undefined {
+function resolveActiveRoute(
+  routeName?: string,
+  role: AppRole = 'admin',
+): MainRoute | undefined {
+  if (role === 'barber') {
+    if (routeName === 'Barber-Home') return 'Barber-Home';
+    if (
+      routeName === 'Reservas' ||
+      routeName === 'Metrics' ||
+      routeName === 'Settings' ||
+      routeName === 'Notification-Settings' ||
+      routeName === 'Usage-Guide' ||
+      routeName === 'Change-Password' ||
+      routeName === 'Recover-Password'
+    ) {
+      return 'Settings';
+    }
+    return undefined;
+  }
+
   if (
     routeName === 'Barber-Home' ||
     routeName === 'Register-Employed' ||
+    routeName === 'Barber-Access' ||
     routeName === 'List-Barber'
   ) {
     return 'List-Barber';
@@ -103,13 +125,13 @@ const NavButton = ({
   );
 };
 
-function Nav({ currentRouteName, onNavigate }: Props) {
+function Nav({ currentRouteName, role = 'admin', onNavigate }: Props) {
   if (!currentRouteName || HIDDEN_ROUTES.has(currentRouteName)) {
     return null;
   }
 
   const { theme } = useTheme();
-  const activeRoute = resolveActiveRoute(currentRouteName);
+  const activeRoute = resolveActiveRoute(currentRouteName, role);
 
   return (
     <View style={[styles.safeArea]}>
@@ -120,37 +142,59 @@ function Nav({ currentRouteName, onNavigate }: Props) {
         ]}
       >
         <View style={styles.navInner}>
-          <NavButton
-            isActive={activeRoute === 'Home'}
-            onPress={() => onNavigate('Home')}
-            label="Inicio"
-            Icon={House}
-            theme={theme}
-          />
+          {role === 'barber' ? (
+            <>
+              <NavButton
+                isActive={activeRoute === 'Barber-Home'}
+                onPress={() => onNavigate('Barber-Home')}
+                label="Agenda"
+                Icon={UserRound}
+                theme={theme}
+              />
 
-          <NavButton
-            isActive={activeRoute === 'Reservas'}
-            onPress={() => onNavigate('Reservas')}
-            label="Nuevo Turno"
-            Icon={Plus}
-            theme={theme}
-          />
+              <NavButton
+                isActive={activeRoute === 'Settings'}
+                onPress={() => onNavigate('Settings')}
+                label="Ajustes"
+                Icon={Settings}
+                theme={theme}
+              />
+            </>
+          ) : (
+            <>
+              <NavButton
+                isActive={activeRoute === 'Home'}
+                onPress={() => onNavigate('Home')}
+                label="Inicio"
+                Icon={House}
+                theme={theme}
+              />
 
-          <NavButton
-            isActive={activeRoute === 'List-Barber'}
-            onPress={() => onNavigate('List-Barber')}
-            label="Barberos"
-            Icon={UserRound}
-            theme={theme}
-          />
+              <NavButton
+                isActive={activeRoute === 'Reservas'}
+                onPress={() => onNavigate('Reservas')}
+                label="Nuevo Turno"
+                Icon={Plus}
+                theme={theme}
+              />
 
-          <NavButton
-            isActive={activeRoute === 'Settings'}
-            onPress={() => onNavigate('Settings')}
-            label="Ajustes"
-            Icon={Settings}
-            theme={theme}
-          />
+              <NavButton
+                isActive={activeRoute === 'List-Barber'}
+                onPress={() => onNavigate('List-Barber')}
+                label="Barberos"
+                Icon={UserRound}
+                theme={theme}
+              />
+
+              <NavButton
+                isActive={activeRoute === 'Settings'}
+                onPress={() => onNavigate('Settings')}
+                label="Ajustes"
+                Icon={Settings}
+                theme={theme}
+              />
+            </>
+          )}
         </View>
       </View>
       <View style={styles.footer}>

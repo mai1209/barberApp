@@ -1,4 +1,5 @@
 import { UserModel } from "../models/User.js";
+import { BarberModel } from "../models/Barber.js";
 import { SubscriptionCouponModel } from "../models/SubscriptionCoupon.js";
 import { hashPassword, verifyPassword } from "../token/passwordManager.js";
 import { signAccessToken, verifyAccessToken } from "../token/jwtManager.js";
@@ -31,6 +32,11 @@ import {
   resolvePlanPricingForSubscription,
 } from "../services/subscriptionPricingService.js";
 import { normalizeShopClosedDays } from "../utils/shopClosures.js";
+import {
+  normalizeAppRole,
+  resolveEffectiveOwnerId,
+  serializeAuthUser,
+} from "../utils/userRoles.js";
 
 const PASSWORD_RESET_EXPIRY_MS = 15 * 60 * 1000;
 const SUBSCRIPTION_CURRENCY_ID = String(
@@ -847,6 +853,35 @@ async function buildAvailableSlug(baseValue) {
   return candidate;
 }
 
+async function buildAuthUserResponse(userDoc) {
+  const userResponse = serializeAuthUser(userDoc);
+
+  if (userResponse.role !== "barber" || !userDoc?.shopOwnerId) {
+    return userResponse;
+  }
+
+  const ownerDoc = await UserModel.findOne({
+    _id: resolveEffectiveOwnerId(userDoc),
+    isActive: true,
+  })
+    .select({ shopSlug: 1, subscription: 1, themeConfig: 1 })
+    .lean();
+
+  if (ownerDoc?.shopSlug) {
+    userResponse.shopSlug = ownerDoc.shopSlug;
+  }
+
+  if (ownerDoc?.subscription) {
+    userResponse.subscription = ownerDoc.subscription;
+  }
+
+  if (ownerDoc?.themeConfig) {
+    userResponse.themeConfig = ownerDoc.themeConfig;
+  }
+
+  return userResponse;
+}
+
 export async function registerUser(req, res, next) {
   try {
     const fullName = String(req.body?.fullName ?? "").trim();
@@ -900,13 +935,15 @@ export async function registerUser(req, res, next) {
     const token = signAccessToken({
       sub: userDoc._id.toString(),
       email: userDoc.email,
-      role: userDoc.role,
+      role: normalizeAppRole(userDoc.role),
     });
+
+    const userResponse = await buildAuthUserResponse(userDoc);
 
     return res.status(201).json({
       message: "Usuario registrado correctamente",
       token,
-      user: userDoc.toJSON(),
+      user: userResponse,
     });
   } catch (err) {
     return next(err);
@@ -1019,25 +1056,23 @@ export async function loginUser(req, res, next) {
     if (!userDoc.shopSlug) {
       const fallbackSlug = normalizeSlugCandidate(userDoc.fullName) || "barberia";
       userDoc.shopSlug = await buildAvailableSlug(fallbackSlug);
-      await userDoc.save();
     }
+
+    userDoc.lastLoginAt = new Date();
+    await userDoc.save();
 
     const token = signAccessToken({
       sub: userDoc._id.toString(),
       email: userDoc.email,
-      role: userDoc.role,
+      role: normalizeAppRole(userDoc.role),
     });
 
-    // --- AGREGAMOS ESTO PARA QUE LA APP TENGA DATOS SEGUROS ---
-    const userResponse = userDoc.toJSON();
-    
+    const userResponse = await buildAuthUserResponse(userDoc);
+
     return res.json({
       message: "Login exitoso",
       token,
-      user: {
-        ...userResponse,
-        shopSlug: userDoc.shopSlug // Forzamos que viaje el slug
-      },
+      user: userResponse,
     });
   } catch (err) {
     return next(err);
@@ -1063,9 +1098,168 @@ export async function getCurrentUser(req, res, next) {
     }
 
     return res.json({
-      user: {
-        ...userDoc.toJSON(),
-        shopSlug: userDoc.shopSlug,
+      user: await buildAuthUserResponse(userDoc),
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function upsertBarberAccess(req, res, next) {
+  try {
+    const ownerId = req.user?.id;
+    if (!ownerId) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    const barberId = String(req.body?.barberId ?? "").trim();
+    const email = sanitizeEmail(req.body?.email);
+    const password = String(req.body?.password ?? "");
+
+    if (!barberId) {
+      return res.status(400).json({ error: "Falta el barbero a vincular." });
+    }
+
+    if (!email) {
+      return res.status(400).json({ error: "El email del acceso es obligatorio." });
+    }
+
+    const ownerDoc = await UserModel.findById(ownerId)
+      .select({ shopSlug: 1 })
+      .lean();
+
+    if (!ownerDoc || !ownerDoc.shopSlug) {
+      return res.status(404).json({ error: "No encontramos la barbería administradora." });
+    }
+
+    const barberDoc = await BarberModel.findOne({ _id: barberId, owner: ownerId, isActive: true })
+      .select({ fullName: 1 })
+      .lean();
+
+    if (!barberDoc) {
+      return res.status(404).json({ error: "Barbero no encontrado." });
+    }
+
+    const existingAccessUser = await UserModel.findOne({
+      shopOwnerId: ownerId,
+      barberId,
+    }).select("+passwordHash");
+
+    const emailTakenByAnotherUser = await UserModel.findOne({
+      email,
+      _id: { $ne: existingAccessUser?._id || null },
+    }).lean();
+
+    if (emailTakenByAnotherUser) {
+      return res.status(409).json({ error: "Ese email ya está en uso por otra cuenta." });
+    }
+
+    if (!existingAccessUser && password.length < 8) {
+      return res.status(400).json({
+        error: "La contraseña inicial del barbero debe tener al menos 8 caracteres.",
+      });
+    }
+
+    if (existingAccessUser) {
+      existingAccessUser.fullName = barberDoc.fullName;
+      existingAccessUser.email = email;
+      existingAccessUser.role = "barber";
+      existingAccessUser.barberId = barberId;
+      existingAccessUser.shopOwnerId = ownerId;
+      existingAccessUser.isActive = true;
+
+      if (password) {
+        if (password.length < 8) {
+          return res.status(400).json({
+            error: "La nueva contraseña del barbero debe tener al menos 8 caracteres.",
+          });
+        }
+        existingAccessUser.passwordHash = await hashPassword(password);
+      }
+
+      await existingAccessUser.save();
+
+      return res.json({
+        message: "Acceso del barbero actualizado correctamente.",
+        barberAccess: {
+          enabled: true,
+          userId: existingAccessUser._id.toString(),
+          email: existingAccessUser.email,
+          barberId,
+        },
+      });
+    }
+
+    const baseSlug =
+      normalizeSlugCandidate(`${ownerDoc.shopSlug}-${barberDoc.fullName}`) ||
+      normalizeSlugCandidate(`${ownerDoc.shopSlug}-barber`) ||
+      "barberia";
+    const shopSlug = await buildAvailableSlug(baseSlug);
+
+    const passwordHash = await hashPassword(password);
+    const barberUser = await UserModel.create({
+      fullName: barberDoc.fullName,
+      shopSlug,
+      email,
+      passwordHash,
+      role: "barber",
+      barberId,
+      shopOwnerId: ownerId,
+      subscription: {
+        plan: "basic",
+        status: "active",
+        billingCycle: "monthly",
+        startedAt: new Date(),
+      },
+    });
+
+    return res.status(201).json({
+      message: "Acceso del barbero creado correctamente.",
+      barberAccess: {
+        enabled: true,
+        userId: barberUser._id.toString(),
+        email: barberUser.email,
+        barberId,
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function disableBarberAccess(req, res, next) {
+  try {
+    const ownerId = req.user?.id;
+    const barberId = String(req.params?.barberId ?? "").trim();
+
+    if (!ownerId) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    if (!barberId) {
+      return res.status(400).json({ error: "Falta el barbero a desvincular." });
+    }
+
+    const accessUser = await UserModel.findOne({
+      shopOwnerId: ownerId,
+      barberId,
+      role: "barber",
+      isActive: true,
+    });
+
+    if (!accessUser) {
+      return res.status(404).json({ error: "Ese barbero no tiene un acceso activo." });
+    }
+
+    accessUser.isActive = false;
+    accessUser.pushToken = null;
+    await accessUser.save();
+
+    return res.json({
+      message: "El acceso del barbero quedó desactivado.",
+      barberAccess: {
+        enabled: false,
+        barberId,
       },
     });
   } catch (err) {

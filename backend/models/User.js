@@ -317,8 +317,18 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["admin", "technician", "viewer"],
-      default: "technician",
+      enum: ["admin", "barber", "technician", "viewer"],
+      default: "admin",
+    },
+    barberId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Barber",
+      default: null,
+    },
+    shopOwnerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
     },
     isActive: {
       type: Boolean,
@@ -327,6 +337,10 @@ const userSchema = new mongoose.Schema(
     pushToken:{
       type:String,
       default:null,
+    },
+    lastLoginAt: {
+      type: Date,
+      default: null,
     },
     passwordResetCodeHash: {
       type: String,

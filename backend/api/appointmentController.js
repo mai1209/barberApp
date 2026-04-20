@@ -746,7 +746,7 @@ export async function getCustomerHistory(req, res, next) {
 // ACTUALIZAR ESTADO (pending, completed, cancelled)
 export async function updateAppointmentStatus(req, res, next) {
   try {
-    const ownerId = req.user.id;
+    const ownerId = req.user.ownerId || req.user.id;
     const { appointmentId } = req.params;
     const {
       status,
@@ -766,6 +766,13 @@ export async function updateAppointmentStatus(req, res, next) {
 
     if (!appointmentDoc) {
       return res.status(404).json({ error: "Turno no encontrado" });
+    }
+
+    if (
+      req.user.role === "barber" &&
+      String(appointmentDoc.barber || "") !== String(req.user.barberId || "")
+    ) {
+      return res.status(403).json({ error: "No autorizado para modificar este turno." });
     }
 
     appointmentDoc.status = status;
@@ -955,10 +962,17 @@ export async function deleteAppointment(req, res, next) {
     const appointment = await AppointmentModel.findById(appointmentId);
     if (!appointment) return res.status(404).json({ error: "Turno no encontrado" });
 
+    if (
+      req.user.role === "barber" &&
+      String(appointment.barber || "") !== String(req.user.barberId || "")
+    ) {
+      return res.status(403).json({ error: "No autorizado para borrar este turno." });
+    }
+
     // Autorización básica: solo el dueño del turno o un admin puede borrarlo
     if (
       appointment.owner &&
-      appointment.owner.toString() !== req.user.id &&
+      appointment.owner.toString() !== String(req.user.ownerId || req.user.id) &&
       req.user.role !== "admin"
     ) {
       return res.status(403).json({ error: "No autorizado para borrar este turno" });

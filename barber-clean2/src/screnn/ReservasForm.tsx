@@ -29,6 +29,7 @@ import {
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
 import { getUserProfile } from '../services/authStorage';
+import { resolveUserRole } from '../services/subscriptionAccess';
 
 const hexToRgba = (hex: string, alpha: number) => {
   const sanitized = hex.replace('#', '');
@@ -172,8 +173,10 @@ function resolveBarberScheduleForDate(
   };
 }
 
-function ReservasForm({ navigation }: any) {
+function ReservasForm({ navigation, route }: any) {
   const { theme } = useTheme();
+  const routeBarberId = route?.params?.barberId ?? null;
+  const routeLockBarber = Boolean(route?.params?.lockBarber);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
@@ -194,6 +197,8 @@ function ReservasForm({ navigation }: any) {
     useState<ResolvedBarberSchedule | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [closedDayNotice, setClosedDayNotice] = useState('');
+  const [isBarberUser, setIsBarberUser] = useState(false);
+  const [isBarberSelectionLocked, setIsBarberSelectionLocked] = useState(false);
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   useEffect(() => {
@@ -213,9 +218,23 @@ function ReservasForm({ navigation }: any) {
           fetchServices(),
           getCurrentUser().catch(() => null),
         ]);
-        setBarbers(resB.barbers || []);
+        const authUser = currentUserRes?.user ?? storedUser ?? null;
+        const nextIsBarberUser = resolveUserRole(authUser) === 'barber';
+        const ownBarberId = routeBarberId || authUser?.barberId || null;
+        const availableBarbers =
+          nextIsBarberUser && ownBarberId
+            ? (resB.barbers || []).filter((barber: Barber) => barber._id === ownBarberId)
+            : resB.barbers || [];
+
+        setIsBarberUser(nextIsBarberUser);
+        setIsBarberSelectionLocked(nextIsBarberUser || routeLockBarber);
+        setBarbers(availableBarbers);
         setServices(resS.services || []);
-        if (resB.barbers?.length > 0) setSelectedBarber(resB.barbers[0]._id);
+        if (availableBarbers.length > 0) {
+          setSelectedBarber(availableBarbers[0]._id);
+        } else if (ownBarberId) {
+          setSelectedBarber(ownBarberId);
+        }
         if (resS.services?.length > 0) setSelectedService(resS.services[0]);
 
         const paymentSettings =
@@ -232,7 +251,7 @@ function ReservasForm({ navigation }: any) {
       }
     }
     load();
-  }, []);
+  }, [routeBarberId, routeLockBarber]);
 
   useEffect(() => {
     if (!selectedBarber) return;
@@ -683,13 +702,22 @@ function ReservasForm({ navigation }: any) {
 
             {/* BARBEROS */}
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Tu Barbero</Text>
+              <Text style={styles.sectionLabel}>
+                {isBarberSelectionLocked ? 'Barbero asignado' : 'Tu Barbero'}
+              </Text>
+              {isBarberUser ? (
+                <Text style={styles.sectionHelperText}>
+                  Los turnos manuales que cargues desde tu cuenta quedan asignados a tu agenda.
+                </Text>
+              ) : null}
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {barbers.map(b => (
                   <Pressable
                     key={b._id}
                     style={styles.barberCard}
+                    disabled={isBarberSelectionLocked}
                     onPress={() => {
+                      if (isBarberSelectionLocked) return;
                       setSelectedBarber(b._id);
                       setSelectedSlot(null);
                     }}
@@ -860,6 +888,13 @@ const createStyles = (theme: Theme) =>
       fontWeight: '700',
       textTransform: 'uppercase',
       letterSpacing: 1,
+    },
+    sectionHelperText: {
+      color: theme.textMuted,
+      fontSize: 12,
+      lineHeight: 18,
+      marginTop: -2,
+      marginBottom: 2,
     },
     selector: {
       flexDirection: 'row',

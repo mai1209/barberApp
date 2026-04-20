@@ -8,6 +8,7 @@ import Register from '../screnn/Register';
 import Home from '../screnn/Home';
 import ReservasForm from '../screnn/ReservasForm';
 import RegisterEmployed from '../screnn/RegisterEmployed';
+import BarberAccessScreen from '../screnn/BarberAccessScreen';
 import ListBarber from '../screnn/ListBarber';
 import Nav from '../screnn/Nav';
 import BarberDashboard from '../screnn/BarberDashboard';
@@ -28,13 +29,20 @@ import SubscriptionSettingsScreen from '../screnn/SubscriptionSettingsScreen';
 import ScreenGradient from '../components/ScreenGradient';
 import { useTheme } from '../context/ThemeContext';
 import { navigationRef } from '../../App';
+import type { AppRole } from '../services/subscriptionAccess';
 
 export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   Home: undefined;
-  Reservas: undefined;
+  Reservas:
+    | {
+        barberId?: string;
+        lockBarber?: boolean;
+      }
+    | undefined;
   'Register-Employed': { barber?: Barber } | undefined;
+  'Barber-Access': { barber: Barber };
   'List-Barber': undefined;
   'Barber-Home':
     | {
@@ -73,17 +81,23 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 type Props = {
   currentRouteName?: string;
-  initialRouteName?: 'Login' | 'Home' | 'Subscription-Settings';
+  initialRouteName?: 'Login' | 'Home' | 'Barber-Home' | 'Subscription-Settings';
   isSubscriptionLocked?: boolean;
+  currentUserRole?: AppRole;
 };
 
 export default function StackNavigator({
   currentRouteName,
   initialRouteName = 'Login',
   isSubscriptionLocked = false,
+  currentUserRole = 'admin',
 }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme.mode), [theme.mode]);
+  const isBarberUser = currentUserRole === 'barber';
+  const showAdminArea = !isBarberUser && !isSubscriptionLocked;
+  const showBarberArea = isBarberUser;
+  const showNav = showAdminArea || showBarberArea;
 
   return (
     <View style={styles.container}>
@@ -103,11 +117,12 @@ export default function StackNavigator({
           <Stack.Screen name="Plans" component={PlansScreen} />
           <Stack.Screen name="Change-Password" component={ChangePasswordScreen} />
           <Stack.Screen name="Recover-Password" component={RecoverPasswordScreen} />
-          {!isSubscriptionLocked ? (
+          {showAdminArea ? (
             <>
               <Stack.Screen name="Home" component={Home} />
               <Stack.Screen name="Reservas" component={ReservasForm} />
               <Stack.Screen name="Register-Employed" component={RegisterEmployed} />
+              <Stack.Screen name="Barber-Access" component={BarberAccessScreen} />
               <Stack.Screen name="List-Barber" component={ListBarber} />
               <Stack.Screen name="Barber-Home" component={BarberDashboard} />
               <Stack.Screen name="Metrics" component={MetricsScreen} />
@@ -122,11 +137,24 @@ export default function StackNavigator({
               <Stack.Screen name="Shop-Closure-Settings" component={ShopClosureSettingsScreen} />
             </>
           ) : null}
+          {showBarberArea ? (
+            <>
+              <Stack.Screen name="Barber-Home" component={BarberDashboard} />
+              <Stack.Screen name="Reservas" component={ReservasForm} />
+              <Stack.Screen name="Metrics" component={MetricsScreen} />
+              <Stack.Screen name="Settings" component={SettingsScreen} />
+              <Stack.Screen name="Usage-Guide" component={UsageGuideScreen} />
+              <Stack.Screen
+                name="Notification-Settings"
+                component={NotificationSettingsScreen}
+              />
+            </>
+          ) : null}
         </Stack.Navigator>
       </View>
 
-      {!isSubscriptionLocked ? (
-        <Nav currentRouteName={currentRouteName} onNavigate={routeName => {
+      {showNav ? (
+        <Nav currentRouteName={currentRouteName} role={currentUserRole} onNavigate={routeName => {
           navigationRef.navigate(routeName as never);
         }} />
       ) : null}

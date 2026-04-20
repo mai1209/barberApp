@@ -14,7 +14,11 @@ import {
   saveUserProfile,
   subscribeToUserProfile,
 } from './src/services/authStorage';
-import { isSubscriptionRestricted, resolvePostAuthRoute } from './src/services/subscriptionAccess';
+import {
+  isSubscriptionRestricted,
+  resolvePostAuthRoute,
+  resolveUserRole,
+} from './src/services/subscriptionAccess';
 import { ThemeProvider } from './src/context/ThemeContext';
 
 export const navigationRef = createNavigationContainerRef();
@@ -32,7 +36,9 @@ const appNavigationTheme = {
 
 export default function App() {
   const [currentRouteName, setCurrentRouteName] = useState<string | undefined>();
-  const [initialRouteName, setInitialRouteName] = useState<'Login' | 'Home' | 'Subscription-Settings'>('Login');
+  const [initialRouteName, setInitialRouteName] = useState<
+    'Login' | 'Home' | 'Barber-Home' | 'Subscription-Settings'
+  >('Login');
   const [sessionReady, setSessionReady] = useState(false);
   const [currentUser, setCurrentUser] = useState<any | null>(null);
 
@@ -190,6 +196,7 @@ useEffect(() => {
               currentRouteName={currentRouteName}
               initialRouteName={initialRouteName}
               isSubscriptionLocked={isSubscriptionLocked}
+              currentUserRole={resolveUserRole(currentUser)}
             />
           </NavigationContainer>
         </View>

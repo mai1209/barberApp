@@ -30,9 +30,48 @@ const hexToRgba = (hex: string, alpha: number) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
+const formatLastAccess = (value?: string | null) => {
+  if (!value) return "Nunca ingresó";
+
+  try {
+    return new Date(value).toLocaleString("es-AR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch (_error) {
+    return "Sin dato";
+  }
+};
+
+const resolveAccessStatus = (barber: Barber) => {
+  if (!barber.loginAccess?.enabled) {
+    return {
+      label: "Sin acceso",
+      variant: "disabled" as const,
+    };
+  }
+
+  if (barber.loginAccess?.lastLoginAt) {
+    return {
+      label: "Activo",
+      variant: "active" as const,
+    };
+  }
+
+  return {
+    label: "Nunca ingresó",
+    variant: "pending" as const,
+  };
+};
+
 type Props = {
   navigation: any;
 };
+
+type AccessFilter = "all" | "enabled" | "disabled";
 
 function ListBarber({ navigation }: Props) {
   const { theme } = useTheme();
@@ -40,6 +79,7 @@ function ListBarber({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [accessFilter, setAccessFilter] = useState<AccessFilter>("all");
   const openedSwipeableIdRef = useRef<string | null>(null);
   const swipeableRefs = useRef<Record<string, Swipeable | null>>({});
 
@@ -86,6 +126,10 @@ function ListBarber({ navigation }: Props) {
     });
   };
 
+  const handleManageAccess = (barber: Barber) => {
+    navigation.navigate("Barber-Access", { barber });
+  };
+
   const handleDeleteBarber = (barber: Barber) => {
     Alert.alert(
       "Eliminar barbero",
@@ -109,6 +153,17 @@ function ListBarber({ navigation }: Props) {
   };
 
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const filteredBarbers = useMemo(() => {
+    if (accessFilter === "enabled") {
+      return barbers.filter(barber => barber.loginAccess?.enabled);
+    }
+
+    if (accessFilter === "disabled") {
+      return barbers.filter(barber => !barber.loginAccess?.enabled);
+    }
+
+    return barbers;
+  }, [accessFilter, barbers]);
 
   const handleSwipeableOpen = (barberId: string) => {
     const previousId = openedSwipeableIdRef.current;
@@ -157,74 +212,212 @@ function ListBarber({ navigation }: Props) {
           <View style={styles.mainCard}>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
+            <View style={styles.filterRow}>
+              <Pressable
+                onPress={() => setAccessFilter("all")}
+                style={[
+                  styles.filterChip,
+                  accessFilter === "all" && styles.filterChipActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    accessFilter === "all" && styles.filterChipTextActive,
+                  ]}
+                >
+                  Todos
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setAccessFilter("enabled")}
+                style={[
+                  styles.filterChip,
+                  accessFilter === "enabled" && styles.filterChipActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    accessFilter === "enabled" && styles.filterChipTextActive,
+                  ]}
+                >
+                  Con acceso
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setAccessFilter("disabled")}
+                style={[
+                  styles.filterChip,
+                  accessFilter === "disabled" && styles.filterChipActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    accessFilter === "disabled" && styles.filterChipTextActive,
+                  ]}
+                >
+                  Sin acceso
+                </Text>
+              </Pressable>
+            </View>
+
             {loading && !barbers.length ? (
               <ActivityIndicator color={theme.primary} style={{ marginVertical: 40 }} />
             ) : (
               <View style={styles.listContainer}>
-                {barbers.map((barber) => (
-                  <Swipeable
-                    key={barber._id}
-                    ref={ref => {
-                      swipeableRefs.current[barber._id] = ref;
-                    }}
-                    renderRightActions={() => renderRightActions(barber)}
-                    overshootRight={false}
-                    rightThreshold={36}
-                    onSwipeableOpen={() => handleSwipeableOpen(barber._id)}
-                    onSwipeableClose={() => {
-                      if (openedSwipeableIdRef.current === barber._id) {
-                        openedSwipeableIdRef.current = null;
-                      }
-                    }}
-                  >
-                    <View style={styles.barberItem}>
-                      <View style={styles.barberMainAction}>
-                        <View style={styles.barberInfo}>
-                          <View style={styles.avatarCircle}>
-                            {barber.photoUrl ? (
-                              <Image
-                                source={{ uri: barber.photoUrl }}
-                                style={styles.avatarImage}
-                              />
-                            ) : (
-                              <Text style={styles.avatarText}>
-                                {barber.fullName.charAt(0).toUpperCase()}
-                              </Text>
-                            )}
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.barberName} numberOfLines={1}>
-                              {barber.fullName}
-                            </Text>
-                          </View>
-                        </View>
-                        
-                        <View style={styles.barberActions}>
-                          <Pressable
-                            style={({ pressed }) => [
-                              styles.editBtn,
-                              { opacity: pressed ? 0.5 : 1 }
-                            ]}
-                            onPress={() => handleEditBarber(barber)}
-                          >
-                            <Pencil size={12} color="#888" />
-                            <Text style={styles.editBtnText}>Editar</Text>
-                          </Pressable>
+                {filteredBarbers.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyStateTitle}>
+                      No hay barberos para ese filtro
+                    </Text>
+                    <Text style={styles.emptyStateText}>
+                      Probá ver todos o cargá credenciales desde editar barbero.
+                    </Text>
+                  </View>
+                ) : filteredBarbers.map((barber) => {
+                  const accessStatus = resolveAccessStatus(barber);
 
-                          <Pressable
-                            style={({ pressed }) => [
-                              styles.openBtn,
-                              pressed && { transform: [{ scale: 0.96 }], opacity: 0.9 },
-                            ]}
-                            onPress={() => handleOpenBarber(barber)}
-                          >
-                            <Text style={styles.openBtnText}>Abrir</Text>
-                          </Pressable>
+                  return (
+                    <Swipeable
+                      key={barber._id}
+                      ref={ref => {
+                        swipeableRefs.current[barber._id] = ref;
+                      }}
+                      renderRightActions={() => renderRightActions(barber)}
+                      overshootRight={false}
+                      rightThreshold={36}
+                      onSwipeableOpen={() => handleSwipeableOpen(barber._id)}
+                      onSwipeableClose={() => {
+                        if (openedSwipeableIdRef.current === barber._id) {
+                          openedSwipeableIdRef.current = null;
+                        }
+                      }}
+                    >
+                      <View style={styles.barberItem}>
+                        <View style={styles.barberMainAction}>
+                          <View style={styles.barberInfo}>
+                            <View style={styles.avatarCircle}>
+                              {barber.photoUrl ? (
+                                <Image
+                                  source={{ uri: barber.photoUrl }}
+                                  style={styles.avatarImage}
+                                />
+                              ) : (
+                                <Text style={styles.avatarText}>
+                                  {barber.fullName.charAt(0).toUpperCase()}
+                                </Text>
+                              )}
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.barberName} numberOfLines={1}>
+                                {barber.fullName}
+                              </Text>
+                              <View style={styles.accessMetaRow}>
+                                <View
+                                  style={[
+                                    styles.statusBadge,
+                                    accessStatus.variant === "active"
+                                      ? styles.statusBadgeActive
+                                      : accessStatus.variant === "pending"
+                                        ? styles.statusBadgePending
+                                        : styles.statusBadgeDisabled,
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.statusBadgeText,
+                                      accessStatus.variant === "active"
+                                        ? styles.statusBadgeTextActive
+                                        : accessStatus.variant === "pending"
+                                          ? styles.statusBadgeTextPending
+                                          : styles.statusBadgeTextDisabled,
+                                    ]}
+                                  >
+                                    {accessStatus.label}
+                                  </Text>
+                                </View>
+                                <View
+                                  style={[
+                                    styles.accessChip,
+                                    barber.loginAccess?.enabled
+                                      ? styles.accessChipEnabled
+                                      : styles.accessChipDisabled,
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.accessChipText,
+                                      barber.loginAccess?.enabled
+                                        ? styles.accessChipTextEnabled
+                                        : styles.accessChipTextDisabled,
+                                    ]}
+                                    numberOfLines={1}
+                                  >
+                                    {barber.loginAccess?.enabled
+                                      ? barber.loginAccess?.email || 'Con acceso'
+                                      : 'Sin credenciales'}
+                                  </Text>
+                                </View>
+                              </View>
+                              {barber.loginAccess?.enabled ? (
+                                <Text style={styles.lastAccessText}>
+                                  Último acceso: {formatLastAccess(barber.loginAccess?.lastLoginAt)}
+                                </Text>
+                              ) : null}
+                            </View>
+                          </View>
+                          
+                          <View style={styles.barberActions}>
+                            <Pressable
+                              style={({ pressed }) => [
+                                barber.loginAccess?.enabled
+                                  ? styles.accessActionBtn
+                                  : styles.accessActionBtnPrimary,
+                                { opacity: pressed ? 0.7 : 1 },
+                              ]}
+                              onPress={() => handleManageAccess(barber)}
+                            >
+                              <Text
+                                style={
+                                  barber.loginAccess?.enabled
+                                    ? styles.accessActionBtnText
+                                    : styles.accessActionBtnPrimaryText
+                                }
+                              >
+                                {barber.loginAccess?.enabled
+                                  ? "Gestionar acceso"
+                                  : "Crear acceso"}
+                              </Text>
+                            </Pressable>
+
+                            <Pressable
+                              style={({ pressed }) => [
+                                styles.editBtn,
+                                { opacity: pressed ? 0.5 : 1 }
+                              ]}
+                              onPress={() => handleEditBarber(barber)}
+                            >
+                              <Pencil size={12} color="#888" />
+                              <Text style={styles.editBtnText}>Editar</Text>
+                            </Pressable>
+
+                            <Pressable
+                              style={({ pressed }) => [
+                                styles.openBtn,
+                                pressed && { transform: [{ scale: 0.96 }], opacity: 0.9 },
+                              ]}
+                              onPress={() => handleOpenBarber(barber)}
+                            >
+                              <Text style={styles.openBtnText}>Abrir</Text>
+                            </Pressable>
+                          </View>
                         </View>
                       </View>
-                    </View>
-                  </Swipeable>
-                ))}
+                    </Swipeable>
+                  );
+                })}
               </View>
             )}
 
@@ -271,8 +464,57 @@ const createStyles = (theme: Theme) =>
       borderWidth: 1,
       borderColor: hexToRgba(theme.primary, 0.15)
     },
+    filterRow: {
+      flexDirection: "row",
+      gap: 8,
+      marginBottom: 16,
+      flexWrap: "wrap",
+    },
+    filterChip: {
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.input,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    filterChipActive: {
+      backgroundColor: theme.primary,
+      borderColor: theme.primary,
+    },
+    filterChipText: {
+      color: theme.textMuted,
+      fontSize: 12,
+      fontWeight: "700",
+    },
+    filterChipTextActive: {
+      color: theme.textOnPrimary,
+    },
 
     listContainer: { gap: 12 },
+    emptyState: {
+      borderRadius: 24,
+      paddingVertical: 28,
+      paddingHorizontal: 18,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.surfaceAlt,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+    },
+    emptyStateTitle: {
+      color: theme.textPrimary,
+      fontSize: 15,
+      fontWeight: "800",
+      textAlign: "center",
+    },
+    emptyStateText: {
+      color: theme.textMuted,
+      fontSize: 13,
+      lineHeight: 19,
+      textAlign: "center",
+    },
 
     barberItem: {
       backgroundColor: theme.card,
@@ -323,6 +565,77 @@ const createStyles = (theme: Theme) =>
       fontSize: 15,
       fontWeight: "700",
     },
+    accessChip: {
+      alignSelf: "flex-start",
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderWidth: 1,
+      maxWidth: "100%",
+    },
+    accessChipEnabled: {
+      backgroundColor: hexToRgba(theme.primary, 0.14),
+      borderColor: hexToRgba(theme.primary, 0.28),
+    },
+    accessChipDisabled: {
+      backgroundColor: hexToRgba(theme.textMuted, 0.12),
+      borderColor: hexToRgba(theme.textMuted, 0.22),
+    },
+    accessChipText: {
+      fontSize: 11,
+      fontWeight: "700",
+    },
+    accessChipTextEnabled: {
+      color: theme.primary,
+    },
+    accessChipTextDisabled: {
+      color: theme.textMuted,
+    },
+    accessMetaRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+      marginTop: 6,
+      alignItems: "center",
+    },
+    statusBadge: {
+      alignSelf: "flex-start",
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderWidth: 1,
+    },
+    statusBadgeActive: {
+      backgroundColor: "rgba(45, 212, 191, 0.12)",
+      borderColor: "rgba(45, 212, 191, 0.28)",
+    },
+    statusBadgePending: {
+      backgroundColor: "rgba(250, 204, 21, 0.12)",
+      borderColor: "rgba(250, 204, 21, 0.26)",
+    },
+    statusBadgeDisabled: {
+      backgroundColor: "rgba(148, 163, 184, 0.12)",
+      borderColor: "rgba(148, 163, 184, 0.24)",
+    },
+    statusBadgeText: {
+      fontSize: 11,
+      fontWeight: "800",
+    },
+    statusBadgeTextActive: {
+      color: "#2DD4BF",
+    },
+    statusBadgeTextPending: {
+      color: "#FACC15",
+    },
+    statusBadgeTextDisabled: {
+      color: theme.textMuted,
+    },
+    lastAccessText: {
+      marginTop: 5,
+      color: theme.textMuted,
+      fontSize: 11,
+      fontWeight: "600",
+    },
     
 
     // BOTÓN EDITAR (Sutil)
@@ -337,6 +650,32 @@ const createStyles = (theme: Theme) =>
       color: theme.textMuted,
       fontSize: 12,
       fontWeight: "600",
+    },
+    accessActionBtn: {
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: hexToRgba(theme.primary, 0.25),
+      backgroundColor: hexToRgba(theme.primary, 0.1),
+      paddingHorizontal: 10,
+      paddingVertical: 10,
+    },
+    accessActionBtnPrimary: {
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.primary,
+      backgroundColor: theme.primary,
+      paddingHorizontal: 10,
+      paddingVertical: 10,
+    },
+    accessActionBtnText: {
+      color: theme.primary,
+      fontSize: 12,
+      fontWeight: "700",
+    },
+    accessActionBtnPrimaryText: {
+      color: theme.textOnPrimary,
+      fontSize: 12,
+      fontWeight: "700",
     },
 
     // BOTÓN ABRIR (Principal)

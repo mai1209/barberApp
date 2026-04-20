@@ -26,8 +26,10 @@ function normalizeShift(value) {
   return allowed.includes(normalized) ? normalized : undefined;
 }
 
-function serializeBarber(doc) {
+function serializeBarber(doc, accessByBarberId = new Map()) {
   if (!doc) return null;
+  const barberId = String(doc._id || "");
+  const accessInfo = accessByBarberId.get(barberId) || null;
   return {
     ...doc,
     scheduleRange: doc.scheduleRange || null,
@@ -37,6 +39,19 @@ function serializeBarber(doc) {
     workDays: Array.from(new Set(doc.workDays || []))
       .map(Number)
       .sort(),
+    loginAccess: accessInfo
+      ? {
+          enabled: true,
+          userId: accessInfo.userId,
+          email: accessInfo.email,
+          lastLoginAt: accessInfo.lastLoginAt,
+        }
+      : {
+          enabled: false,
+          userId: null,
+          email: null,
+          lastLoginAt: null,
+        },
   };
 }
 
@@ -49,11 +64,29 @@ export async function listBarbers(req, res, next) {
       owner: ownerId,
       isActive: true,
     }).lean();
+    const barberIds = barbersDocs.map(item => item._id);
+    const accessUsers = await UserModel.find({
+      shopOwnerId: ownerId,
+      barberId: { $in: barberIds },
+      isActive: true,
+      role: "barber",
+    })
+      .select({ barberId: 1, email: 1, lastLoginAt: 1 })
+      .lean();
+    const accessByBarberId = new Map(
+      accessUsers.map(user => [
+        String(user.barberId),
+        {
+          userId: String(user._id),
+          email: user.email || null,
+          lastLoginAt: user.lastLoginAt || null,
+        },
+      ]),
+    );
 
     console.log("Documentos encontrados en DB:", barbersDocs.length);
 
-    // 2. MAPEADO FORZADO:
-    const barbers = barbersDocs.map(serializeBarber);
+    const barbers = barbersDocs.map(doc => serializeBarber(doc, accessByBarberId));
 
     return res.json({ barbers });
   } catch (err) {
@@ -230,8 +263,11 @@ export async function listBarberAppointments(req, res, next) {
         ? date
         : undefined;
     const { startOfDay, endOfDay } = buildDayRange(date);
-    const ownerId = req.user?.id;
+    const ownerId = req.user?.ownerId || req.user?.id;
     if (!ownerId) return res.status(401).json({ error: "Auth requerida" });
+    if (req.user?.role === "barber" && req.user?.barberId !== barberId) {
+      return res.status(403).json({ error: "No puedes ver la agenda de otro barbero." });
+    }
 
     // Buscamos al barbero del owner y traemos sus días de trabajo (workDays)
     const barber = await BarberModel.findOne({
