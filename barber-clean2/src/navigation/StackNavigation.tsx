@@ -145,6 +145,7 @@ export default function StackNavigator({
           {showBarberArea ? (
             <>
               <Stack.Screen name="Barber-Home" component={BarberDashboard} />
+              <Stack.Screen name="Register-Employed" component={RegisterEmployed} />
               <Stack.Screen name="Reservas" component={ReservasForm} />
               <Stack.Screen name="Metrics" component={MetricsScreen} />
               <Stack.Screen name="Settings" component={SettingsScreen} />
