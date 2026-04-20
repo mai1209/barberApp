@@ -41,7 +41,12 @@ export type RootStackParamList = {
         lockBarber?: boolean;
       }
     | undefined;
-  'Register-Employed': { barber?: Barber } | undefined;
+  'Register-Employed':
+    | {
+        barber?: Barber;
+        selfEdit?: boolean;
+      }
+    | undefined;
   'Barber-Access': { barber: Barber };
   'List-Barber': undefined;
   'Barber-Home':

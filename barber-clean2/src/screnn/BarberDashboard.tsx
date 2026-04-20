@@ -305,6 +305,7 @@ function BarberDashboard({ route, navigation }: Props) {
     if (barberProfile) {
       navigation.navigate('Register-Employed', {
         barber: barberProfile,
+        selfEdit: isBarberUser,
       });
       return;
     }
@@ -319,6 +320,7 @@ function BarberDashboard({ route, navigation }: Props) {
         fullName: resolvedBarberName,
         workDays: [],
       },
+      selfEdit: isBarberUser,
     });
   };
 
@@ -638,18 +640,16 @@ function BarberDashboard({ route, navigation }: Props) {
             </Pressable>
 
             <View style={styles.secondaryActionsRow}>
-              {!isBarberUser ? (
-                <Pressable
-                  onPress={handleEditProfile}
-                  style={({ pressed }) => [
-                    styles.secondaryActionBtn,
-                    pressed && { backgroundColor: hexToRgba(theme.primary, 0.2) },
-                  ]}
-                >
-                  <Pencil size={14} color={theme.primary} />
-                  <Text style={styles.secondaryActionText}>Editar Perfil</Text>
-                </Pressable>
-              ) : null}
+              <Pressable
+                onPress={handleEditProfile}
+                style={({ pressed }) => [
+                  styles.secondaryActionBtn,
+                  pressed && { backgroundColor: hexToRgba(theme.primary, 0.2) },
+                ]}
+              >
+                <Pencil size={14} color={theme.primary} />
+                <Text style={styles.secondaryActionText}>Editar Perfil</Text>
+              </Pressable>
 
               <Pressable
                 onPress={() =>

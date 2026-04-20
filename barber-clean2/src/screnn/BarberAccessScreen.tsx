@@ -179,32 +179,45 @@ export default function BarberAccessScreen({ navigation, route }: Props) {
       return;
     }
 
-    const nextPassword = buildTemporaryPassword();
+    Alert.alert(
+      'Resetear clave',
+      'Se va a generar una nueva clave temporal y la anterior dejará de servir. ¿Querés continuar?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sí, resetear',
+          style: 'destructive',
+          onPress: async () => {
+            const nextPassword = buildTemporaryPassword();
 
-    try {
-      setLoading(true);
-      await upsertBarberAccess({
-        barberId: barber._id,
-        email: normalizedEmail,
-        password: nextPassword,
-      });
-      Clipboard.setString(nextPassword);
-      setAccessEmail(normalizedEmail);
-      setAccessPassword('');
-      setGeneratedAccessPassword(nextPassword);
-      await syncLatestBarber();
-      Alert.alert(
-        'Clave reseteada',
-        `La nueva clave temporal es:\n\n${nextPassword}\n\nYa quedó copiada para compartirla.`,
-      );
-    } catch (err: any) {
-      Alert.alert(
-        'Error',
-        err?.message || 'No se pudo resetear la contraseña del barbero.',
-      );
-    } finally {
-      setLoading(false);
-    }
+            try {
+              setLoading(true);
+              await upsertBarberAccess({
+                barberId: barber._id,
+                email: normalizedEmail,
+                password: nextPassword,
+              });
+              Clipboard.setString(nextPassword);
+              setAccessEmail(normalizedEmail);
+              setAccessPassword('');
+              setGeneratedAccessPassword(nextPassword);
+              await syncLatestBarber();
+              Alert.alert(
+                'Clave reseteada',
+                `La nueva clave temporal es:\n\n${nextPassword}\n\nYa quedó copiada para compartirla.`,
+              );
+            } catch (err: any) {
+              Alert.alert(
+                'Error',
+                err?.message || 'No se pudo resetear la contraseña del barbero.',
+              );
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleDisableAccess = async () => {

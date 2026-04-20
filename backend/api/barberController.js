@@ -153,10 +153,16 @@ export async function createBarber(req, res, next) {
 
 export async function updateBarber(req, res, next) {
   try {
-    const ownerId = req.user?.id;
+    const ownerId = req.user?.ownerId || req.user?.id;
     const { barberId } = req.params;
 
     if (!ownerId) return res.status(401).json({ error: "Auth requerida" });
+    if (
+      req.user?.role === "barber" &&
+      (!req.user?.barberId || String(req.user.barberId) !== String(barberId))
+    ) {
+      return res.status(403).json({ error: "Solo puedes editar tu propio perfil." });
+    }
 
     const fullName = String(req.body?.fullName ?? "").trim();
     const email = String(req.body?.email ?? "")

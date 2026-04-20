@@ -368,7 +368,7 @@ function ListBarber({ navigation }: Props) {
                               ) : null}
                             </View>
                           </View>
-                          
+
                           <View style={styles.barberActions}>
                             <Pressable
                               style={({ pressed }) => [
@@ -392,26 +392,28 @@ function ListBarber({ navigation }: Props) {
                               </Text>
                             </Pressable>
 
-                            <Pressable
-                              style={({ pressed }) => [
-                                styles.editBtn,
-                                { opacity: pressed ? 0.5 : 1 }
-                              ]}
-                              onPress={() => handleEditBarber(barber)}
-                            >
-                              <Pencil size={12} color="#888" />
-                              <Text style={styles.editBtnText}>Editar</Text>
-                            </Pressable>
+                            <View style={styles.secondaryActionsRow}>
+                              <Pressable
+                                style={({ pressed }) => [
+                                  styles.editBtn,
+                                  { opacity: pressed ? 0.5 : 1 }
+                                ]}
+                                onPress={() => handleEditBarber(barber)}
+                              >
+                                <Pencil size={12} color={theme.textMuted} />
+                                <Text style={styles.editBtnText}>Editar</Text>
+                              </Pressable>
 
-                            <Pressable
-                              style={({ pressed }) => [
-                                styles.openBtn,
-                                pressed && { transform: [{ scale: 0.96 }], opacity: 0.9 },
-                              ]}
-                              onPress={() => handleOpenBarber(barber)}
-                            >
-                              <Text style={styles.openBtnText}>Abrir</Text>
-                            </Pressable>
+                              <Pressable
+                                style={({ pressed }) => [
+                                  styles.openBtn,
+                                  pressed && { transform: [{ scale: 0.96 }], opacity: 0.9 },
+                                ]}
+                                onPress={() => handleOpenBarber(barber)}
+                              >
+                                <Text style={styles.openBtnText}>Abrir panel</Text>
+                              </Pressable>
+                            </View>
                           </View>
                         </View>
                       </View>
@@ -437,10 +439,10 @@ function ListBarber({ navigation }: Props) {
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: theme.background },
-    scrollContent: { paddingBottom: 60 },
+    scrollContent: { paddingBottom: 130 },
     
     header: { 
-      marginTop: Platform.OS === 'ios' ? 70 : 20 , 
+      marginTop: Platform.OS === 'ios' ? 60 : 20 , 
       paddingHorizontal: 25, 
       alignItems: 'center',
       marginBottom: 20 ,
@@ -521,29 +523,35 @@ const createStyles = (theme: Theme) =>
       borderRadius: 24,
       borderWidth: 1,
       borderColor: theme.border,
-      overflow: 'hidden'
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: theme.mode === 'light' ? 0.05 : 0.18,
+      shadowRadius: 18,
+      elevation: 2,
     },
     barberMainAction: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
+      flexDirection: "column",
+      alignItems: "stretch",
       padding: 14,
+      gap: 14,
     },
     barberInfo: {
       flexDirection: "row",
-      alignItems: "center",
+      alignItems: "flex-start",
       gap: 12,
-      flex: 1,
     },
     barberActions: {
+      gap: 10,
+    },
+    secondaryActionsRow: {
       flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
+      gap: 10,
     },
     avatarCircle: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: 52,
+      height: 52,
+      borderRadius: 26,
       backgroundColor: theme.surfaceAlt,
       alignItems: "center",
       justifyContent: "center",
@@ -557,13 +565,13 @@ const createStyles = (theme: Theme) =>
     },
     avatarText: {
       color: theme.primary,
-      fontSize: 16,
+      fontSize: 18,
       fontWeight: "800",
     },
     barberName: {
       color: theme.textPrimary,
-      fontSize: 15,
-      fontWeight: "700",
+      fontSize: 16,
+      fontWeight: "800",
     },
     accessChip: {
       alignSelf: "flex-start",
@@ -635,6 +643,7 @@ const createStyles = (theme: Theme) =>
       color: theme.textMuted,
       fontSize: 11,
       fontWeight: "600",
+      lineHeight: 16,
     },
     
 
@@ -642,60 +651,72 @@ const createStyles = (theme: Theme) =>
     editBtn: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 4,
-      paddingHorizontal: 8,
-      paddingVertical: 10,
+      justifyContent: "center",
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 11,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.input,
+      flex: 1,
     },
     editBtnText: {
       color: theme.textMuted,
       fontSize: 12,
-      fontWeight: "600",
+      fontWeight: "700",
     },
     accessActionBtn: {
-      borderRadius: 10,
+      borderRadius: 14,
       borderWidth: 1,
       borderColor: hexToRgba(theme.primary, 0.25),
       backgroundColor: hexToRgba(theme.primary, 0.1),
-      paddingHorizontal: 10,
-      paddingVertical: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 13,
+      alignItems: "center",
+      justifyContent: "center",
     },
     accessActionBtnPrimary: {
-      borderRadius: 10,
+      borderRadius: 14,
       borderWidth: 1,
       borderColor: theme.primary,
       backgroundColor: theme.primary,
-      paddingHorizontal: 10,
-      paddingVertical: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 13,
+      alignItems: "center",
+      justifyContent: "center",
     },
     accessActionBtnText: {
       color: theme.primary,
-      fontSize: 12,
-      fontWeight: "700",
+      fontSize: 13,
+      fontWeight: "800",
     },
     accessActionBtnPrimaryText: {
       color: theme.textOnPrimary,
-      fontSize: 12,
-      fontWeight: "700",
+      fontSize: 13,
+      fontWeight: "800",
     },
 
     // BOTÓN ABRIR (Principal)
     openBtn: {
       flexDirection: "row",
       alignItems: "center",
+      justifyContent: "center",
       backgroundColor: theme.primary,
       paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: 10,
+      paddingVertical: 11,
+      borderRadius: 12,
       shadowColor: theme.primary,
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.2,
       shadowRadius: 5,
       elevation: 3,
+      flex: 1,
     },
     openBtnText: {
       color: theme.textOnPrimary,
       fontSize: 12,
-      fontWeight: "600",
+      fontWeight: "800",
     },
  
 

@@ -15,7 +15,7 @@ router.use(requireAuth);
 router.get("/", requireAdminRole, listBarbers);
 router.get("/:barberId/appointments", listBarberAppointments);
 router.post("/", requireAdminRole, createBarber);
-router.put("/:barberId", requireAdminRole, updateBarber);
+router.put("/:barberId", updateBarber);
 router.delete("/:barberId", requireAdminRole, deactivateBarber);
 
 export default router;

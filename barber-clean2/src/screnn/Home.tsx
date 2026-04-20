@@ -1031,7 +1031,8 @@ const capitalize = (text: string) =>
 
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.background },
+    container: { flex: 1, backgroundColor: theme.background ,      paddingBottom: 120,
+},
     topHeader: {
       paddingHorizontal: 25,
       paddingTop: Platform.OS === 'ios' ? 60 : 20,

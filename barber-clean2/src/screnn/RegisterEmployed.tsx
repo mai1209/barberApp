@@ -40,6 +40,7 @@ type Props = {
   route?: {
     params?: {
       barber?: Barber;
+      selfEdit?: boolean;
     };
   };
 };
@@ -177,6 +178,7 @@ function formatClosedDayLabel(value: string) {
 function RegisterEmployed({ navigation, route }: Props) {
   const { theme } = useTheme();
   const routeBarber = route?.params?.barber ?? null;
+  const selfEdit = Boolean(route?.params?.selfEdit);
   const [barberToEdit, setBarberToEdit] = useState<Barber | null>(routeBarber);
   const isEditing = Boolean(barberToEdit?._id);
   const [fullName, setFullName] = useState('');
@@ -1005,6 +1007,7 @@ function RegisterEmployed({ navigation, route }: Props) {
                 />
               </View>
 
+              {!selfEdit ? (
               <View style={styles.section}>
                 <Text style={styles.sectionLabel}>Acceso del barbero a la app</Text>
                 <Text style={styles.sectionHelper}>
@@ -1048,6 +1051,7 @@ function RegisterEmployed({ navigation, route }: Props) {
                   </Text>
                 )}
               </View>
+              ) : null}
 
               {/* DÍAS */}
               <View style={styles.section}>
