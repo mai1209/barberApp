@@ -8,6 +8,7 @@ import SubscriptionCouponsPage from './SubscriptionCouponsPage';
 import SubscriptionCheckoutPage from './SubscriptionCheckoutPage';
 import NotFoundPage from './NotFoundPage';
 import PrivacyPolicyPage from './PrivacyPolicyPage';
+import AccountDeletionPage from './AccountDeletionPage';
 //import landingStyles from '../styles/LandingPage.module.css';
 
 
@@ -59,11 +60,22 @@ function resolveInternalPage() {
   }
 
   if (
+    pathname === 'eliminacion-de-cuenta' ||
+    pathname === 'eliminar-cuenta' ||
+    pathname === 'account-deletion'
+  ) {
+    return 'account-deletion';
+  }
+
+  if (
     segments[0] === 'admin' ||
     segments[0] === 'planes' ||
     segments[0] === 'suscripcion' ||
     segments[0] === 'politica-de-privacidad' ||
-    segments[0] === 'privacy-policy'
+    segments[0] === 'privacy-policy' ||
+    segments[0] === 'eliminacion-de-cuenta' ||
+    segments[0] === 'eliminar-cuenta' ||
+    segments[0] === 'account-deletion'
   ) {
     return 'not-found';
   }
@@ -95,6 +107,10 @@ function App() {
 
   if (internalPage === 'privacy-policy') {
     return <PrivacyPolicyPage />;
+  }
+
+  if (internalPage === 'account-deletion') {
+    return <AccountDeletionPage />;
   }
 
   if (internalPage === 'not-found' || missingShop) {
