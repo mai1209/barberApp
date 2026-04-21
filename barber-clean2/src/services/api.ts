@@ -15,10 +15,10 @@ type ApiError = Error & {
   isNetworkError?: boolean;
 };
 
-const LAN_IP = "192.168.100.55"; 
+const LAN_IP = "192.168.100.57"; 
 const ANDROID_EMULATOR_HOST = "10.0.2.2";
 const REQUEST_TIMEOUT_MS = 8000;
-const FORCE_PROD_IN_DEBUG = false; // Útil para probar el comportamiento en producción sin necesidad de un backend local
+const FORCE_PROD_IN_DEBUG = true; // Útil para probar el comportamiento en producción sin necesidad de un backend local
 
 const isAndroid = Platform.OS === "android";
 const isAndroidEmulator = Boolean(
@@ -226,6 +226,10 @@ export type NotificationSettings = {
   customerSameDayEmailEnabled?: boolean;
 };
 
+export type BarberProfileSettings = {
+  barberSelfEditEnabled?: boolean;
+};
+
 export type ShopClosedDay = {
   date: string;
   message?: string | null;
@@ -286,6 +290,14 @@ export function updatePaymentSettings(payload: PaymentSettings) {
 
 export function updateNotificationSettings(payload: NotificationSettings) {
   return request<{ message: string; user: any }>("/api/auth/notification-settings", {
+    method: "PUT",
+    body: payload,
+    auth: true,
+  });
+}
+
+export function updateBarberProfileSettings(payload: BarberProfileSettings) {
+  return request<{ message: string; user: any }>("/api/auth/barber-profile-settings", {
     method: "PUT",
     body: payload,
     auth: true,

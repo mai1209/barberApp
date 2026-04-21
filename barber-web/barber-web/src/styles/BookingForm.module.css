@@ -142,6 +142,8 @@
 
 .shopHeroText {
   text-align: center;
+  position: relative;
+  z-index: 2;
 }
 
 .shopHeroEyebrow {
@@ -173,7 +175,7 @@
   margin: 0;
   font-family: "Syne", sans-serif;
   color: var(--text);
-  font-size: clamp(1.85rem, 4vw, 2.5rem);
+  font-size: 1.5rem;
   line-height: 1.02;
   font-weight: 800;
   letter-spacing: -0.04em;
@@ -190,19 +192,110 @@
 
 .shopHeroMedia {
   position: relative;
+  min-height: 270px;
+  margin: -28px -28px 18px;
+  margin-bottom: 18px;
+}
+
+.shopHeroPicture {
+  position: absolute;
+  inset: 0;
+  display: block;
   overflow: hidden;
-  min-height: 138px;
- 
+  border-radius: 32px 32px 28px 28px;
+  border-bottom: 1px solid var(--pink-border);
+  background: var(--surface-2);
+}
+
+.shopHeroPicture::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 28%, rgba(0, 0, 0, 0.16) 0%, transparent 38%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.68) 0%, rgba(0, 0, 0, 0.38) 46%, rgba(0, 0, 0, 0.42) 100%);
 }
 
 .shopHeroBanner {
-  position: absolute;
-  inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
-  padding: 0.5rem 0.75rem;
+  display: block;
+}
+
+.shopHeroOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.shopHeroOverlay .shopHeroText {
+  width: 100%;
+  padding: 14px 16px 16px;
+
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.194) 100%);
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  box-shadow:
+    0 18px 45px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(4px);
+}
+
+.shopHeroOverlay .shopHeroEyebrow {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(255, 255, 255, 0.72);
+  color: #2c1d13;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.24);
+}
+
+.shopHeroOverlay .shopHeroEyebrow::before {
+  background: var(--pink);
+}
+
+.shopHeroOverlay .shopHeroName {
+  color: #ffffff;
+  text-shadow:
+    0 2px 2px rgba(0, 0, 0, 0.95),
+    0 8px 24px rgba(0, 0, 0, 0.82);
+}
+
+.shopHeroOverlay .shopHeroSubtitle {
+  color: rgba(255, 255, 255, 0.96);
+  font-weight: 700;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.90),
+    0 5px 18px rgba(0, 0, 0, 0.72);
+}
+
+.shopHeroAvatar {
+  position: absolute;
+  left: 50%;
+  bottom: -34px;
+  z-index: 2;
+  width: 78px;
+  height: 78px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  padding: 4px;
+  background: var(--card-bg);
+  border: 1px solid var(--pink-border);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
+}
+
+.shopHeroAvatar img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center;
+  border-radius: inherit;
+  background: var(--avatar-bg);
 }
 
 
@@ -258,6 +351,21 @@
 
 .input::placeholder {
   color: #666873;
+}
+
+.emailFeedback {
+  margin: -2px 4px 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  font-weight: 650;
+}
+
+.emailFeedbackOk {
+  color: var(--text-dim);
+}
+
+.emailFeedbackWarning {
+  color: var(--warning-text);
 }
 
 .selector {
@@ -786,8 +894,27 @@
   }
 
   .shopHeroMedia {
-    min-height: 96px;
-    border-radius: 22px;
+    min-height: 230px;
+    margin: -20px -16px 20px;
+  }
+
+  .shopHeroPicture {
+    border-radius: 24px 24px 22px 22px;
+  }
+
+  .shopHeroAvatar {
+    width: 66px;
+    height: 66px;
+    bottom: -30px;
+  }
+
+  .shopHeroOverlay {
+    padding: 16px 12px 58px;
+  }
+
+  .shopHeroOverlay .shopHeroText {
+    padding: 12px 12px 14px;
+    border-radius: 20px;
   }
 
   .shopHeroEyebrow {

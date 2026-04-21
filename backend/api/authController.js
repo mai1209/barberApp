@@ -13,6 +13,7 @@ import {
   buildMercadoPagoOAuthUrl,
   buildMercadoPagoSubscriptionReturnUrls,
   buildMercadoPagoSubscriptionWebhookUrl,
+  createMercadoPagoPkcePair,
   createMercadoPagoSystemPreference,
   exchangeMercadoPagoCode,
   getMercadoPagoConfig,
@@ -153,12 +154,13 @@ export async function getMailDebug(req, res, next) {
   }
 }
 
-function buildMercadoPagoStateToken(userId) {
+function buildMercadoPagoStateToken(userId, extra = {}) {
   return signAccessToken(
     {
       sub: userId,
       type: "mp_oauth",
       nonce: crypto.randomUUID(),
+      ...extra,
     },
     { expiresIn: "15m" },
   );
@@ -825,6 +827,22 @@ function sanitizeNotificationSettingsInput(input) {
   return { updates, hasAnyField };
 }
 
+function sanitizeBarberProfileSettingsInput(input) {
+  if (!input || typeof input !== "object") {
+    return { updates: {}, hasAnyField: false };
+  }
+
+  const updates = {};
+  let hasAnyField = false;
+
+  if (Object.prototype.hasOwnProperty.call(input, "barberSelfEditEnabled")) {
+    hasAnyField = true;
+    updates.barberSelfEditEnabled = Boolean(input.barberSelfEditEnabled);
+  }
+
+  return { updates, hasAnyField };
+}
+
 function sanitizeShopClosedDaysInput(input) {
   if (!input || typeof input !== "object") {
     return { updates: {}, hasAnyField: false };
@@ -864,7 +882,7 @@ async function buildAuthUserResponse(userDoc) {
     _id: resolveEffectiveOwnerId(userDoc),
     isActive: true,
   })
-    .select({ shopSlug: 1, subscription: 1, themeConfig: 1 })
+    .select({ shopSlug: 1, subscription: 1, themeConfig: 1, barberProfileSettings: 1 })
     .lean();
 
   if (ownerDoc?.shopSlug) {
@@ -877,6 +895,10 @@ async function buildAuthUserResponse(userDoc) {
 
   if (ownerDoc?.themeConfig) {
     userResponse.themeConfig = ownerDoc.themeConfig;
+  }
+
+  if (ownerDoc?.barberProfileSettings) {
+    userResponse.barberProfileSettings = ownerDoc.barberProfileSettings;
   }
 
   return userResponse;
@@ -1298,8 +1320,15 @@ export async function getMercadoPagoConnectUrl(req, res, next) {
     }
 
     getMercadoPagoConfig();
-    const state = buildMercadoPagoStateToken(userId);
-    const authUrl = buildMercadoPagoOAuthUrl({ state });
+    const pkce = createMercadoPagoPkcePair();
+    const state = buildMercadoPagoStateToken(userId, {
+      codeVerifier: pkce.codeVerifier,
+    });
+    const authUrl = buildMercadoPagoOAuthUrl({
+      state,
+      codeChallenge: pkce.codeChallenge,
+      codeChallengeMethod: pkce.codeChallengeMethod,
+    });
 
     return res.json({ authUrl });
   } catch (err) {
@@ -1364,7 +1393,10 @@ export async function handleMercadoPagoOAuthCallback(req, res, next) {
         );
     }
 
-    const tokenResponse = await exchangeMercadoPagoCode({ code });
+    const tokenResponse = await exchangeMercadoPagoCode({
+      code,
+      codeVerifier: payload.codeVerifier,
+    });
     const expiresAt = tokenResponse.expires_in
       ? new Date(Date.now() + Number(tokenResponse.expires_in) * 1000)
       : null;
@@ -1532,6 +1564,46 @@ export async function updateNotificationSettings(req, res, next) {
 
     return res.json({
       message: "Notificaciones guardadas correctamente",
+      user: userDoc.toJSON(),
+    });
+  } catch (err) {
+    if (err instanceof Error) {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
+}
+
+export async function updateBarberProfileSettings(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    const userDoc = await UserModel.findById(userId);
+    if (!userDoc || userDoc.isActive === false) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    if (normalizeAppRole(userDoc.role) !== "admin") {
+      return res.status(403).json({ error: "Solo el administrador puede cambiar este ajuste." });
+    }
+
+    const { updates, hasAnyField } = sanitizeBarberProfileSettingsInput(req.body ?? {});
+    if (!hasAnyField) {
+      return res.status(400).json({ error: "No llegaron cambios del perfil del barbero para guardar." });
+    }
+
+    userDoc.barberProfileSettings = {
+      ...(userDoc.barberProfileSettings?.toObject?.() ?? userDoc.barberProfileSettings ?? {}),
+      ...updates,
+    };
+
+    await userDoc.save();
+
+    return res.json({
+      message: "Configuración del perfil del barbero guardada correctamente",
       user: userDoc.toJSON(),
     });
   } catch (err) {

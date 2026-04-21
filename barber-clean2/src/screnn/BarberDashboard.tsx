@@ -25,11 +25,16 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Appointment,
   Barber,
+  getCurrentUser,
   fetchBarberAppointments,
   updateAppointmentStatus,
   deleteAppointment,
 } from '../services/api';
-import { getUserProfile, subscribeToUserProfile } from '../services/authStorage';
+import {
+  getUserProfile,
+  saveUserProfile,
+  subscribeToUserProfile,
+} from '../services/authStorage';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
 import type { RootStackParamList } from '../navigation/StackNavigation';
@@ -161,6 +166,9 @@ function BarberDashboard({ route, navigation }: Props) {
   const resolvedBarberName =
     barberName ?? initialBarber?.fullName ?? authUser?.fullName ?? 'Mi Agenda';
   const isBarberUser = resolveUserRole(authUser) === 'barber';
+  const canSelfEditProfile =
+    !isBarberUser ||
+    authUser?.barberProfileSettings?.barberSelfEditEnabled !== false;
 
   const [date, setDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -283,6 +291,13 @@ function BarberDashboard({ route, navigation }: Props) {
   useFocusEffect(
     useCallback(() => {
       loadAppointments();
+      getCurrentUser()
+        .then(response => {
+          if (response?.user) {
+            return saveUserProfile(response.user);
+          }
+        })
+        .catch(() => {});
       const intervalId = setInterval(() => loadAppointments(), 15000);
       return () => clearInterval(intervalId);
     }, [loadAppointments]),
@@ -302,6 +317,14 @@ function BarberDashboard({ route, navigation }: Props) {
   const handleGoToToday = () => setDate(new Date());
 
   const handleEditProfile = () => {
+    if (!canSelfEditProfile) {
+      Alert.alert(
+        'Perfil bloqueado',
+        'El administrador desactivó la edición del perfil del barbero.',
+      );
+      return;
+    }
+
     if (barberProfile) {
       navigation.navigate('Register-Employed', {
         barber: barberProfile,
@@ -640,16 +663,18 @@ function BarberDashboard({ route, navigation }: Props) {
             </Pressable>
 
             <View style={styles.secondaryActionsRow}>
-              <Pressable
-                onPress={handleEditProfile}
-                style={({ pressed }) => [
-                  styles.secondaryActionBtn,
-                  pressed && { backgroundColor: hexToRgba(theme.primary, 0.2) },
-                ]}
-              >
-                <Pencil size={14} color={theme.primary} />
-                <Text style={styles.secondaryActionText}>Editar Perfil</Text>
-              </Pressable>
+              {canSelfEditProfile ? (
+                <Pressable
+                  onPress={handleEditProfile}
+                  style={({ pressed }) => [
+                    styles.secondaryActionBtn,
+                    pressed && { backgroundColor: hexToRgba(theme.primary, 0.2) },
+                  ]}
+                >
+                  <Pencil size={14} color={theme.primary} />
+                  <Text style={styles.secondaryActionText}>Editar Perfil</Text>
+                </Pressable>
+              ) : null}
 
               <Pressable
                 onPress={() =>

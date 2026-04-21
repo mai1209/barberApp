@@ -1,4 +1,6 @@
-const DEFAULT_AUTH_URL = "https://auth.mercadopago.com.ar/authorization";
+import crypto from "node:crypto";
+
+const DEFAULT_AUTH_URL = "https://auth.mercadopago.com/authorization";
 const DEFAULT_API_BASE_URL = "https://api.mercadopago.com";
 
 function getRequiredEnv(name) {
@@ -11,13 +13,58 @@ function getRequiredEnv(name) {
   return value;
 }
 
+function normalizeBaseUrl(value) {
+  return String(value || "").trim().replace(/\/+$/, "");
+}
+
+function validateMercadoPagoRedirectUri(redirectUri) {
+  let parsed;
+
+  try {
+    parsed = new URL(redirectUri);
+  } catch (_error) {
+    const error = new Error(
+      "La URL de retorno de Mercado Pago no es válida. Revisá MERCADO_PAGO_REDIRECT_URI.",
+    );
+    error.statusCode = 500;
+    throw error;
+  }
+
+  const isLocalhost =
+    parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+
+  if (parsed.protocol !== "https:" && !(isLocalhost && parsed.protocol === "http:")) {
+    const error = new Error(
+      "Mercado Pago está mal configurado: MERCADO_PAGO_REDIRECT_URI debe usar HTTPS en producción y coincidir exactamente con la URL cargada en la app de Mercado Pago Developers.",
+    );
+    error.statusCode = 500;
+    throw error;
+  }
+
+  if (parsed.search || parsed.hash) {
+    const error = new Error(
+      "Mercado Pago está mal configurado: MERCADO_PAGO_REDIRECT_URI no debe incluir parámetros ni fragmentos.",
+    );
+    error.statusCode = 500;
+    throw error;
+  }
+
+  return redirectUri;
+}
+
 export function getMercadoPagoConfig() {
+  const backendBaseUrl = normalizeBaseUrl(getRequiredEnv("BACKEND_PUBLIC_BASE_URL"));
+  const redirectUri = String(
+    process.env.MERCADO_PAGO_REDIRECT_URI ||
+      `${backendBaseUrl}/api/auth/mercadopago/callback`,
+  ).trim();
+
   return {
     clientId: getRequiredEnv("MERCADO_PAGO_CLIENT_ID"),
     clientSecret: getRequiredEnv("MERCADO_PAGO_CLIENT_SECRET"),
-    redirectUri: getRequiredEnv("MERCADO_PAGO_REDIRECT_URI"),
+    redirectUri: validateMercadoPagoRedirectUri(redirectUri),
     publicBookingBaseUrl: getRequiredEnv("PUBLIC_BOOKING_BASE_URL"),
-    backendBaseUrl: getRequiredEnv("BACKEND_PUBLIC_BASE_URL"),
+    backendBaseUrl,
     authUrl: String(process.env.MERCADO_PAGO_OAUTH_AUTHORIZE_URL || DEFAULT_AUTH_URL).trim(),
     apiBaseUrl: String(process.env.MERCADO_PAGO_API_BASE_URL || DEFAULT_API_BASE_URL).trim(),
     webhookSecret: String(process.env.MERCADO_PAGO_WEBHOOK_SECRET || "").trim() || null,
@@ -26,6 +73,27 @@ export function getMercadoPagoConfig() {
         process.env.MERCADO_PAGO_ACCESS_TOKEN ||
         "",
     ).trim(),
+  };
+}
+
+function base64Url(buffer) {
+  return buffer
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+export function createMercadoPagoPkcePair() {
+  const codeVerifier = base64Url(crypto.randomBytes(64));
+  const codeChallenge = base64Url(
+    crypto.createHash("sha256").update(codeVerifier).digest(),
+  );
+
+  return {
+    codeVerifier,
+    codeChallenge,
+    codeChallengeMethod: "S256",
   };
 }
 
@@ -49,7 +117,11 @@ async function mercadoPagoFetch(path, options = {}) {
   return payload;
 }
 
-export function buildMercadoPagoOAuthUrl({ state }) {
+export function buildMercadoPagoOAuthUrl({
+  state,
+  codeChallenge,
+  codeChallengeMethod = "S256",
+}) {
   const { authUrl, clientId, redirectUri } = getMercadoPagoConfig();
   const params = new URLSearchParams({
     client_id: clientId,
@@ -57,11 +129,13 @@ export function buildMercadoPagoOAuthUrl({ state }) {
     platform_id: "mp",
     redirect_uri: redirectUri,
     state,
+    code_challenge: codeChallenge,
+    code_challenge_method: codeChallengeMethod,
   });
   return `${authUrl}?${params.toString()}`;
 }
 
-export async function exchangeMercadoPagoCode({ code }) {
+export async function exchangeMercadoPagoCode({ code, codeVerifier }) {
   const { clientId, clientSecret, redirectUri } = getMercadoPagoConfig();
 
   const body = new URLSearchParams({
@@ -71,6 +145,10 @@ export async function exchangeMercadoPagoCode({ code }) {
     code,
     redirect_uri: redirectUri,
   });
+
+  if (codeVerifier) {
+    body.set("code_verifier", codeVerifier);
+  }
 
   return mercadoPagoFetch("/oauth/token", {
     method: "POST",

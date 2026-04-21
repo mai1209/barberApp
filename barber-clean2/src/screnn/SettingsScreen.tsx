@@ -185,6 +185,15 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
             />
             <View style={styles.separator} />
             <MenuItem
+              icon={KeyRound}
+              label="Habilitar editar perfil barbero"
+              description="Activá o desactivá si el barbero puede cambiar su propio perfil."
+              onPress={() => navigation.navigate('Barber-Profile-Settings')}
+              theme={theme}
+              styles={styles}
+            />
+            <View style={styles.separator} />
+            <MenuItem
               icon={CalendarDays}
               label="Cerrar barbería por día"
               description="Bloqueá una fecha puntual para que la web no tome turnos."

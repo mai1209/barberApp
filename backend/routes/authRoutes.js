@@ -21,6 +21,7 @@ import {
   updatePaymentSettings,
   updatePassword,
   updateNotificationSettings,
+  updateBarberProfileSettings,
   updatePlanPricingAdmin,
   updateOwnSubscriptionSettings,
   upsertBarberAccess,
@@ -54,6 +55,7 @@ router.put("/password", requireAuth, updatePassword);
 router.put("/theme", requireAuth, updateThemeConfig);
 router.put("/payment-settings", requireAuth, updatePaymentSettings);
 router.put("/notification-settings", requireAuth, updateNotificationSettings);
+router.put("/barber-profile-settings", requireAuth, requireAdminRole, updateBarberProfileSettings);
 router.put("/shop-closed-days", requireAuth, updateShopClosedDays);
 router.put("/subscription-settings", requireAuth, updateOwnSubscriptionSettings);
 router.post("/barber-access", requireAuth, requireAdminRole, upsertBarberAccess);

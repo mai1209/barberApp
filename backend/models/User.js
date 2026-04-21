@@ -84,6 +84,15 @@ const notificationSettingsSchema = new mongoose.Schema(
   },
 );
 
+const barberProfileSettingsSchema = new mongoose.Schema(
+  {
+    barberSelfEditEnabled: { type: Boolean, default: true },
+  },
+  {
+    _id: false,
+  },
+);
+
 const shopClosedDaySchema = new mongoose.Schema(
   {
     date: { type: String, required: true, trim: true },
@@ -367,6 +376,10 @@ const userSchema = new mongoose.Schema(
     },
     notificationSettings: {
       type: notificationSettingsSchema,
+      default: () => ({}),
+    },
+    barberProfileSettings: {
+      type: barberProfileSettingsSchema,
       default: () => ({}),
     },
     shopClosedDays: {

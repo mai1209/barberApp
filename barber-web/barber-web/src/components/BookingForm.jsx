@@ -25,8 +25,11 @@ const minutesToLabel = (totalMinutes) => {
 };
 
 const SLOT_INTERVAL_MINUTES = 30;
+const CATCH_UP_SLOT_INTERVAL_MINUTES = 5;
+const MAX_CATCH_UP_SLOTS = 3;
 const SHOP_TZ = "America/Argentina/Cordoba";
 const DEFAULT_BOOKING_BANNER = "/logoBarber.png";
+const DEFAULT_BOOKING_LOGO = "/logoBarber.png";
 const WEB_STYLE_PRESETS = {
   dark: {
     "--page-bg": "linear-gradient(180deg, #06070a 0%, #120812 100%)",
@@ -253,10 +256,73 @@ const getPublicPaymentOptions = (shopInfo) => {
   return options;
 };
 
+const EMAIL_DOMAIN_FIXES = {
+  "gmail.con": "gmail.com",
+  "gmai.com": "gmail.com",
+  "gmial.com": "gmail.com",
+  "gnail.com": "gmail.com",
+  "hotmail.con": "hotmail.com",
+  "hotmal.com": "hotmail.com",
+  "hotmil.com": "hotmail.com",
+  "outlook.con": "outlook.com",
+  "icloud.con": "icloud.com",
+  "yahoo.con": "yahoo.com",
+};
+
+const normalizeEmail = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "");
+
+const reviewEmail = (value) => {
+  const normalized = normalizeEmail(value);
+
+  if (!normalized) {
+    return {
+      normalized,
+      isValid: false,
+      message: "Ingresá un email para recibir la confirmación del turno.",
+    };
+  }
+
+  const basicEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  if (!basicEmailPattern.test(normalized)) {
+    return {
+      normalized,
+      isValid: false,
+      message: "Revisá el formato del email. Ejemplo: nombre@correo.com",
+    };
+  }
+
+  const [localPart, domain] = normalized.split("@");
+  const fixedDomain =
+    EMAIL_DOMAIN_FIXES[domain] ||
+    (domain.endsWith(".con") ? domain.replace(/\.con$/, ".com") : "");
+
+  if (fixedDomain) {
+    return {
+      normalized,
+      isValid: false,
+      suggestion: `${localPart}@${fixedDomain}`,
+      message: `Parece que quisiste escribir ${localPart}@${fixedDomain}.`,
+    };
+  }
+
+  return {
+    normalized,
+    isValid: true,
+    message: "Vamos a enviar la confirmación a este email.",
+  };
+};
+
 const labelToMinutes = (label) => {
   const [hours, minutes] = label.split(":").map(Number);
   return hours * 60 + minutes;
 };
+
+const roundUpToInterval = (minutes, interval) =>
+  Math.ceil(minutes / interval) * interval;
 
 const parseTimeFragment = (fragment) => {
   if (!fragment) return null;
@@ -353,13 +419,14 @@ function BookingForm({ shopSlug, onNotFound }) {
   const [selectedBarber, setSelectedBarber] = useState(null);
   const [loadingBarbers, setLoadingBarbers] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [occupiedSlots, setOccupiedSlots] = useState(() => new Set());
+  const [occupiedRanges, setOccupiedRanges] = useState([]);
   const [shopInfo, setShopInfo] = useState(null);
   const [shopLoading, setShopLoading] = useState(true);
   const [services, setServices] = useState([]);
   const [selectedService, setSelectedService] = useState(null);
   const [servicePickerOpen, setServicePickerOpen] = useState(false);
   const [email, setEmail] = useState(""); // <-- AGREGAR ESTO
+  const [emailConfirmation, setEmailConfirmation] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedBarberSchedule, setSelectedBarberSchedule] = useState(null);
@@ -394,6 +461,7 @@ function BookingForm({ shopSlug, onNotFound }) {
     if (!workDays.includes(currentDayOfWeek)) return [];
 
     const step = currentDuration;
+    const isToday = selectedDate.toDateString() === new Date().toDateString();
 
     const buildSlots = (startStr, endStr) => {
       const parse = (t) => {
@@ -402,12 +470,38 @@ function BookingForm({ shopSlug, onNotFound }) {
       };
       const start = parse(startStr);
       const end = parse(endStr);
-      const slots = [];
+      const slotSet = new Set();
       for (let m = start; m <= end; m += step) {
         if (m + step > end) break;
-        slots.push(minutesToLabel(m));
+        slotSet.add(minutesToLabel(m));
       }
-      return slots;
+
+      if (isToday) {
+        const now = new Date();
+        const nowMinutes = now.getHours() * 60 + now.getMinutes();
+        const firstCatchUp = Math.max(
+          start,
+          roundUpToInterval(nowMinutes + 1, CATCH_UP_SLOT_INTERVAL_MINUTES),
+        );
+        const nextRegularSlot = roundUpToInterval(
+          Math.max(nowMinutes + 1 - start, 0),
+          step,
+        ) + start;
+        let added = 0;
+
+        for (
+          let m = firstCatchUp;
+          m < nextRegularSlot && m + step <= end && added < MAX_CATCH_UP_SLOTS;
+          m += CATCH_UP_SLOT_INTERVAL_MINUTES
+        ) {
+          slotSet.add(minutesToLabel(m));
+          added += 1;
+        }
+      }
+
+      return Array.from(slotSet).sort(
+        (a, b) => labelToMinutes(a) - labelToMinutes(b),
+      );
     };
 
     // Turno cortado
@@ -457,10 +551,16 @@ function BookingForm({ shopSlug, onNotFound }) {
     shopInfo?.themeConfig?.mobileBannerDataUrl ||
     shopInfo?.themeConfig?.bannerDataUrl ||
     DEFAULT_BOOKING_BANNER;
+  const shopProfileSrc =
+    shopInfo?.themeConfig?.logoDataUrl || DEFAULT_BOOKING_LOGO;
   const webStyleVars = useMemo(
     () => getWebStylePreset(shopInfo?.themeConfig?.webPreset),
     [shopInfo?.themeConfig?.webPreset],
   );
+  const emailReview = useMemo(() => reviewEmail(email), [email]);
+  const emailConfirmationMatches =
+    !emailConfirmation ||
+    normalizeEmail(email) === normalizeEmail(emailConfirmation);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -580,7 +680,7 @@ function BookingForm({ shopSlug, onNotFound }) {
       } else {
         setClosedDayNotice("");
       }
-      const busy = new Set();
+      const busyRanges = [];
       if (res?.appointments) {
         res.appointments.forEach((app) => {
           if (app.status === "cancelled") return;
@@ -588,9 +688,10 @@ function BookingForm({ shopSlug, onNotFound }) {
           const [baseHour, baseMinute] = startLabel.split(":").map(Number);
           const startMinutes = baseHour * 60 + baseMinute;
           const occupiedDuration = app.durationMinutes ?? SLOT_INTERVAL_MINUTES;
-          for (let o = 0; o < occupiedDuration; o += SLOT_INTERVAL_MINUTES) {
-            busy.add(minutesToLabel(startMinutes + o));
-          }
+          busyRanges.push({
+            start: startMinutes,
+            end: startMinutes + occupiedDuration,
+          });
         });
       }
       if (res?.resolvedSchedule) {
@@ -603,7 +704,7 @@ function BookingForm({ shopSlug, onNotFound }) {
       } else {
         setSelectedBarberSchedule(null);
       }
-      setOccupiedSlots(busy);
+      setOccupiedRanges(busyRanges);
     } catch (err) {
       console.error("Error ocupación:", err);
       if (err?.status === 404) {
@@ -659,16 +760,15 @@ function BookingForm({ shopSlug, onNotFound }) {
       }
 
       // Bloquear si está ocupado
-      const steps = Math.ceil(currentDuration / SLOT_INTERVAL_MINUTES);
-      for (let i = 0; i < steps; i++) {
-        const checkLabel = minutesToLabel(
-          startMinutes + i * SLOT_INTERVAL_MINUTES,
-        );
-        if (occupiedSlots.has(checkLabel)) return true;
-      }
+      const endMinutes = startMinutes + currentDuration;
+      const overlaps = occupiedRanges.some(
+        (range) => range.start < endMinutes && range.end > startMinutes,
+      );
+      if (overlaps) return true;
+
       return false;
     },
-    [currentDuration, occupiedSlots, selectedDate],
+    [currentDuration, occupiedRanges, selectedDate],
   );
 
   const handleSubmit = async (e) => {
@@ -680,6 +780,16 @@ function BookingForm({ shopSlug, onNotFound }) {
 
     if (!selectedBarber || !selectedSlot) {
       alert("Por favor selecciona barbero y horario");
+      return;
+    }
+
+    if (!emailReview.isValid) {
+      alert(emailReview.message);
+      return;
+    }
+
+    if (emailReview.normalized !== normalizeEmail(emailConfirmation)) {
+      alert("Confirmá el email escribiéndolo igual en los dos campos.");
       return;
     }
 
@@ -700,7 +810,7 @@ function BookingForm({ shopSlug, onNotFound }) {
         durationMinutes: currentDuration,
         servicePrice: selectedService?.price ?? 0,
         notes: phone.trim(),
-        email: email.trim(),
+        email: emailReview.normalized,
         paymentMethod,
       });
 
@@ -725,7 +835,7 @@ function BookingForm({ shopSlug, onNotFound }) {
         );
       } else {
         alert(
-          "¡Listo! Tu turno fue reservado. Revisá tu email para ver los detalles de la confirmación.",
+          `¡Listo! Tu turno fue reservado. Enviamos la confirmación a ${emailReview.normalized}.`,
         );
       }
       // -----------------------------
@@ -842,19 +952,8 @@ function BookingForm({ shopSlug, onNotFound }) {
 
       <form className={styles.card} onSubmit={handleSubmit}>
         <div className={styles.cardHero}>
-          <div className={styles.shopHeroText}>
-            <p className={styles.shopHeroEyebrow}>Reservá tu turno en</p>
-            <h2 className={styles.shopHeroName}>
-              {shopLoading
-                ? "Cargando barbería..."
-                : shopInfo?.name || "Barbería"}
-            </h2>
-            <p className={styles.shopHeroSubtitle}>
-              Elegí servicio, horario y forma de pago para confirmar tu visita.
-            </p>
-          </div>
           <div className={styles.shopHeroMedia}>
-            <picture>
+            <picture className={styles.shopHeroPicture}>
               <source media="(max-width: 768px)" srcSet={mobileBannerSrc} />
               <img
                 className={styles.shopHeroBanner}
@@ -863,6 +962,25 @@ function BookingForm({ shopSlug, onNotFound }) {
                 aria-hidden="true"
               />
             </picture>
+            <div className={styles.shopHeroOverlay}>
+              <div className={styles.shopHeroText}>
+                <p className={styles.shopHeroEyebrow}>Reservá tu turno en</p>
+                <h2 className={styles.shopHeroName}>
+                  {shopLoading
+                    ? "Cargando barbería..."
+                    : shopInfo?.name || "Barbería"}
+                </h2>
+                <p className={styles.shopHeroSubtitle}>
+                  Elegí servicio, horario y forma de pago para confirmar tu visita.
+                </p>
+              </div>
+            </div>
+            <div className={styles.shopHeroAvatar}>
+              <img
+                src={shopProfileSrc}
+                alt={shopInfo?.name ? `Logo de ${shopInfo.name}` : "Logo de la barbería"}
+              />
+            </div>
           </div>
         </div>
 
@@ -922,6 +1040,36 @@ function BookingForm({ shopSlug, onNotFound }) {
             onChange={(e) => setEmail(e.target.value)}
             required
           />
+          {email ? (
+            <p
+              className={`${styles.emailFeedback} ${
+                emailReview.isValid
+                  ? styles.emailFeedbackOk
+                  : styles.emailFeedbackWarning
+              }`}
+            >
+              {emailReview.message}
+            </p>
+          ) : null}
+        </div>
+
+        <div className={styles.fieldGroup}>
+          <label className={styles.label}>Confirmar email</label>
+          <input
+            className={styles.input}
+            type="email"
+            placeholder="Volvé a escribir tu email"
+            value={emailConfirmation}
+            onChange={(e) => setEmailConfirmation(e.target.value)}
+            required
+          />
+          {emailConfirmation && !emailConfirmationMatches ? (
+            <p
+              className={`${styles.emailFeedback} ${styles.emailFeedbackWarning}`}
+            >
+              Los emails no coinciden. Revisalos antes de confirmar el turno.
+            </p>
+          ) : null}
         </div>
 
         {paymentOptions.length ? (

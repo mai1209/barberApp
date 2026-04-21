@@ -164,6 +164,17 @@ export async function updateBarber(req, res, next) {
       return res.status(403).json({ error: "Solo puedes editar tu propio perfil." });
     }
 
+    if (req.user?.role === "barber") {
+      const ownerDoc = await UserModel.findById(ownerId)
+        .select({ barberProfileSettings: 1 })
+        .lean();
+      if (ownerDoc?.barberProfileSettings?.barberSelfEditEnabled === false) {
+        return res.status(403).json({
+          error: "El administrador desactivó la edición del perfil del barbero.",
+        });
+      }
+    }
+
     const fullName = String(req.body?.fullName ?? "").trim();
     const email = String(req.body?.email ?? "")
       .trim()
