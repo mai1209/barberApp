@@ -7,6 +7,7 @@ import SubscriptionAdmin from './SubscriptionAdmin';
 import SubscriptionCouponsPage from './SubscriptionCouponsPage';
 import SubscriptionCheckoutPage from './SubscriptionCheckoutPage';
 import NotFoundPage from './NotFoundPage';
+import PrivacyPolicyPage from './PrivacyPolicyPage';
 //import landingStyles from '../styles/LandingPage.module.css';
 
 
@@ -53,7 +54,17 @@ function resolveInternalPage() {
     return 'subscription-checkout';
   }
 
-  if (segments[0] === 'admin' || segments[0] === 'planes' || segments[0] === 'suscripcion') {
+  if (pathname === 'politica-de-privacidad' || pathname === 'privacy-policy') {
+    return 'privacy-policy';
+  }
+
+  if (
+    segments[0] === 'admin' ||
+    segments[0] === 'planes' ||
+    segments[0] === 'suscripcion' ||
+    segments[0] === 'politica-de-privacidad' ||
+    segments[0] === 'privacy-policy'
+  ) {
     return 'not-found';
   }
 
@@ -80,6 +91,10 @@ function App() {
 
   if (internalPage === 'subscription-checkout') {
     return <SubscriptionCheckoutPage />;
+  }
+
+  if (internalPage === 'privacy-policy') {
+    return <PrivacyPolicyPage />;
   }
 
   if (internalPage === 'not-found' || missingShop) {
