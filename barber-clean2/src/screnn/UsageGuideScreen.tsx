@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Platform,
@@ -21,6 +21,8 @@ import {
   Users,
 } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
+import { getUserProfile, subscribeToUserProfile } from '../services/authStorage';
+import { resolveUserRole } from '../services/subscriptionAccess';
 
 const PUBLIC_BOOKING_BASE = 'https://barberappbycodex.com';
 
@@ -98,6 +100,29 @@ function TipRow({
 export default function UsageGuideScreen({ navigation }: Props) {
   const { theme, shopSlug } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const [currentUser, setCurrentUser] = useState<any | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      const storedUser = await getUserProfile();
+      if (mounted) {
+        setCurrentUser(storedUser);
+      }
+    })();
+
+    const unsubscribe = subscribeToUserProfile(user => {
+      setCurrentUser(user);
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  const isBarberUser = resolveUserRole(currentUser) === 'barber';
 
   const shareLink = useMemo(() => {
     if (!shopSlug) return '';
@@ -132,87 +157,158 @@ export default function UsageGuideScreen({ navigation }: Props) {
           <BookOpen size={24} color={theme.primary} />
         </View>
         <Text style={styles.heroEyebrow}>Centro de ayuda</Text>
-        <Text style={styles.heroTitle}>Cómo arrancar con la app</Text>
+        <Text style={styles.heroTitle}>
+          {isBarberUser ? 'Manual del barbero' : 'Cómo arrancar con la app'}
+        </Text>
         <Text style={styles.heroText}>
-          Si es tu primera vez, seguí estos pasos en orden. En menos de cinco
-          minutos dejás lista la barbería para tomar turnos.
+          {isBarberUser
+            ? 'Guía rápida para usar tu agenda, cargar turnos y mantener tu cuenta segura.'
+            : 'Si es tu primera vez, seguí estos pasos en orden. En menos de cinco minutos dejás lista la barbería para tomar turnos.'}
         </Text>
       </View>
 
-      <Text style={styles.sectionLabel}>Primeros pasos</Text>
-      <StepCard
-        step="1"
-        title="Cargá tus servicios"
-        description="Agregá cada servicio con su duración y precio. Esto define lo que el cliente va a poder elegir al pedir un turno."
-        icon={Scissors}
-        actionLabel="Ir a servicios"
-        onPress={() => navigation.navigate('Service-Settings')}
-        styles={styles}
-        theme={theme}
-      />
-      <StepCard
-        step="2"
-        title="Sumá tus barberos"
-        description="Creá al menos un barbero con sus horarios, días de trabajo y foto. El administrador puede modificar esos datos cuando lo necesite."
-        icon={Users}
-        actionLabel="Ir a barberos"
-        onPress={() => navigation.navigate('List-Barber')}
-        styles={styles}
-        theme={theme}
-      />
-      <StepCard
-        step="3"
-        title="Configurá cómo cobrás"
-        description="Definí si aceptás efectivo, transferencia o seña online con Mercado Pago para que el cliente vea las opciones correctas."
-        icon={CreditCard}
-        actionLabel="Ir a cobros"
-        onPress={() => navigation.navigate('Payment-Settings')}
-        styles={styles}
-        theme={theme}
-      />
-      <StepCard
-        step="4"
-        title="Compartí tu enlace de turnos"
-        description="Copiá tu link y mandalo por WhatsApp, Instagram o donde quieras. Ese link abre la web para que tus clientes pidan turnos solos."
-        icon={Link2}
-        actionLabel="Copiar enlace"
-        onPress={handleCopyLink}
-        styles={styles}
-        theme={theme}
-      />
+      {isBarberUser ? (
+        <>
+          <Text style={styles.sectionLabel}>Uso diario</Text>
+          <StepCard
+            step="1"
+            title="Revisá tu agenda"
+            description="En tu panel ves los turnos asignados a tu perfil. Podés cambiar de día y volver rápido a la fecha actual."
+            icon={CalendarDays}
+            actionLabel="Ir a mi agenda"
+            onPress={() => navigation.navigate('Barber-Home')}
+            styles={styles}
+            theme={theme}
+          />
+          <StepCard
+            step="2"
+            title="Cargá turnos manuales"
+            description="Si alguien te pide un turno por fuera de la web, podés cargarlo desde Nuevo turno."
+            icon={Users}
+            actionLabel="Nuevo turno"
+            onPress={() => navigation.navigate('Reservas')}
+            styles={styles}
+            theme={theme}
+          />
+          <StepCard
+            step="3"
+            title="Notificaciones"
+            description="Podés revisar recordatorios para recibir avisos de tus próximos turnos."
+            icon={Store}
+            actionLabel="Ir a notificaciones"
+            onPress={() => navigation.navigate('Notification-Settings')}
+            styles={styles}
+            theme={theme}
+          />
+        </>
+      ) : (
+        <>
+          <Text style={styles.sectionLabel}>Primeros pasos</Text>
+          <StepCard
+            step="1"
+            title="Cargá tus servicios"
+            description="Agregá cada servicio con su duración y precio. Esto define lo que el cliente va a poder elegir al pedir un turno."
+            icon={Scissors}
+            actionLabel="Ir a servicios"
+            onPress={() => navigation.navigate('Service-Settings')}
+            styles={styles}
+            theme={theme}
+          />
+          <StepCard
+            step="2"
+            title="Sumá tus barberos"
+            description="Creá al menos un barbero con sus horarios, días de trabajo y foto. El administrador puede modificar esos datos cuando lo necesite."
+            icon={Users}
+            actionLabel="Ir a barberos"
+            onPress={() => navigation.navigate('List-Barber')}
+            styles={styles}
+            theme={theme}
+          />
+          <StepCard
+            step="3"
+            title="Configurá cómo cobrás"
+            description="Definí si aceptás efectivo, transferencia o seña online con Mercado Pago para que el cliente vea las opciones correctas."
+            icon={CreditCard}
+            actionLabel="Ir a cobros"
+            onPress={() => navigation.navigate('Payment-Settings')}
+            styles={styles}
+            theme={theme}
+          />
+          <StepCard
+            step="4"
+            title="Compartí tu enlace de turnos"
+            description="Copiá tu link y mandalo por WhatsApp, Instagram o donde quieras. Ese link abre la web para que tus clientes pidan turnos solos."
+            icon={Link2}
+            actionLabel="Copiar enlace"
+            onPress={handleCopyLink}
+            styles={styles}
+            theme={theme}
+          />
+        </>
+      )}
 
       <Text style={styles.sectionLabel}>Dónde está cada cosa</Text>
       <View style={styles.infoCard}>
-        <TipRow
-          icon={Store}
-          title="Ajustes"
-          text="Acá tenés colores, servicios, notificaciones, cierre de barbería, pagos, suscripción y seguridad."
-          styles={styles}
-          theme={theme}
-        />
-        <TipRow
-          icon={CalendarDays}
-          title="Home"
-          text="Desde el inicio ves los turnos del día, copiás el link de autogestión y entrás a métricas e historial."
-          styles={styles}
-          theme={theme}
-        />
-        <TipRow
-          icon={Users}
-          title="Barberos"
-          text="Desde el listado de barberos el administrador crea, edita o elimina perfiles y gestiona el acceso de cada barbero."
-          styles={styles}
-          theme={theme}
-        />
+        {isBarberUser ? (
+          <>
+            <TipRow
+              icon={CalendarDays}
+              title="Mi agenda"
+              text="Acá ves tus turnos, el estado de cada reserva y las acciones disponibles."
+              styles={styles}
+              theme={theme}
+            />
+            <TipRow
+              icon={Store}
+              title="Ajustes"
+              text="Desde ajustes podés cambiar contraseña, revisar notificaciones, pedir soporte y cerrar sesión."
+              styles={styles}
+              theme={theme}
+            />
+            <TipRow
+              icon={Users}
+              title="Perfil y horarios"
+              text="Los datos del perfil, servicios y horarios los administra el dueño o administrador de la barbería."
+              styles={styles}
+              theme={theme}
+            />
+          </>
+        ) : (
+          <>
+            <TipRow
+              icon={Store}
+              title="Ajustes"
+              text="Acá tenés colores, servicios, notificaciones, cierre de barbería, pagos, suscripción y seguridad."
+              styles={styles}
+              theme={theme}
+            />
+            <TipRow
+              icon={CalendarDays}
+              title="Home"
+              text="Desde el inicio ves los turnos del día, copiás el link de autogestión y entrás a métricas e historial."
+              styles={styles}
+              theme={theme}
+            />
+            <TipRow
+              icon={Users}
+              title="Barberos"
+              text="Desde el listado de barberos el administrador crea, edita o elimina perfiles y gestiona el acceso de cada barbero."
+              styles={styles}
+              theme={theme}
+            />
+          </>
+        )}
       </View>
 
       <Text style={styles.sectionLabel}>Consejo rápido</Text>
       <View style={styles.noteCard}>
-        <Text style={styles.noteTitle}>Orden recomendado</Text>
+        <Text style={styles.noteTitle}>
+          {isBarberUser ? 'Importante' : 'Orden recomendado'}
+        </Text>
         <Text style={styles.noteText}>
-          Primero cargá servicios. Después sumá barberos. Recién ahí configurá
-          cobros y compartí el link. Así evitás que el cliente entre a una web
-          incompleta.
+          {isBarberUser
+            ? 'Si necesitás cambiar horarios, foto, servicios o datos de tu perfil, pedíselo al administrador de la barbería.'
+            : 'Primero cargá servicios. Después sumá barberos. Recién ahí configurá cobros y compartí el link. Así evitás que el cliente entre a una web incompleta.'}
         </Text>
       </View>
     </ScrollView>
