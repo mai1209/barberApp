@@ -19,6 +19,7 @@ import {
   KeyRound,
   LogOut,
   Mail,
+  MessageCircle,
   Palette,
   Scissors,
 } from 'lucide-react-native';
@@ -226,6 +227,22 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
               label="Plan y suscripción"
               description="Estado del plan, vencimiento y comparación de opciones."
               onPress={() => navigation.navigate('Subscription-Settings')}
+              theme={theme}
+              styles={styles}
+            />
+          </View>
+        </>
+      ) : null}
+
+      {!isBarberUser ? (
+        <>
+          <Text style={styles.sectionLabel}>Clientes</Text>
+          <View style={styles.groupCard}>
+            <MenuItem
+              icon={MessageCircle}
+              label="Promociones por WhatsApp"
+              description="Escribí un mensaje y abrí WhatsApp para clientes que ya reservaron."
+              onPress={() => navigation.navigate('WhatsApp-Campaigns')}
               theme={theme}
               styles={styles}
             />

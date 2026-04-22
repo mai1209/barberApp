@@ -21,6 +21,7 @@ import PaymentSettingsScreen from '../screnn/PaymentSettingsScreen';
 import NotificationSettingsScreen from '../screnn/NotificationSettingsScreen';
 import BarberProfileSettingsScreen from '../screnn/BarberProfileSettingsScreen';
 import ShopClosureSettingsScreen from '../screnn/ShopClosureSettingsScreen';
+import WhatsAppCampaignScreen from '../screnn/WhatsAppCampaignScreen';
 import ChangePasswordScreen from '../screnn/ChangePasswordScreen';
 import RecoverPasswordScreen from '../screnn/RecoverPasswordScreen';
 import SettingsScreen from '../screnn/SettingsScreen';
@@ -72,6 +73,7 @@ export type RootStackParamList = {
   'Notification-Settings': undefined;
   'Barber-Profile-Settings': undefined;
   'Shop-Closure-Settings': undefined;
+  'WhatsApp-Campaigns': undefined;
   'Subscription-Settings': undefined;
   'Usage-Guide': undefined;
   Plans:
@@ -143,6 +145,7 @@ export default function StackNavigator({
               <Stack.Screen name="Notification-Settings" component={NotificationSettingsScreen} />
               <Stack.Screen name="Barber-Profile-Settings" component={BarberProfileSettingsScreen} />
               <Stack.Screen name="Shop-Closure-Settings" component={ShopClosureSettingsScreen} />
+              <Stack.Screen name="WhatsApp-Campaigns" component={WhatsAppCampaignScreen} />
             </>
           ) : null}
           {showBarberArea ? (

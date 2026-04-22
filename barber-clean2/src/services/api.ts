@@ -167,7 +167,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   if (!response.ok) {
     const message = payload?.error ?? `Error servidor: ${response.status}`;
-    throw buildApiError(message, { status: response.status });
+    throw buildApiError(message, { status: response.status, code: payload?.code });
   }
 
   return payload as T;
@@ -514,6 +514,16 @@ export type CustomerHistoryResponse = {
   items: CustomerHistoryItem[];
 };
 
+export type CustomerContact = {
+  id: string;
+  customerName: string;
+  phone: string;
+  normalizedPhone?: string;
+  lastAppointmentAt?: string;
+  lastService?: string;
+  appointmentsCount: number;
+};
+
 export function fetchBarbers() {
   return request<{ barbers: Barber[] }>("/api/barbers", { auth: true });
 }
@@ -766,6 +776,21 @@ export function fetchCustomerHistory(params?: {
 
   return request<CustomerHistoryResponse>(
     `/api/appointments/history${query ? `?${query}` : ""}`,
+    { auth: true }
+  );
+}
+
+export function fetchCustomerContacts(params?: {
+  search?: string;
+  limit?: number;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params?.search) searchParams.set("search", params.search);
+  if (params?.limit) searchParams.set("limit", String(params.limit));
+  const query = searchParams.toString();
+
+  return request<{ contacts: CustomerContact[] }>(
+    `/api/appointments/customers${query ? `?${query}` : ""}`,
     { auth: true }
   );
 }

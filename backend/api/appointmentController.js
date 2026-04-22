@@ -755,6 +755,63 @@ export async function getCustomerHistory(req, res, next) {
   }
 }
 
+export async function listCustomerContacts(req, res, next) {
+  try {
+    const ownerId = req.user.ownerId || req.user.id;
+    const search = String(req.query.search ?? "").trim();
+    const limit = Math.min(Math.max(Number(req.query.limit) || 300, 1), 800);
+
+    const filter = {
+      owner: ownerId,
+      status: { $in: ["pending", "completed"] },
+      notes: { $exists: true, $ne: "" },
+    };
+
+    if (search) {
+      const safePattern = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(safePattern, "i");
+      filter.$or = [{ customerName: regex }, { notes: regex }, { service: regex }];
+    }
+
+    const appointments = await AppointmentModel.find(filter)
+      .select({ customerName: 1, notes: 1, startTime: 1, service: 1 })
+      .sort({ startTime: -1 })
+      .limit(limit)
+      .lean();
+
+    const contactsByPhone = new Map();
+
+    appointments.forEach((appointment) => {
+      const phone = String(appointment.notes || "").trim();
+      const normalizedPhone = phone.replace(/[^\d+]/g, "");
+      const digitsKey = normalizedPhone.replace(/\D/g, "");
+      if (!digitsKey) return;
+
+      const previous = contactsByPhone.get(digitsKey);
+      if (previous) {
+        previous.appointmentsCount += 1;
+        return;
+      }
+
+      contactsByPhone.set(digitsKey, {
+        id: digitsKey,
+        customerName: String(appointment.customerName || "Cliente").trim() || "Cliente",
+        phone,
+        normalizedPhone,
+        lastAppointmentAt: appointment.startTime,
+        lastService: appointment.service || "",
+        appointmentsCount: 1,
+      });
+    });
+
+    return res.json({
+      contacts: Array.from(contactsByPhone.values()),
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 // ACTUALIZAR ESTADO (pending, completed, cancelled)
 export async function updateAppointmentStatus(req, res, next) {
   try {
