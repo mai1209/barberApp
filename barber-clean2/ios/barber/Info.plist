@@ -33,8 +33,12 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Barber App necesita acceso a tu galería para seleccionar y cargar imágenes.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Barber App necesita permiso para guardar imágenes en tu galería.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>Barber App puede usar tu ubicación para mejorar funciones relacionadas con tu barbería.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

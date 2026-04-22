@@ -153,7 +153,7 @@ export default function UsageGuideScreen({ navigation }: Props) {
       <StepCard
         step="2"
         title="Sumá tus barberos"
-        description="Creá al menos un barbero con sus horarios, días de trabajo y foto si querés personalizar más la experiencia."
+        description="Creá al menos un barbero con sus horarios, días de trabajo y foto. El administrador puede modificar esos datos cuando lo necesite."
         icon={Users}
         actionLabel="Ir a barberos"
         onPress={() => navigation.navigate('List-Barber')}
@@ -200,7 +200,7 @@ export default function UsageGuideScreen({ navigation }: Props) {
         <TipRow
           icon={Users}
           title="Barberos"
-          text="En el listado de barberos podés crear, editar o eliminar perfiles, y entrar al panel de cada uno."
+          text="Desde el listado de barberos el administrador crea, edita o elimina perfiles y gestiona el acceso de cada barbero."
           styles={styles}
           theme={theme}
         />

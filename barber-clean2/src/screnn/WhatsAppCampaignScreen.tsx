@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { MessageCircle, Search, Send } from 'lucide-react-native';
 import { CustomerContact, fetchCustomerContacts } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
@@ -31,8 +32,16 @@ const hexToRgba = (hex: string, alpha: number) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
-const normalizeWhatsAppPhone = (value?: string | null) =>
-  String(value ?? '').replace(/\D/g, '');
+const normalizeWhatsAppPhone = (value?: string | null) => {
+  const raw = String(value ?? '').trim();
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  if (raw.startsWith('+')) return digits;
+  if (digits.startsWith('00')) return digits.slice(2);
+  if (digits.startsWith('54')) return digits;
+  if (digits.length === 10 && digits.startsWith('3')) return `549${digits}`;
+  return digits;
+};
 
 const buildMessage = (template: string, contact: CustomerContact) =>
   template
@@ -106,16 +115,21 @@ export default function WhatsAppCampaignScreen() {
 
     const encodedText = encodeURIComponent(text);
     const appUrl = `whatsapp://send?phone=${phone}&text=${encodedText}`;
-    const webUrl = `https://wa.me/${phone}?text=${encodedText}`;
+    const webUrl = `https://api.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
 
     try {
-      const canOpenApp = await Linking.canOpenURL(appUrl);
-      await Linking.openURL(canOpenApp ? appUrl : webUrl);
-    } catch (_error) {
-      Alert.alert(
-        'No pudimos abrir WhatsApp',
-        'Revisá que WhatsApp esté instalado o copiá el número manualmente.',
-      );
+      await Linking.openURL(appUrl);
+    } catch (firstError) {
+      try {
+        await Linking.openURL(webUrl);
+      } catch (_secondError) {
+        Clipboard.setString(text);
+        console.error('No pudimos abrir WhatsApp:', firstError);
+        Alert.alert(
+          'No pudimos abrir WhatsApp',
+          `Copiamos el mensaje. Revisá que el número tenga código de país: +${phone}`,
+        );
+      }
     }
   };
 
