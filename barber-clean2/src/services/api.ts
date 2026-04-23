@@ -77,6 +77,14 @@ function buildApiError(
   return error;
 }
 
+function buildTimeoutMessage(url: string) {
+  if (url.startsWith(PROD_API_URL)) {
+    return `La conexión con el servidor tardó demasiado (${url}). Revisá internet, VPN/firewall del teléfono o bloqueos de red del lado del cliente.`;
+  }
+
+  return `La conexión tardó demasiado. Revisá el backend o la IP local (${url}).`;
+}
+
 async function fetchWithTimeout(
   url: string,
   options: RequestOptions,
@@ -148,7 +156,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
       lastError = buildApiError(
         isTimeout
-          ? `La conexión tardó demasiado. Revisá el backend o la IP local (${url}).`
+          ? buildTimeoutMessage(url)
           : `RED FALLÓ: ${url} | Motivo: ${err?.message ?? "sin detalle"}`,
         {
           code: isTimeout ? "TIMEOUT" : "NETWORK_ERROR",
