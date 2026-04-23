@@ -6,6 +6,10 @@ import {
 } from '../services/api';
 import styles from '../styles/SubscriptionCheckoutPage.module.css';
 
+const APP_STORE_URL = 'https://apps.apple.com';
+const PLAY_STORE_URL =
+  'https://play.google.com/store/apps/details?id=com.barberAppByCodex.hub';
+
 const PLAN_META = {
   basic: {
     label: 'Básico',
@@ -284,6 +288,32 @@ export default function SubscriptionCheckoutPage() {
         >
           Hablar por WhatsApp
         </a>
+
+        <div className={styles.downloadCard}>
+          <p className={styles.downloadTitle}>Después del alta, descargá la app</p>
+          <p className={styles.downloadText}>
+            Cuando completes la activación, entrá a la app con esta misma cuenta para empezar a
+            usar tu barbería desde el celular.
+          </p>
+          <div className={styles.downloadButtons}>
+            <a
+              href={APP_STORE_URL}
+              target="_blank"
+              rel="noreferrer"
+              className={styles.storeButton}
+            >
+              App Store
+            </a>
+            <a
+              href={PLAY_STORE_URL}
+              target="_blank"
+              rel="noreferrer"
+              className={styles.storeButton}
+            >
+              Google Play
+            </a>
+          </div>
+        </div>
       </section>
     </main>
   );

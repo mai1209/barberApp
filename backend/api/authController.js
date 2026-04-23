@@ -43,6 +43,9 @@ const PASSWORD_RESET_EXPIRY_MS = 15 * 60 * 1000;
 const SUBSCRIPTION_CURRENCY_ID = String(
   process.env.SUBSCRIPTIONS_CURRENCY_ID || "USD",
 ).trim().toUpperCase();
+const SUPPORT_CONTACT_EMAIL = String(
+  process.env.SUPPORT_CONTACT_EMAIL || "barberappbycodex@gmail.com",
+).trim();
 const SUBSCRIPTION_PLAN_CONFIG = {
   basic: {
     title: "Suscripción BarberApp Básico",
@@ -339,6 +342,17 @@ function sanitizeThemeConfigInput(input) {
   }
 
   return { updates, hasAnyField };
+}
+
+function sanitizeAccountDeletionRequestInput(input) {
+  const reason = String(input?.reason ?? "").trim();
+  if (reason.length > 500) {
+    throw new Error("El motivo no puede superar los 500 caracteres.");
+  }
+
+  return {
+    reason,
+  };
 }
 
 function sanitizePaymentSettingsInput(input) {
@@ -1692,6 +1706,72 @@ export async function updateOwnSubscriptionSettings(req, res, next) {
     return res.json({
       message: "Configuración de suscripción guardada correctamente.",
       user: userDoc.toJSON(),
+    });
+  } catch (err) {
+    if (err instanceof Error) {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
+}
+
+export async function requestAccountDeletion(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    const userDoc = await UserModel.findById(userId);
+    if (!userDoc || userDoc.isActive === false) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    const { reason } = sanitizeAccountDeletionRequestInput(req.body ?? {});
+    const existingRequest = userDoc.accountDeletionRequest ?? null;
+    const alreadyPending = existingRequest?.status === "pending";
+
+    userDoc.accountDeletionRequest = {
+      status: "pending",
+      requestedAt: existingRequest?.requestedAt || new Date(),
+      reason,
+      contactEmail: sanitizeEmail(userDoc.email),
+      handledAt: null,
+    };
+
+    await userDoc.save();
+
+    const requestedAtLabel = new Intl.DateTimeFormat("es-AR", {
+      dateStyle: "short",
+      timeStyle: "short",
+      timeZone: "America/Argentina/Cordoba",
+    }).format(userDoc.accountDeletionRequest.requestedAt);
+
+    try {
+      await sendAppMail({
+        to: SUPPORT_CONTACT_EMAIL,
+        subject: `Solicitud de eliminación de cuenta - ${userDoc.fullName || userDoc.email}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111;">
+            <h2 style="margin-bottom: 8px;">Solicitud de eliminación de cuenta</h2>
+            <p><strong>Cuenta:</strong> ${userDoc.fullName || "Sin nombre"}</p>
+            <p><strong>Email:</strong> ${userDoc.email}</p>
+            <p><strong>Shop slug:</strong> ${userDoc.shopSlug}</p>
+            <p><strong>Fecha:</strong> ${requestedAtLabel}</p>
+            <p><strong>Motivo:</strong> ${reason || "Sin motivo especificado"}</p>
+          </div>
+        `,
+        text: `Solicitud de eliminación de cuenta\nCuenta: ${userDoc.fullName || "Sin nombre"}\nEmail: ${userDoc.email}\nShop slug: ${userDoc.shopSlug}\nFecha: ${requestedAtLabel}\nMotivo: ${reason || "Sin motivo especificado"}`,
+      });
+    } catch (mailError) {
+      console.error("No se pudo enviar el mail de solicitud de eliminación:", mailError?.message || mailError);
+    }
+
+    return res.json({
+      message: alreadyPending
+        ? "Tu solicitud ya estaba pendiente. La dejamos actualizada."
+        : "Recibimos tu solicitud de eliminación. Soporte la va a revisar.",
+      user: serializeAuthUser(userDoc),
     });
   } catch (err) {
     if (err instanceof Error) {

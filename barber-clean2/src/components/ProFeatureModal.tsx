@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import {
   Image,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -64,6 +65,14 @@ export default function ProFeatureModal({
 }: Props) {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const copy = COPY[variant];
+  const isIOS = Platform.OS === 'ios';
+  const ctaLabel = isIOS ? 'Ver estado comercial' : copy.cta;
+  const titleText = isIOS
+    ? 'Función disponible según el plan activo'
+    : copy.title;
+  const bodyText = isIOS
+    ? 'Esta sección depende del plan activo de la cuenta. En iPhone, la activación comercial se resuelve fuera de la app.'
+    : copy.body;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -127,15 +136,15 @@ export default function ProFeatureModal({
             </View>
           </View>
 
-          <Text style={styles.title}>{copy.title}</Text>
-          <Text style={styles.body}>{copy.body}</Text>
+          <Text style={styles.title}>{titleText}</Text>
+          <Text style={styles.body}>{bodyText}</Text>
 
           <View style={styles.actions}>
             <Pressable style={styles.secondaryBtn} onPress={onClose}>
               <Text style={styles.secondaryBtnText}>Ahora no</Text>
             </Pressable>
             <Pressable style={styles.primaryBtn} onPress={onOpenPlan}>
-              <Text style={styles.primaryBtnText}>{copy.cta}</Text>
+              <Text style={styles.primaryBtnText}>{ctaLabel}</Text>
             </Pressable>
           </View>
         </View>

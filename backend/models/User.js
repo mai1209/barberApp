@@ -103,6 +103,39 @@ const shopClosedDaySchema = new mongoose.Schema(
   },
 );
 
+const accountDeletionRequestSchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: ["pending", "processed", "cancelled"],
+      default: "pending",
+    },
+    requestedAt: {
+      type: Date,
+      default: null,
+    },
+    reason: {
+      type: String,
+      trim: true,
+      default: "",
+      maxlength: 500,
+    },
+    contactEmail: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: null,
+    },
+    handledAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  {
+    _id: false,
+  },
+);
+
 const subscriptionSchema = new mongoose.Schema(
   {
     plan: {
@@ -385,6 +418,10 @@ const userSchema = new mongoose.Schema(
     shopClosedDays: {
       type: [shopClosedDaySchema],
       default: [],
+    },
+    accountDeletionRequest: {
+      type: accountDeletionRequestSchema,
+      default: null,
     },
     subscription: {
       type: subscriptionSchema,

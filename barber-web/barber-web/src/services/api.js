@@ -29,6 +29,7 @@ function resolveBaseUrl() {
 }
 
 const BASE_URL = resolveBaseUrl();
+const AUTH_BASE_URL = BASE_URL.replace(/\/public$/, '/auth');
 let currentShopSlug = null;
 
 function sanitizeSlug(value) {
@@ -137,4 +138,29 @@ export async function createPublicRecurringSubscription(payload) {
     method: 'POST',
     body: payload,
   });
+}
+
+export async function registerPublicAccount(payload) {
+  const response = await fetch(`${AUTH_BASE_URL}/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message =
+      data?.message ||
+      data?.error ||
+      `La solicitud falló con código ${response.status}`;
+    const error = new Error(message);
+    error.status = response.status;
+    error.details = data;
+    throw error;
+  }
+
+  return data;
 }

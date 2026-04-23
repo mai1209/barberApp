@@ -9,6 +9,7 @@ import SubscriptionCheckoutPage from './SubscriptionCheckoutPage';
 import NotFoundPage from './NotFoundPage';
 import PrivacyPolicyPage from './PrivacyPolicyPage';
 import AccountDeletionPage from './AccountDeletionPage';
+import RegisterAccountPage from './RegisterAccountPage';
 //import landingStyles from '../styles/LandingPage.module.css';
 
 
@@ -55,6 +56,14 @@ function resolveInternalPage() {
     return 'subscription-checkout';
   }
 
+  if (
+    pathname === 'registro' ||
+    pathname === 'crear-cuenta' ||
+    pathname === 'signup'
+  ) {
+    return 'register-account';
+  }
+
   if (pathname === 'politica-de-privacidad' || pathname === 'privacy-policy') {
     return 'privacy-policy';
   }
@@ -71,6 +80,9 @@ function resolveInternalPage() {
     segments[0] === 'admin' ||
     segments[0] === 'planes' ||
     segments[0] === 'suscripcion' ||
+    segments[0] === 'registro' ||
+    segments[0] === 'crear-cuenta' ||
+    segments[0] === 'signup' ||
     segments[0] === 'politica-de-privacidad' ||
     segments[0] === 'privacy-policy' ||
     segments[0] === 'eliminacion-de-cuenta' ||
@@ -103,6 +115,10 @@ function App() {
 
   if (internalPage === 'subscription-checkout') {
     return <SubscriptionCheckoutPage />;
+  }
+
+  if (internalPage === 'register-account') {
+    return <RegisterAccountPage />;
   }
 
   if (internalPage === 'privacy-policy') {

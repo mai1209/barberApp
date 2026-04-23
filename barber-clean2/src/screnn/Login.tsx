@@ -12,6 +12,7 @@ import {
   Pressable,
   Image,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 
 import { loginUser, savePushTokenApi } from '../services/api'; // Importado savePushTokenApi
@@ -29,9 +30,12 @@ const AUTH_THEME = {
   background: '#121212',
   logo: require('../assets/logoBarber.png'),
 } as const;
+const IOS_SUPPORT_WHATSAPP_URL =
+  'https://wa.me/543425543308?text=Hola,%20necesito%20ayuda%20con%20mi%20cuenta%20de%20BarberApp';
 
 function Login({ navigation }: any) {
   const { applyUserTheme } = useTheme();
+  const isIOS = Platform.OS === 'ios';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -40,6 +44,14 @@ function Login({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [focusedField, setFocusedField] = useState<string | null>(null);
+
+  const handleOpenIosSupport = async () => {
+    try {
+      await Linking.openURL(IOS_SUPPORT_WHATSAPP_URL);
+    } catch (_error) {
+      setError('No pudimos abrir WhatsApp de soporte');
+    }
+  };
 
   const handleLogin = async () => {
     if (loading) return;
@@ -101,8 +113,28 @@ function Login({ navigation }: any) {
 
           <View style={styles.loginCard}>
             <Text style={styles.instructionText}>
-              Inicia sesión para continuar
+              {isIOS
+                ? 'Iniciá sesión con tu cuenta existente para continuar'
+                : 'Inicia sesión para continuar'}
             </Text>
+
+            {isIOS ? (
+              <View style={styles.iosInfoCard}>
+                <Text style={styles.iosInfoTitle}>Acceso para cuentas activas</Text>
+                <Text style={styles.iosInfoText}>
+                  En iPhone, el alta y la activación comercial se resuelven fuera de la app.
+                  Si necesitás ayuda con tu cuenta, podés hablar con soporte.
+                </Text>
+                <Pressable
+                  style={styles.iosInfoAction}
+                  onPress={handleOpenIosSupport}
+                >
+                  <Text style={styles.iosInfoActionText}>
+                    Hablar con soporte por WhatsApp
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Email</Text>
@@ -176,15 +208,17 @@ function Login({ navigation }: any) {
               </Text>
             </Pressable>
 
-            <Pressable
-              onPress={() => navigation.navigate('Register')}
-              style={styles.registerBtn}
-            >
-              <Text style={styles.registerText}>
-                ¿No tienes cuenta?{' '}
-                <Text style={styles.registerTextBold}>Registrate</Text>
-              </Text>
-            </Pressable>
+            {!isIOS ? (
+              <Pressable
+                onPress={() => navigation.navigate('Register')}
+                style={styles.registerBtn}
+              >
+                <Text style={styles.registerText}>
+                  ¿No tienes cuenta?{' '}
+                  <Text style={styles.registerTextBold}>Registrate</Text>
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
           <Text style={styles.codexText}>BarberApp by CODEX®</Text>
         </ScrollView>
@@ -220,6 +254,40 @@ const createStyles = (theme: Theme | typeof AUTH_THEME) =>
       textAlign: 'center',
       marginBottom: 25,
       fontSize: 14,
+    },
+    iosInfoCard: {
+      marginBottom: 18,
+      borderRadius: 16,
+      padding: 14,
+      backgroundColor: '#252525',
+      borderWidth: 1,
+      borderColor: '#333',
+      gap: 6,
+    },
+    iosInfoTitle: {
+      color: '#fff',
+      fontSize: 13,
+      fontWeight: '800',
+    },
+    iosInfoText: {
+      color: '#a3a3a3',
+      fontSize: 12,
+      lineHeight: 18,
+    },
+    iosInfoAction: {
+      marginTop: 4,
+      alignSelf: 'flex-start',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 12,
+      backgroundColor: 'rgba(255, 20, 147, 0.12)',
+      borderWidth: 1,
+      borderColor: 'rgba(255, 20, 147, 0.32)',
+    },
+    iosInfoActionText: {
+      color: '#FF1493',
+      fontSize: 12,
+      fontWeight: '800',
     },
     inputContainer: { marginBottom: 15 },
     inputLabel: {

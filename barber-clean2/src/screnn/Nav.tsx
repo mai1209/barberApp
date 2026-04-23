@@ -21,7 +21,15 @@ type Props = {
   onNavigate: (routeName: any) => void;
 };
 
-const HIDDEN_ROUTES = new Set(['Login', 'Register', 'Plans', 'Subscription-Settings']);
+const HIDDEN_ROUTES = new Set([
+  'Login',
+  'Register',
+  'Plans',
+  'Subscription-Settings',
+  'Change-Password',
+  'Recover-Password',
+  'Account-Deletion-Request',
+]);
 
 function resolveActiveRoute(
   routeName?: string,

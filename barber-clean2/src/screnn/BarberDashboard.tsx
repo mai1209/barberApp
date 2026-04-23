@@ -220,12 +220,16 @@ function BarberDashboard({ route, navigation }: Props) {
 
   const handleOpenSubscriptionSettings = useCallback(async () => {
     setShowProModal(false);
+    if (Platform.OS === 'ios') {
+      navigation.navigate('Subscription-Settings');
+      return;
+    }
     try {
       await Linking.openURL(PRO_PLAN_URL);
     } catch (_error) {
       Alert.alert('No pudimos abrir el sitio de planes', PRO_PLAN_URL);
     }
-  }, []);
+  }, [navigation]);
 
   const isToday = useMemo(() => isSameDay(date, new Date()), [date]);
 

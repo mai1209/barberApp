@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -141,6 +142,7 @@ function getCycleCopy(cycle?: SubscriptionState['billingCycle']) {
 export default function SubscriptionSettingsScreen({ navigation }: { navigation: any }) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const isIOS = Platform.OS === 'ios';
   const [subscription, setSubscription] = useState<SubscriptionState | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -256,15 +258,21 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
 
   const getRenewalHint = () => {
     if (!expiresAtDate || Number.isNaN(expiresAtDate.getTime())) {
-      return 'Podés renovar tu plan desde esta pantalla cuando lo necesites.';
+      return isIOS
+        ? 'Si necesitás revisar la renovación de esta cuenta, contactá a soporte comercial.'
+        : 'Podés renovar tu plan desde esta pantalla cuando lo necesites.';
     }
 
     if (subscription?.status === 'past_due') {
-      return 'Tu plan está pendiente de pago. Renovalo para volver a quedar activo.';
+      return isIOS
+        ? 'Tu plan está pendiente. Contactá a soporte comercial para regularizar la cuenta.'
+        : 'Tu plan está pendiente de pago. Renovalo para volver a quedar activo.';
     }
 
     if (subscription?.status === 'cancelled') {
-      return 'Tu plan fue desactivado. Podés activarlo otra vez desde esta pantalla.';
+      return isIOS
+        ? 'Tu plan fue desactivado. Contactá a soporte comercial para reactivar la cuenta.'
+        : 'Tu plan fue desactivado. Podés activarlo otra vez desde esta pantalla.';
     }
 
     if (typeof daysRemaining === 'number' && daysRemaining <= 1) {
@@ -312,7 +320,9 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
       await saveUserProfile(response.user);
       Alert.alert(
         'Renovación automática desactivada',
-        'La cuenta volvió a renovación manual. Cuando venza, vas a poder renovar desde la web.',
+        isIOS
+          ? 'La cuenta volvió a renovación manual. Cuando venza, contactá a soporte comercial para revisar la continuidad.'
+          : 'La cuenta volvió a renovación manual. Cuando venza, vas a poder renovar desde la web.',
       );
     } catch (error: any) {
       Alert.alert('No pudimos cambiar el modo', error?.message ?? 'Probá de nuevo.');
@@ -334,7 +344,9 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
         <Text style={styles.eyebrow}>PLAN Y SUSCRIPCIÓN</Text>
         <Text style={styles.title}>Estado comercial de tu cuenta</Text>
         <Text style={styles.subtitle}>
-          Acá ves qué plan tenés activo, cómo está la cuenta y qué incluye hoy tu barbería.
+          {isIOS
+            ? 'Acá ves el estado de tu cuenta y el plan activo. En iPhone, la activación y los cambios comerciales se resuelven fuera de la app.'
+            : 'Acá ves qué plan tenés activo, cómo está la cuenta y qué incluye hoy tu barbería.'}
         </Text>
       </View>
 
@@ -353,7 +365,9 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
                 Esta cuenta todavía no tiene una suscripción activa. Hasta completar el alta o la renovación, dejamos bloqueado el panel principal y solo vas a ver el estado comercial.
               </Text>
               <Text style={styles.lockedHint}>
-                Para activar tu cuenta, completá el pago desde la web o pedile a soporte que la active.
+                {isIOS
+                  ? 'Para activar tu cuenta en iPhone, escribile a soporte comercial y te ayudamos con el alta.'
+                  : 'Para activar tu cuenta, completá el pago desde la web o pedile a soporte que la active.'}
               </Text>
             </View>
           ) : null}
@@ -445,7 +459,9 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
               <View style={styles.autoRenewCard}>
                 <Text style={styles.autoRenewTitle}>Renovación manual</Text>
                 <Text style={styles.autoRenewText}>
-                  Cuando llegue el vencimiento, te vamos a avisar por mail y vas a poder renovar desde la web con el link directo.
+                  {isIOS
+                    ? 'Cuando llegue el vencimiento, te vamos a avisar por mail para que revises la continuidad de la cuenta con soporte.'
+                    : 'Cuando llegue el vencimiento, te vamos a avisar por mail y vas a poder renovar desde la web con el link directo.'}
                 </Text>
               </View>
             )}
@@ -479,21 +495,34 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
               </View>
               <Text style={styles.renewalHintText}>{getRenewalHint()}</Text>
             </View>
-            {isRestrictedAccount ? (
-              <Pressable style={styles.primaryButton} onPress={openPlansWebsite}>
-                <Text style={styles.primaryButtonText}>Ver sitio de planes</Text>
-              </Pressable>
-            ) : null}
-            {!isRestrictedAccount ? (
-              <Pressable style={styles.primaryButton} onPress={openPlansWebsite}>
-                <Text style={styles.primaryButtonText}>Entrar al panel de planes</Text>
-              </Pressable>
-            ) : null}
+            {isIOS ? (
+              <View style={styles.iosNoticeCard}>
+                <Text style={styles.iosNoticeTitle}>Gestión comercial fuera de la app</Text>
+                <Text style={styles.iosNoticeText}>
+                  Si necesitás activar, renovar o modificar esta cuenta, contactá a soporte comercial.
+                </Text>
+              </View>
+            ) : (
+              <>
+                {isRestrictedAccount ? (
+                  <Pressable style={styles.primaryButton} onPress={openPlansWebsite}>
+                    <Text style={styles.primaryButtonText}>Ver sitio de planes</Text>
+                  </Pressable>
+                ) : null}
+                {!isRestrictedAccount ? (
+                  <Pressable style={styles.primaryButton} onPress={openPlansWebsite}>
+                    <Text style={styles.primaryButtonText}>Entrar al panel de planes</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable style={styles.ghostButton} onPress={openCustomContact}>
+                  <Text style={styles.ghostButtonText}>Consultar plan personalizable</Text>
+                </Pressable>
+              </>
+            )}
             <Pressable style={styles.secondaryButton} onPress={openSupportMail}>
-              <Text style={styles.secondaryButtonText}>Hablar con soporte comercial</Text>
-            </Pressable>
-            <Pressable style={styles.ghostButton} onPress={openCustomContact}>
-              <Text style={styles.ghostButtonText}>Consultar plan personalizable</Text>
+              <Text style={styles.secondaryButtonText}>
+                {isIOS ? 'Contactar soporte' : 'Hablar con soporte comercial'}
+              </Text>
             </Pressable>
           </View>
         </>
@@ -727,6 +756,24 @@ const createStyles = (theme: Theme) =>
       fontWeight: '900',
     },
     autoRenewText: {
+      color: theme.textSecondary,
+      fontSize: 13,
+      lineHeight: 19,
+    },
+    iosNoticeCard: {
+      borderRadius: 18,
+      padding: 14,
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      gap: 6,
+    },
+    iosNoticeTitle: {
+      color: theme.textPrimary,
+      fontSize: 14,
+      fontWeight: '900',
+    },
+    iosNoticeText: {
       color: theme.textSecondary,
       fontSize: 13,
       lineHeight: 19,

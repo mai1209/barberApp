@@ -14,6 +14,7 @@ import {
   loginUser,
   listSubscriptionCouponsAdmin,
   requestPasswordRecovery,
+  requestAccountDeletion,
   registerUser,
   runSubscriptionLifecycle,
   sendTestMail,
@@ -42,6 +43,7 @@ router.post("/register", registerUser);
 router.post("/login", loginUser);
 router.post("/password/recovery/request", requestPasswordRecovery);
 router.post("/password/recovery/confirm", confirmPasswordRecovery);
+router.post("/account-deletion-request", requireAuth, requestAccountDeletion);
 router.get("/mercadopago/callback", handleMercadoPagoOAuthCallback);
 router.get("/subscription/lifecycle/run", runSubscriptionLifecycle);
 router.post("/subscription/lifecycle/run", runSubscriptionLifecycle);

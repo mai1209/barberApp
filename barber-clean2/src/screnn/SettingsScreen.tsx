@@ -21,6 +21,7 @@ import {
   Mail,
   MessageCircle,
   Palette,
+  ShieldCheck,
   Scissors,
 } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
@@ -33,6 +34,8 @@ import {
 import { resolveUserRole } from '../services/subscriptionAccess';
 
 const SUPPORT_EMAIL = 'barberappbycodex@gmail.com';
+const PRIVACY_POLICY_URL = 'https://barberappbycodex.com/politica-de-privacidad';
+const ACCOUNT_DELETION_URL = 'https://barberappbycodex.com/eliminacion-de-cuenta';
 
 type MenuItemProps = {
   icon: React.ComponentType<any>;
@@ -81,6 +84,7 @@ function MenuItem({
 export default function SettingsScreen({ navigation }: { navigation: any }) {
   const { theme, applyUserTheme } = useTheme();
   const styles = createStyles(theme);
+  const isIOS = Platform.OS === 'ios';
   const [currentUser, setCurrentUser] = useState<any | null>(null);
 
   useEffect(() => {
@@ -136,6 +140,14 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
       await Linking.openURL(url);
     } catch (_error) {
       Alert.alert('No pudimos abrir el mail', SUPPORT_EMAIL);
+    }
+  };
+
+  const openExternalPage = async (url: string, fallbackLabel: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch (_error) {
+      Alert.alert('No pudimos abrir el enlace', fallbackLabel);
     }
   };
 
@@ -280,6 +292,28 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
           label="Manual de uso"
           description="Guía simple para arrancar, configurar y compartir tu sistema."
           onPress={() => navigation.navigate('Usage-Guide')}
+          theme={theme}
+          styles={styles}
+        />
+        <View style={styles.separator} />
+        <MenuItem
+          icon={ShieldCheck}
+          label="Política de privacidad"
+          description="Revisá cómo usamos, guardamos y protegemos tus datos."
+          onPress={() => openExternalPage(PRIVACY_POLICY_URL, PRIVACY_POLICY_URL)}
+          theme={theme}
+          styles={styles}
+        />
+        <View style={styles.separator} />
+        <MenuItem
+          icon={ShieldCheck}
+          label="Eliminar cuenta"
+          description={
+            isIOS
+              ? 'Solicitá la eliminación de tu cuenta y revisá qué datos se conservan.'
+              : 'Abrí los pasos para solicitar la eliminación de tu cuenta y datos.'
+          }
+          onPress={() => navigation.navigate('Account-Deletion-Request')}
           theme={theme}
           styles={styles}
         />

@@ -16,10 +16,24 @@ const app = express();
 app.use(helmet());
 
 function getEnvAllowedOrigins() {
-  return String(process.env.ALLOWED_WEB_ORIGINS || "")
+  const entries = String(process.env.ALLOWED_WEB_ORIGINS || "")
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+
+  const exactOrigins = [];
+  const allowedHosts = [];
+
+  for (const entry of entries) {
+    try {
+      const parsed = new URL(entry);
+      exactOrigins.push(parsed.origin);
+    } catch (_error) {
+      allowedHosts.push(entry.replace(/^https?:\/\//i, "").replace(/\/+$/, ""));
+    }
+  }
+
+  return { exactOrigins, allowedHosts };
 }
 
 function isPrivateDevOrigin(origin) {
@@ -58,8 +72,13 @@ function isAllowedWebOrigin(origin) {
     const parsed = new URL(origin);
     const { hostname, protocol } = parsed;
     const normalizedOrigin = parsed.origin;
+    const { exactOrigins, allowedHosts } = getEnvAllowedOrigins();
 
-    if (getEnvAllowedOrigins().includes(normalizedOrigin)) {
+    if (exactOrigins.includes(normalizedOrigin)) {
+      return true;
+    }
+
+    if (allowedHosts.includes(hostname)) {
       return true;
     }
 
@@ -89,16 +108,18 @@ function isAllowedWebOrigin(origin) {
 // Esto permite que tu Frontend en Vercel pueda hablar con este Backend
 app.use(cors({
   origin: function (origin, callback) {
-    // Si el origin está permitido O si no hay origin (App móvil), permitimos
+    // Si el origin está permitido O si no hay origin (App móvil), permitimos.
+    // Si no está permitido, no agregamos cabeceras CORS pero evitamos romper el backend con 500.
     if (isAllowedWebOrigin(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('No permitido por CORS'));
+      callback(null, false);
     }
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "x-admin-secret"],
-  credentials: true
+  credentials: true,
+  optionsSuccessStatus: 204,
 }));
 
 app.use(express.json({ limit: "8mb" }));

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import type { Barber } from '../services/api';
 
 import Login from '../screnn/Login';
@@ -28,6 +28,7 @@ import SettingsScreen from '../screnn/SettingsScreen';
 import UsageGuideScreen from '../screnn/UsageGuideScreen';
 import PlansScreen from '../screnn/PlansScreen';
 import SubscriptionSettingsScreen from '../screnn/SubscriptionSettingsScreen';
+import AccountDeletionRequestScreen from '../screnn/AccountDeletionRequestScreen';
 import ScreenGradient from '../components/ScreenGradient';
 import { useTheme } from '../context/ThemeContext';
 import { navigationRef } from '../../App';
@@ -84,6 +85,7 @@ export type RootStackParamList = {
     | undefined;
   'Change-Password': undefined;
   'Recover-Password': undefined;
+  'Account-Deletion-Request': undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -103,6 +105,7 @@ export default function StackNavigator({
 }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme.mode), [theme.mode]);
+  const isIOS = Platform.OS === 'ios';
   const isBarberUser = currentUserRole === 'barber';
   const showAdminArea = !isBarberUser && !isSubscriptionLocked;
   const showBarberArea = isBarberUser;
@@ -121,11 +124,15 @@ export default function StackNavigator({
           }}
         >
           <Stack.Screen name="Login" component={Login} />
-          <Stack.Screen name="Register" component={Register} />
+          {!isIOS ? <Stack.Screen name="Register" component={Register} /> : null}
           <Stack.Screen name="Subscription-Settings" component={SubscriptionSettingsScreen} />
-          <Stack.Screen name="Plans" component={PlansScreen} />
+          {!isIOS ? <Stack.Screen name="Plans" component={PlansScreen} /> : null}
           <Stack.Screen name="Change-Password" component={ChangePasswordScreen} />
           <Stack.Screen name="Recover-Password" component={RecoverPasswordScreen} />
+          <Stack.Screen
+            name="Account-Deletion-Request"
+            component={AccountDeletionRequestScreen}
+          />
           {showAdminArea ? (
             <>
               <Stack.Screen name="Home" component={Home} />

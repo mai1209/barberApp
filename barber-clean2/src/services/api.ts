@@ -248,6 +248,10 @@ export type SubscriptionSettings = {
   nextBillingAt?: string | null;
 };
 
+export type AccountDeletionRequestPayload = {
+  reason?: string;
+};
+
 export type PlanPricingResponse = {
   pricing: {
     basic: { ars: number; usdReference: number };
@@ -315,6 +319,14 @@ export function updateShopClosedDays(payload: { shopClosedDays: ShopClosedDay[] 
 export function updateSubscriptionSettings(payload: SubscriptionSettings) {
   return request<{ message: string; user: any }>("/api/auth/subscription-settings", {
     method: "PUT",
+    body: payload,
+    auth: true,
+  });
+}
+
+export function requestAccountDeletion(payload: AccountDeletionRequestPayload) {
+  return request<{ message: string; user: any }>("/api/auth/account-deletion-request", {
+    method: "POST",
     body: payload,
     auth: true,
   });

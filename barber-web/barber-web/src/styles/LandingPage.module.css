@@ -261,6 +261,12 @@
   gap: 10px;
 }
 
+.navActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .navLogoScissors {
   font-size: 1.4rem;
   color: var(--pink);
@@ -298,6 +304,27 @@
   text-transform: uppercase;
   padding: 4px 10px;
   border-radius: 100px;
+}
+
+.navRegisterButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--pink) 0%, #ff4ab0 100%);
+  color: #fff;
+  text-decoration: none;
+  font-size: 0.84rem;
+  font-weight: 800;
+  box-shadow: 0 14px 30px rgba(255, 20, 147, 0.22);
+  transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+}
+
+.navRegisterButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 34px rgba(255, 20, 147, 0.28);
 }
 
 .navLogoImg{
@@ -434,6 +461,20 @@
   max-width: 500px;
   line-height: 1.75;
   margin-bottom: 44px;
+  transition:
+    opacity 0.7s ease,
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--delay, 0s);
+}
+
+.heroFlowNote {
+  max-width: 760px;
+  margin-top: -18px;
+  margin-bottom: 26px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.98rem;
+  line-height: 1.7;
+  font-weight: 700;
   transition:
     opacity 0.7s ease,
     transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);

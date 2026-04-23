@@ -436,12 +436,16 @@ function Home({ navigation }: Props) {
 
   const handleOpenSubscriptionSettings = useCallback(async () => {
     setProModalVariant(null);
+    if (Platform.OS === 'ios') {
+      navigation.navigate('Subscription-Settings');
+      return;
+    }
     try {
       await Linking.openURL(PRO_PLAN_URL);
     } catch (_error) {
       Alert.alert('No pudimos abrir el sitio de planes', PRO_PLAN_URL);
     }
-  }, []);
+  }, [navigation]);
 
   useFocusEffect(
     useCallback(() => {
