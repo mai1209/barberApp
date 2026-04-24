@@ -17,7 +17,7 @@ type ApiError = Error & {
 
 const LAN_IP = "192.168.100.57"; 
 const ANDROID_EMULATOR_HOST = "10.0.2.2";
-const REQUEST_TIMEOUT_MS = 8000;
+const REQUEST_TIMEOUT_MS = 15000;
 const FORCE_PROD_IN_DEBUG = true; // Útil para probar el comportamiento en producción sin necesidad de un backend local
 
 const isAndroid = Platform.OS === "android";

@@ -7,7 +7,12 @@ const DEFAULT_TIMEOUT = 15000;
 let mongoReadyPromise;
 
 export async function connectMongo() {
-  if (mongoReadyPromise && mongoose.connection.readyState === 1) return mongoReadyPromise;
+  if (
+    mongoReadyPromise &&
+    (mongoose.connection.readyState === 1 || mongoose.connection.readyState === 2)
+  ) {
+    return mongoReadyPromise;
+  }
 
   // El .trim() elimina los espacios invisibles que nos estaban rompiendo todo
   const uri = (process.env.MONGODB_URI ?? DEFAULT_URI).trim();
