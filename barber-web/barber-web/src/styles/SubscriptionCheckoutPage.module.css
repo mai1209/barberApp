@@ -4,218 +4,515 @@
     radial-gradient(circle at top right, rgba(255, 20, 147, 0.14), transparent 30%),
     linear-gradient(180deg, #0a0a0f 0%, #050507 100%);
   color: #fff;
-  padding: 40px 20px 64px;
   font-family: 'DM Sans', system-ui, sans-serif;
+  position: relative;
+  overflow-x: hidden;
+  padding: 0 0 96px;
 }
 
-.hero,
-.cards,
-.formCard {
-  max-width: 1100px;
-  margin: 0 auto;
+.meshGrid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 20, 147, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 20, 147, 0.025) 1px, transparent 1px);
+  background-size: 64px 64px;
 }
 
-.hero {
-  margin-bottom: 24px;
+.orbTop {
+  position: fixed;
+  width: 640px;
+  height: 640px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 20, 147, 0.14) 0%, transparent 68%);
+  top: -240px;
+  right: -180px;
+  pointer-events: none;
+  z-index: 0;
+  animation: orbDrift 15s ease-in-out infinite;
 }
 
-.backHomeButton {
+.orbBottom {
+  position: fixed;
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(33, 192, 99, 0.1) 0%, transparent 68%);
+  bottom: -160px;
+  left: -120px;
+  pointer-events: none;
+  z-index: 0;
+  animation: orbDrift 20s ease-in-out infinite reverse;
+}
+
+@keyframes orbDrift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  40% {
+    transform: translate(-22px, 34px) scale(1.05);
+  }
+  70% {
+    transform: translate(16px, -20px) scale(0.97);
+  }
+}
+
+.topBar {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  height: 60px;
+  background: rgba(10, 10, 15, 0.84);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.backBtn {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  margin-bottom: 16px;
-  padding: 10px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.04);
-  color: #fff;
-  text-decoration: none;
+  gap: 6px;
   font-size: 0.84rem;
   font-weight: 700;
-  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease, color 140ms ease;
+  color: #f6b1d6;
+  transition: color 0.2s ease, transform 0.2s ease;
 }
 
-.backHomeButton:hover {
-  background: #fff;
-  border-color: #fff;
-  color: #050507;
-  transform: translateY(-1px);
+.backBtn:hover {
+  color: #fff;
+  transform: translateX(-1px);
+}
+
+.topBarBrand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.topBarMark {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #ff1493, #ff4db3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(255, 20, 147, 0.28);
+}
+
+.topBarName {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: -0.4px;
+  color: #fff;
+}
+
+.layout {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 480px;
+  gap: 32px;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 48px 28px 0;
+  align-items: start;
+}
+
+.leftCol {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  position: sticky;
+  top: 80px;
+}
+
+.heroBlock {
+  display: flex;
+  flex-direction: column;
 }
 
 .eyebrow {
-  margin: 0 0 10px;
-  color: #ff69b4;
   font-size: 0.74rem;
   font-weight: 800;
   letter-spacing: 2px;
   text-transform: uppercase;
-}
-
-.title {
-  margin: 0 0 10px;
-  font-size: clamp(2rem, 4vw, 3.2rem);
-  line-height: 0.95;
-  letter-spacing: -2px;
-  font-family: 'Syne', system-ui, sans-serif;
-}
-
-.subtitle {
-  margin: 0;
-  max-width: 760px;
-  color: #b8b8c5;
-  line-height: 1.6;
-}
-
-.cards {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.planCard,
-.formCard {
-  border-radius: 24px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(23,23,30,0.95);
-  box-shadow: 0 24px 60px rgba(0,0,0,0.28);
-}
-
-.planCard {
-  text-align: left;
-  padding: 20px;
-  cursor: pointer;
-}
-
-.planCardActive {
-  outline: 2px solid rgba(255,255,255,0.2);
-  transform: translateY(-1px);
-}
-
-.pink.planCardActive {
-  outline-color: rgba(255,20,147,0.5);
-}
-
-.green.planCardActive {
-  outline-color: rgba(33,192,99,0.5);
-}
-
-.planBadge {
-  display: inline-flex;
-  padding: 7px 11px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.06);
-  color: #fff;
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 1px;
-  text-transform: uppercase;
+  color: #ff69b4;
   margin-bottom: 14px;
 }
 
+.title {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: clamp(2.2rem, 4.5vw, 3.4rem);
+  font-weight: 800;
+  line-height: 0.93;
+  letter-spacing: -3px;
+  color: #fff;
+  margin-bottom: 16px;
+}
+
+.titleAccent {
+  display: block;
+  background: linear-gradient(130deg, #ff1493 0%, #ff6dc4 58%, #ff1493 100%);
+  background-size: 220% 220%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: accentShift 6s ease infinite;
+}
+
+@keyframes accentShift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.subtitle {
+  font-size: 0.98rem;
+  color: #b8b8c5;
+  line-height: 1.7;
+  max-width: 540px;
+}
+
+.planGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.planCard {
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(23, 23, 30, 0.95);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  padding: 22px 20px;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+  transition:
+    border-color 0.22s ease,
+    box-shadow 0.22s ease,
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.planCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+
+.planCard_basic::before {
+  background: linear-gradient(90deg, transparent, #ff1493, transparent);
+}
+
+.planCard_pro::before {
+  background: linear-gradient(90deg, transparent, #21c063, transparent);
+}
+
+.planCardActive {
+  transform: translateY(-3px);
+}
+
+.planCard_basic.planCardActive {
+  border-color: rgba(255, 20, 147, 0.35);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.28),
+    0 0 0 2px rgba(255, 20, 147, 0.2);
+}
+
+.planCard_pro.planCardActive {
+  border-color: rgba(33, 192, 99, 0.35);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.28),
+    0 0 0 2px rgba(33, 192, 99, 0.18);
+}
+
+.planCard.planCardActive::before {
+  opacity: 1;
+}
+
+.planCardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.planBadge {
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 6px 11px;
+  border-radius: 999px;
+}
+
+.planBadge_basic {
+  background: rgba(255, 20, 147, 0.12);
+  border: 1px solid rgba(255, 20, 147, 0.24);
+  color: #ff69b4;
+}
+
+.planBadge_pro {
+  background: rgba(33, 192, 99, 0.12);
+  border: 1px solid rgba(33, 192, 99, 0.24);
+  color: #53dc87;
+}
+
+.planSelectedDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  animation: dotPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.planSelectedDot_basic {
+  background: #ff1493;
+  box-shadow: 0 0 0 3px rgba(255, 20, 147, 0.18);
+}
+
+.planSelectedDot_pro {
+  background: #21c063;
+  box-shadow: 0 0 0 3px rgba(33, 192, 99, 0.18);
+}
+
+@keyframes dotPop {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
 .planTitle {
-  margin: 0 0 10px;
-  font-size: 1.4rem;
+  margin: 0 0 8px;
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: 1.25rem;
   font-weight: 800;
   color: #fff;
 }
 
-.planPrice {
-  display: block;
-  font-size: 2rem;
-  font-weight: 900;
-  margin-bottom: 6px;
+.planPricingRow {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
 }
 
-.pink .planPrice {
+.planPrice {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: 1.9rem;
+  font-weight: 900;
+  letter-spacing: -1.2px;
+  line-height: 1;
+}
+
+.planPrice_basic {
   color: #ff1493;
 }
 
-.green .planPrice {
+.planPrice_pro {
   color: #21c063;
 }
 
 .planNote {
-  display: block;
+  font-size: 0.7rem;
   color: #b3b3bf;
-  font-size: 0.84rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
-  margin-bottom: 12px;
 }
 
 .planDescription {
   margin: 0;
   color: #c6c6d0;
   line-height: 1.55;
+  font-size: 0.84rem;
 }
 
 .formCard {
-  padding: 20px;
+  border-radius: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(23, 23, 30, 0.96);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
+  padding: 28px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-.form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 14px;
-  align-items: end;
+.formCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #ff1493, transparent);
 }
 
-.modeSwitch {
-  grid-column: 1 / -1;
-  display: inline-flex;
-  gap: 10px;
+.formCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
-.modeButton {
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(18,18,24,0.92);
-  color: #d7d7e0;
-  min-height: 44px;
+.formCardTag {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #ff69b4;
+  background: rgba(255, 20, 147, 0.12);
+  border: 1px solid rgba(255, 20, 147, 0.24);
   border-radius: 999px;
-  padding: 0 16px;
-  font-size: 0.9rem;
-  font-weight: 700;
-  cursor: pointer;
+  padding: 4px 12px;
 }
 
-.modeButtonActive {
-  border-color: rgba(255,20,147,0.35);
-  background: rgba(255,20,147,0.14);
+.formCardCaption {
+  font-size: 0.84rem;
+  color: #b8b8c5;
+  font-weight: 500;
+}
+
+.modeToggleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modeGroupLabel {
+  font-size: 0.8rem;
+  font-weight: 700;
   color: #fff;
 }
 
-.modeButtonAutomatic {
+.modeToggle {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.modeBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(18, 18, 24, 0.92);
+  color: #d7d7e0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.modeBtn:hover {
+  border-color: rgba(255, 20, 147, 0.3);
+  color: #fff;
+}
+
+.modeBtnDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.24);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+  flex-shrink: 0;
+}
+
+.modeBtnActive {
+  border-color: rgba(255, 20, 147, 0.35);
+  background: rgba(255, 20, 147, 0.14);
+  color: #fff;
+}
+
+.modeBtnActive .modeBtnDot {
+  background: #ff1493;
+  box-shadow: 0 0 0 2px rgba(255, 20, 147, 0.18);
+}
+
+.modeBtnReco {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  background: rgba(33, 192, 99, 0.12);
+  color: #7defa7;
+  border: 1px solid rgba(33, 192, 99, 0.24);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
+.modeBtnAuto {
   border-color: rgba(255, 138, 0, 0.18);
   color: #f3c27c;
 }
 
-.modeButtonAutomaticActive {
+.modeBtnAuto .modeBtnDot {
+  background: rgba(255, 138, 0, 0.34);
+}
+
+.modeBtnAutoActive {
   border-color: rgba(255, 138, 0, 0.34);
   background: rgba(255, 138, 0, 0.14);
   color: #fff2de;
 }
 
-.modeHelper {
-  grid-column: 1 / -1;
-  margin: -2px 0 0;
-  color: #a5a5b3;
-  line-height: 1.5;
+.modeBtnAutoActive .modeBtnDot {
+  background: #ff9b2f;
+  box-shadow: 0 0 0 2px rgba(255, 138, 0, 0.18);
 }
 
-.modeWarning {
-  grid-column: 1 / -1;
-  margin: -2px 0 2px;
-  padding: 12px 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 138, 0, 0.28);
+.modeHelper {
+  font-size: 0.8rem;
+  color: #a5a5b3;
+  line-height: 1.6;
+}
+
+.warningBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   background: rgba(255, 138, 0, 0.08);
+  border: 1px solid rgba(255, 138, 0, 0.28);
+  border-radius: 14px;
+  padding: 12px 14px;
   color: #ffd7a1;
-  line-height: 1.5;
-  font-size: 0.92rem;
+  font-size: 0.84rem;
   font-weight: 600;
+  line-height: 1.55;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .field {
@@ -224,7 +521,7 @@
   gap: 8px;
 }
 
-.field span {
+.fieldLabel {
   color: #bcbccc;
   font-size: 0.78rem;
   font-weight: 700;
@@ -235,37 +532,50 @@
 .field input {
   height: 50px;
   border-radius: 16px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(18,18,24,0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(18, 18, 24, 0.92);
   color: #fff;
   padding: 0 14px;
   font-size: 0.96rem;
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
 }
 
-.submitWarning {
-  grid-column: 1 / -1;
-  margin: -4px 0 0;
-  color: #d8b381;
-  font-size: 0.88rem;
-  line-height: 1.45;
-  font-weight: 600;
+.field input::placeholder {
+  color: rgba(255, 255, 255, 0.34);
 }
 
-.submitButton,
-.whatsappLink {
+.field input:focus {
+  border-color: rgba(255, 20, 147, 0.55);
+  background: rgba(255, 255, 255, 0.07);
+  transform: translateY(-1px);
+}
+
+.submitButton {
   border: none;
   border-radius: 16px;
   background: linear-gradient(135deg, #ff1493, #d60b7b);
   color: #fff;
   font-weight: 800;
   cursor: pointer;
-  min-height: 50px;
+  min-height: 52px;
   padding: 0 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  text-decoration: none;
-  transition: background 140ms ease, color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+  gap: 9px;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease;
+  box-shadow: 0 18px 36px rgba(255, 20, 147, 0.22);
+}
+
+.submitButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 22px 40px rgba(255, 20, 147, 0.28);
 }
 
 .submitButton:disabled {
@@ -273,16 +583,31 @@
   cursor: default;
 }
 
-.whatsappLink:hover {
-  background: #ffffff;
-  color: #050507;
-  transform: translateY(-1px);
-  box-shadow: 0 16px 34px rgba(255,255,255,0.16);
+.submitWarning {
+  margin: -4px 0 0;
+  color: #d8b381;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  font-weight: 600;
+}
+
+.spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .messageBox,
 .errorBox {
-  margin-top: 14px;
   border-radius: 16px;
   padding: 14px 16px;
 }
@@ -299,22 +624,101 @@
   color: #ffd6d8;
 }
 
-.helper {
-  margin: 16px 0 12px;
+.cardDivider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cardDivider span {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #a5a5b3;
+  white-space: nowrap;
+}
+
+.cardDivider::before,
+.cardDivider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.whatsappRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.whatsappHelper {
+  font-size: 0.84rem;
   color: #a5a5b3;
   line-height: 1.6;
+  max-width: 240px;
+}
+
+.whatsappBtn {
+  border: none;
+  border-radius: 16px;
+  background: #25d366;
+  color: #fff;
+  font-weight: 800;
+  min-height: 46px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease;
+  box-shadow: 0 16px 34px rgba(37, 211, 102, 0.16);
+}
+
+.whatsappBtn:hover {
+  background: #1da851;
+  transform: translateY(-1px);
 }
 
 .downloadCard {
-  margin-top: 18px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
   border-radius: 20px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
   padding: 18px;
 }
 
+.downloadCardIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 20, 147, 0.12);
+  border: 1px solid rgba(255, 20, 147, 0.24);
+  color: #ff69b4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.downloadCardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
 .downloadTitle {
-  margin: 0 0 8px;
+  margin: 0;
   color: #fff;
   font-size: 1rem;
   font-weight: 800;
@@ -326,37 +730,93 @@
   line-height: 1.6;
 }
 
-.downloadButtons {
-  margin-top: 14px;
+.storeButtons {
+  margin-top: 10px;
   display: flex;
-  gap: 12px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
-.storeButton {
+.storeBtn {
   border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
   color: #fff;
   font-weight: 800;
-  min-height: 46px;
-  padding: 0 18px;
+  min-height: 42px;
+  padding: 0 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  text-decoration: none;
-  transition: background 140ms ease, color 140ms ease, transform 140ms ease;
+  gap: 7px;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
 }
 
-.storeButton:hover {
+.storeBtn:hover {
   background: #fff;
   color: #050507;
   transform: translateY(-1px);
 }
 
-@media (max-width: 900px) {
-  .cards,
-  .form {
+@media (max-width: 960px) {
+  .layout {
     grid-template-columns: 1fr;
+    padding: 32px 20px 0;
+    gap: 24px;
+  }
+
+  .leftCol {
+    position: static;
+  }
+}
+
+@media (max-width: 600px) {
+  .topBar {
+    padding: 0 18px;
+  }
+
+  .layout {
+    padding: 24px 16px 0;
+  }
+
+  .planGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .formCard {
+    padding: 22px 18px;
+    border-radius: 22px;
+  }
+
+  .modeToggle {
+    flex-direction: column;
+  }
+
+  .modeBtn {
+    width: 100%;
+  }
+
+  .whatsappRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .whatsappHelper {
+    max-width: none;
+  }
+
+  .whatsappBtn {
+    width: 100%;
+  }
+
+  .storeButtons {
+    flex-direction: column;
+  }
+
+  .storeBtn {
+    width: 100%;
   }
 }

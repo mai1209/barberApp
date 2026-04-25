@@ -10,6 +10,7 @@ import NotFoundPage from './NotFoundPage';
 import PrivacyPolicyPage from './PrivacyPolicyPage';
 import AccountDeletionPage from './AccountDeletionPage';
 import RegisterAccountPage from './RegisterAccountPage';
+import SupportPage from './SupportPage';
 //import landingStyles from '../styles/LandingPage.module.css';
 
 
@@ -69,6 +70,14 @@ function resolveInternalPage() {
   }
 
   if (
+    pathname === 'soporte' ||
+    pathname === 'contacto' ||
+    pathname === 'support'
+  ) {
+    return 'support';
+  }
+
+  if (
     pathname === 'eliminacion-de-cuenta' ||
     pathname === 'eliminar-cuenta' ||
     pathname === 'account-deletion'
@@ -83,6 +92,9 @@ function resolveInternalPage() {
     segments[0] === 'registro' ||
     segments[0] === 'crear-cuenta' ||
     segments[0] === 'signup' ||
+    segments[0] === 'soporte' ||
+    segments[0] === 'contacto' ||
+    segments[0] === 'support' ||
     segments[0] === 'politica-de-privacidad' ||
     segments[0] === 'privacy-policy' ||
     segments[0] === 'eliminacion-de-cuenta' ||
@@ -123,6 +135,10 @@ function App() {
 
   if (internalPage === 'privacy-policy') {
     return <PrivacyPolicyPage />;
+  }
+
+  if (internalPage === 'support') {
+    return <SupportPage />;
   }
 
   if (internalPage === 'account-deletion') {

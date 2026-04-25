@@ -74,6 +74,52 @@ function formatDateInShopTZ(value: string | number | Date): string {
   return `${year}-${month}-${day}`;
 }
 
+function getOffsetMinutesInShopTZ(date: Date): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: SHOP_TZ,
+    timeZoneName: 'shortOffset',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).formatToParts(date);
+
+  const offsetText = parts.find(part => part.type === 'timeZoneName')?.value ?? 'GMT';
+  const match = offsetText.match(/^GMT([+-])(\d{1,2})(?::?(\d{2}))?$/);
+
+  if (!match) return 0;
+
+  const sign = match[1] === '-' ? -1 : 1;
+  const hours = Number(match[2] ?? 0);
+  const minutes = Number(match[3] ?? 0);
+  return sign * (hours * 60 + minutes);
+}
+
+function getWeekdayInShopTZ(value: string | number | Date): number {
+  const weekday = new Intl.DateTimeFormat('en-US', {
+    timeZone: SHOP_TZ,
+    weekday: 'short',
+  }).format(new Date(value));
+
+  const map: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+
+  return map[weekday] ?? new Date(value).getDay();
+}
+
+function buildIsoFromShopDateAndTime(dateValue: Date, slotLabel: string): string {
+  const [year, month, day] = formatDateInShopTZ(dateValue).split('-').map(Number);
+  const [hour, minute] = slotLabel.split(':').map(Number);
+  const startUtcGuess = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
+  const offsetMinutes = getOffsetMinutesInShopTZ(new Date(startUtcGuess));
+  return new Date(startUtcGuess - offsetMinutes * 60_000).toISOString();
+}
+
 function labelToMinutes(label: string): number {
   const [hour, minute] = label.split(':').map(Number);
   return hour * 60 + minute;
@@ -260,9 +306,7 @@ function ReservasForm({ navigation, route }: any) {
     if (!selectedBarber) return;
     async function loadBooked() {
       try {
-        const dateStr = `${selectedDate.getFullYear()}-${String(
-          selectedDate.getMonth() + 1,
-        ).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+        const dateStr = formatDateInShopTZ(selectedDate);
         const res = await fetchBarberAppointments(selectedBarber!, dateStr);
         const closureMessage = res.shopClosure?.isClosed
           ? res.shopClosure.message ||
@@ -325,7 +369,7 @@ function ReservasForm({ navigation, route }: any) {
       selectedBarberData.workDays.length === 0
     )
       return true;
-    const dayOfWeek = selectedDate.getDay();
+    const dayOfWeek = getWeekdayInShopTZ(selectedDate);
     return selectedBarberData.workDays.map(Number).includes(dayOfWeek);
   }, [selectedBarberData, selectedDate]);
 
@@ -437,21 +481,11 @@ function ReservasForm({ navigation, route }: any) {
     }
     setSaving(true);
     try {
-      const [h, m] = selectedSlot.split(':').map(Number);
-      const date = new Date(
-        selectedDate.getFullYear(),
-        selectedDate.getMonth(),
-        selectedDate.getDate(),
-        h,
-        m,
-        0,
-        0,
-      );
       await createAppointment({
         barberId: selectedBarber!,
         customerName: customerName.trim(),
         service: selectedService?.name || 'Corte',
-        startTime: date.toISOString(),
+        startTime: buildIsoFromShopDateAndTime(selectedDate, selectedSlot),
         servicePrice: selectedService?.price ?? 0,
         notes: phone,
         email: customerEmail.trim(),

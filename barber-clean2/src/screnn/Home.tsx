@@ -62,6 +62,21 @@ type Props = {
 const PUBLIC_BOOKING_BASE = 'https://barberappbycodex.com';
 const PRO_PLAN_URL = 'https://barberappbycodex.com/planes?plan=pro';
 const WELCOME_MODAL_KEY_PREFIX = 'HOME_WELCOME_MODAL_DISMISSED';
+const SHOP_TZ = 'America/Argentina/Cordoba';
+
+function formatDateInShopTZ(value: string | number | Date): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: SHOP_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(value));
+  const year = parts.find(p => p.type === 'year')?.value ?? '0000';
+  const month = parts.find(p => p.type === 'month')?.value ?? '00';
+  const day = parts.find(p => p.type === 'day')?.value ?? '00';
+  return `${year}-${month}-${day}`;
+}
+
 const hexToRgba = (hex: string, alpha: number) => {
   const sanitized = hex.replace('#', '');
   const bigint = parseInt(
@@ -285,7 +300,7 @@ function Home({ navigation }: Props) {
       if (!isRefresh) setLoading(true);
       setError('');
       const appointmentsRes = await fetchAppointments({
-        date: activeDate.toISOString().slice(0, 10),
+        date: formatDateInShopTZ(activeDate),
       });
       setAppointments(
         appointmentsRes.appointments.filter(a => a.status !== 'cancelled'),

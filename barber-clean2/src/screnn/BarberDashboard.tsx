@@ -51,6 +51,20 @@ import {
 } from 'lucide-react-native';
 
 const PRO_PLAN_URL = 'https://barberappbycodex.com/planes?plan=pro';
+const SHOP_TZ = 'America/Argentina/Cordoba';
+
+function formatDateInShopTZ(value: string | number | Date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: SHOP_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(value));
+  const year = parts.find(p => p.type === 'year')?.value ?? '0000';
+  const month = parts.find(p => p.type === 'month')?.value ?? '00';
+  const day = parts.find(p => p.type === 'day')?.value ?? '00';
+  return `${year}-${month}-${day}`;
+}
 
 const hexToRgba = (hex: string, alpha: number) => {
   const sanitized = hex.replace('#', '');
@@ -69,10 +83,7 @@ const sanitizeWhatsappNumber = (value: string) => value.replace(/[^\d]/g, '');
 type Props = NativeStackScreenProps<RootStackParamList, 'Barber-Home'>;
 
 function formatDateParam(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return formatDateInShopTZ(date);
 }
 
 function addDays(date: Date, days: number) {
