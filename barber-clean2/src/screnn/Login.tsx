@@ -31,7 +31,7 @@ const AUTH_THEME = {
   logo: require('../assets/logoBarber.png'),
 } as const;
 const IOS_SUPPORT_WHATSAPP_URL =
-  'https://wa.me/543425543308?text=Hola,%20necesito%20ayuda%20con%20mi%20cuenta%20de%20BarberApp';
+  'https://barberappbycodex.com/soporte';
 
 function Login({ navigation }: any) {
   const { applyUserTheme } = useTheme();
@@ -49,7 +49,7 @@ function Login({ navigation }: any) {
     try {
       await Linking.openURL(IOS_SUPPORT_WHATSAPP_URL);
     } catch (_error) {
-      setError('No pudimos abrir WhatsApp de soporte');
+      setError('No pudimos abrir la página de soporte');
     }
   };
 
@@ -120,17 +120,17 @@ function Login({ navigation }: any) {
 
             {isIOS ? (
               <View style={styles.iosInfoCard}>
-                <Text style={styles.iosInfoTitle}>Acceso para cuentas activas</Text>
+                <Text style={styles.iosInfoTitle}>Acceso con cuenta existente</Text>
                 <Text style={styles.iosInfoText}>
-                  En iPhone, el alta y la activación comercial se resuelven fuera de la app.
-                  Si necesitás ayuda con tu cuenta, podés hablar con soporte.
+                  Esta app funciona con cuentas ya habilitadas. Si necesitás ayuda para
+                  acceder o revisar el estado de tu cuenta, podés hablar con soporte.
                 </Text>
                 <Pressable
                   style={styles.iosInfoAction}
                   onPress={handleOpenIosSupport}
                 >
                   <Text style={styles.iosInfoActionText}>
-                    Hablar con soporte por WhatsApp
+                    Abrir soporte
                   </Text>
                 </Pressable>
               </View>
@@ -207,18 +207,6 @@ function Login({ navigation }: any) {
                 <Text style={styles.recoverTextBold}>Recuperarla</Text>
               </Text>
             </Pressable>
-
-            {!isIOS ? (
-              <Pressable
-                onPress={() => navigation.navigate('Register')}
-                style={styles.registerBtn}
-              >
-                <Text style={styles.registerText}>
-                  ¿No tienes cuenta?{' '}
-                  <Text style={styles.registerTextBold}>Registrate</Text>
-                </Text>
-              </Pressable>
-            ) : null}
           </View>
           <Text style={styles.codexText}>BarberApp by CODEX®</Text>
         </ScrollView>

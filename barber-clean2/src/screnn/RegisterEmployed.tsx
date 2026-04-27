@@ -1010,10 +1010,7 @@ function RegisterEmployed({ navigation, route }: Props) {
               {!selfEdit ? (
               <View style={styles.section}>
                 <Text style={styles.sectionLabel}>Acceso del barbero a la app</Text>
-                <Text style={styles.sectionHelper}>
-                  El acceso del barbero ahora se administra en una pantalla separada
-                  para no mezclar credenciales con horarios y perfil.
-                </Text>
+              
                 {isEditing ? (
                   <>
                     <View style={styles.accessSummaryCard}>
@@ -1459,7 +1456,7 @@ function RegisterEmployed({ navigation, route }: Props) {
               <View style={styles.section}>
                 <Text style={styles.sectionLabel}>Días no disponibles del barbero</Text>
                 <Text style={styles.closedDaysHint}>
-                  Si la barbería abre pero este barbero no viene, cargá la fecha acá para bloquear nuevos turnos.
+                  Si la barbería abre pero este barbero falta, cargá la fecha acá para bloquear nuevos turnos y el motivo de falta.
                 </Text>
 
                 <View style={styles.closedDaysQuickRow}>
@@ -1835,12 +1832,7 @@ const createStyles = (theme: Theme) =>
       textTransform: 'uppercase',
       marginLeft: 4,
     },
-    sectionHelper: {
-      color: theme.textSecondary,
-      fontSize: 13,
-      lineHeight: 19,
-      marginHorizontal: 4,
-    },
+ 
     sectionHelperMuted: {
       color: theme.textMuted,
       fontSize: 12,

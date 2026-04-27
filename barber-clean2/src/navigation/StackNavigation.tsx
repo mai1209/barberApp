@@ -4,7 +4,6 @@ import { Platform, StyleSheet, View } from 'react-native';
 import type { Barber } from '../services/api';
 
 import Login from '../screnn/Login';
-import Register from '../screnn/Register';
 import Home from '../screnn/Home';
 import ReservasForm from '../screnn/ReservasForm';
 import RegisterEmployed from '../screnn/RegisterEmployed';
@@ -26,7 +25,6 @@ import ChangePasswordScreen from '../screnn/ChangePasswordScreen';
 import RecoverPasswordScreen from '../screnn/RecoverPasswordScreen';
 import SettingsScreen from '../screnn/SettingsScreen';
 import UsageGuideScreen from '../screnn/UsageGuideScreen';
-import PlansScreen from '../screnn/PlansScreen';
 import SubscriptionSettingsScreen from '../screnn/SubscriptionSettingsScreen';
 import AccountDeletionRequestScreen from '../screnn/AccountDeletionRequestScreen';
 import ScreenGradient from '../components/ScreenGradient';
@@ -105,7 +103,6 @@ export default function StackNavigator({
 }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme.mode), [theme.mode]);
-  const isIOS = Platform.OS === 'ios';
   const isBarberUser = currentUserRole === 'barber';
   const showAdminArea = !isBarberUser && !isSubscriptionLocked;
   const showBarberArea = isBarberUser;
@@ -124,9 +121,7 @@ export default function StackNavigator({
           }}
         >
           <Stack.Screen name="Login" component={Login} />
-          {!isIOS ? <Stack.Screen name="Register" component={Register} /> : null}
           <Stack.Screen name="Subscription-Settings" component={SubscriptionSettingsScreen} />
-          {!isIOS ? <Stack.Screen name="Plans" component={PlansScreen} /> : null}
           <Stack.Screen name="Change-Password" component={ChangePasswordScreen} />
           <Stack.Screen name="Recover-Password" component={RecoverPasswordScreen} />
           <Stack.Screen

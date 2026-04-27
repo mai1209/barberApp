@@ -17,6 +17,7 @@ import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
 
 const COMMERCIAL_EMAIL = 'barberappbycodex@gmail.com';
+const SUPPORT_URL = 'https://barberappbycodex.com/soporte';
 const CUSTOM_PLAN_URL =
   'https://wa.me/543425543308?text=Hola%20quiero%20consultar%20por%20el%20plan%20personalizable%20de%20BarberApp';
 const PLANS_WEBSITE_URL = 'https://barberappbycodex.com/planes';
@@ -257,22 +258,28 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
     subscription?.nextBillingAt || subscription?.expiresAt || null;
 
   const getRenewalHint = () => {
+    if (isIOS) {
+      if (subscription?.status === 'past_due' || subscription?.status === 'cancelled') {
+        return 'Revisá el estado de esta cuenta con soporte para continuar usando la app.';
+      }
+
+      if (!expiresAtDate || Number.isNaN(expiresAtDate.getTime())) {
+        return 'Si necesitás ayuda con esta cuenta, contactá a soporte.';
+      }
+
+      return 'Si necesitás ayuda con el acceso o con el vencimiento de esta cuenta, contactá a soporte.';
+    }
+
     if (!expiresAtDate || Number.isNaN(expiresAtDate.getTime())) {
-      return isIOS
-        ? 'Si necesitás revisar la renovación de esta cuenta, contactá a soporte comercial.'
-        : 'Podés renovar tu plan desde esta pantalla cuando lo necesites.';
+      return 'Podés renovar tu plan desde esta pantalla cuando lo necesites.';
     }
 
     if (subscription?.status === 'past_due') {
-      return isIOS
-        ? 'Tu plan está pendiente. Contactá a soporte comercial para regularizar la cuenta.'
-        : 'Tu plan está pendiente de pago. Renovalo para volver a quedar activo.';
+      return 'Tu plan está pendiente de pago. Renovalo para volver a quedar activo.';
     }
 
     if (subscription?.status === 'cancelled') {
-      return isIOS
-        ? 'Tu plan fue desactivado. Contactá a soporte comercial para reactivar la cuenta.'
-        : 'Tu plan fue desactivado. Podés activarlo otra vez desde esta pantalla.';
+      return 'Tu plan fue desactivado. Podés activarlo otra vez desde esta pantalla.';
     }
 
     if (typeof daysRemaining === 'number' && daysRemaining <= 1) {
@@ -296,11 +303,9 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
 
   const openSupportMail = async () => {
     try {
-      await Linking.openURL(
-        `mailto:${COMMERCIAL_EMAIL}?subject=${encodeURIComponent('Consulta sobre plan BarberApp')}`,
-      );
+      await Linking.openURL(isIOS ? SUPPORT_URL : `mailto:${COMMERCIAL_EMAIL}?subject=${encodeURIComponent('Consulta sobre plan BarberApp')}`);
     } catch (_error) {
-      Alert.alert('No pudimos abrir el mail', COMMERCIAL_EMAIL);
+      Alert.alert('No pudimos abrir el soporte', isIOS ? SUPPORT_URL : COMMERCIAL_EMAIL);
     }
   };
 
@@ -331,6 +336,117 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
     }
   };
 
+  if (isIOS) {
+    return (
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => loadSubscription(true)} />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <Text style={styles.eyebrow}>CUENTA</Text>
+          <Text style={styles.title}>Estado de la cuenta</Text>
+          <Text style={styles.subtitle}>
+            Acá ves el estado actual de la cuenta y los datos necesarios para seguir usando la
+            app.
+          </Text>
+        </View>
+
+        {loading ? (
+          <View style={styles.loadingCard}>
+            <ActivityIndicator size="small" color={theme.primary} />
+            <Text style={styles.loadingText}>Cargando estado de la cuenta...</Text>
+          </View>
+        ) : (
+          <>
+            {isRestrictedAccount ? (
+              <View style={styles.lockedCard}>
+                <Text style={styles.lockedEyebrow}>ACCESO LIMITADO</Text>
+                <Text style={styles.lockedTitle}>Esta cuenta tiene acceso limitado</Text>
+                <Text style={styles.lockedText}>
+                  El acceso operativo no está disponible en este momento. Si necesitás revisar la
+                  cuenta o recuperar acceso, contactá a soporte.
+                </Text>
+              </View>
+            ) : null}
+
+            <View style={styles.statusCard}>
+              <View style={styles.statusTopRow}>
+                <View>
+                  <Text style={styles.planLabel}>Cuenta</Text>
+                  <Text style={styles.planValue}>Acceso disponible</Text>
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: `${statusInfo.color}22` }]}>
+                  <Text style={[styles.statusBadgeText, { color: statusInfo.color }]}>
+                    {statusInfo.label}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={styles.planSummary}>
+                Información general del acceso disponible en esta cuenta.
+              </Text>
+
+              <View style={styles.metaGrid}>
+                <View style={styles.metaItem}>
+                  <Text style={styles.metaLabel}>Estado</Text>
+                  <Text style={[styles.metaValue, { color: statusInfo.color }]}>
+                    {statusInfo.label}
+                  </Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Text style={styles.metaLabel}>Inicio</Text>
+                  <Text style={styles.metaValue}>{formatDateLabel(subscription?.startedAt)}</Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Text style={styles.metaLabel}>Vencimiento</Text>
+                  <Text style={styles.metaValue}>{formatDateLabel(subscription?.expiresAt)}</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.actionsCard}>
+              <Text style={styles.sectionTitle}>Ayuda y soporte</Text>
+              <View style={styles.renewalHintCard}>
+                <Text style={styles.renewalHintTitle}>Estado de la cuenta</Text>
+                <View style={styles.renewalMetaList}>
+                  <View style={styles.renewalMetaRow}>
+                    <Text style={styles.renewalMetaLabel}>Estado</Text>
+                    <Text style={[styles.renewalMetaValue, { color: statusInfo.color }]}>
+                      {statusInfo.label}
+                    </Text>
+                  </View>
+                  <View style={styles.renewalMetaRow}>
+                    <Text style={styles.renewalMetaLabel}>Vencimiento</Text>
+                    <Text style={styles.renewalMetaValue}>
+                      {formatDateLabel(nextRelevantBillingDate)}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.renewalHintText}>{getRenewalHint()}</Text>
+              </View>
+
+              <View style={styles.iosNoticeCard}>
+                <Text style={styles.iosNoticeTitle}>Soporte para esta cuenta</Text>
+                <Text style={styles.iosNoticeText}>
+                  Si necesitás ayuda con el acceso, el estado o el vencimiento de esta cuenta,
+                  contactá a soporte.
+                </Text>
+              </View>
+
+              <Pressable style={styles.secondaryButton} onPress={openSupportMail}>
+                <Text style={styles.secondaryButtonText}>Contactar soporte</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView
       style={styles.screen}
@@ -345,7 +461,7 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
         <Text style={styles.title}>Estado comercial de tu cuenta</Text>
         <Text style={styles.subtitle}>
           {isIOS
-            ? 'Acá ves el estado de tu cuenta y el plan activo. En iPhone, la activación y los cambios comerciales se resuelven fuera de la app.'
+            ? 'Acá ves el estado actual de la cuenta y la información necesaria para seguir usando la app.'
             : 'Acá ves qué plan tenés activo, cómo está la cuenta y qué incluye hoy tu barbería.'}
         </Text>
       </View>
@@ -360,13 +476,14 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
           {isRestrictedAccount ? (
             <View style={styles.lockedCard}>
               <Text style={styles.lockedEyebrow}>ACCESO LIMITADO</Text>
-              <Text style={styles.lockedTitle}>Activá tu plan para usar la barbería</Text>
+              <Text style={styles.lockedTitle}>Esta cuenta tiene acceso limitado</Text>
               <Text style={styles.lockedText}>
-                Esta cuenta todavía no tiene una suscripción activa. Hasta completar el alta o la renovación, dejamos bloqueado el panel principal y solo vas a ver el estado comercial.
+                Esta cuenta no tiene acceso operativo en este momento. Por ahora dejamos
+                bloqueado el panel principal y solo mostramos el estado general.
               </Text>
               <Text style={styles.lockedHint}>
                 {isIOS
-                  ? 'Para activar tu cuenta en iPhone, escribile a soporte comercial y te ayudamos con el alta.'
+                  ? 'Si necesitás revisar esta cuenta desde iPhone, escribile a soporte.'
                   : 'Para activar tu cuenta, completá el pago desde la web o pedile a soporte que la active.'}
               </Text>
             </View>
@@ -385,9 +502,13 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
               </View>
             </View>
 
-            <Text style={styles.planSummary}>{planInfo.summary}</Text>
-            <Text style={[styles.planPrice, { color: planAccent }]}>Precio: {effectivePlanPrice}</Text>
-            {discountArs > 0 ? (
+            <Text style={styles.planSummary}>
+              {isIOS ? 'Información general del acceso disponible en esta cuenta.' : planInfo.summary}
+            </Text>
+            {!isIOS ? (
+              <Text style={[styles.planPrice, { color: planAccent }]}>Precio: {effectivePlanPrice}</Text>
+            ) : null}
+            {!isIOS && discountArs > 0 ? (
               <View style={styles.discountCard}>
                 <Text style={styles.discountTitle}>Descuento aplicado</Text>
                 <Text style={styles.discountText}>
@@ -424,19 +545,23 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
             </View>
           </View>
 
-          <View style={styles.includesCard}>
-            <Text style={styles.sectionTitle}>Qué incluye hoy tu plan</Text>
-            {planInfo.includes.map(item => (
-              <View key={item} style={styles.includeRow}>
-                <View style={[styles.includeDot, { backgroundColor: planAccent }]} />
-                <Text style={styles.includeText}>{item}</Text>
-              </View>
-            ))}
-          </View>
+          {!isIOS ? (
+            <View style={styles.includesCard}>
+              <Text style={styles.sectionTitle}>Qué incluye hoy tu plan</Text>
+              {planInfo.includes.map(item => (
+                <View key={item} style={styles.includeRow}>
+                  <View style={[styles.includeDot, { backgroundColor: planAccent }]} />
+                  <Text style={styles.includeText}>{item}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
 
           <View style={styles.actionsCard}>
-            <Text style={styles.sectionTitle}>Acciones rápidas</Text>
-            {hasAutomaticRenewal ? (
+            <Text style={styles.sectionTitle}>
+              {isIOS ? 'Ayuda con la cuenta' : 'Acciones rápidas'}
+            </Text>
+            {!isIOS && hasAutomaticRenewal ? (
               <View style={styles.autoRenewCard}>
                 <Text style={styles.autoRenewTitle}>Renovación automática activa</Text>
                 <Text style={styles.autoRenewText}>
@@ -455,21 +580,21 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
                   </Text>
                 </Pressable>
               </View>
-            ) : (
+            ) : !isIOS ? (
               <View style={styles.autoRenewCard}>
                 <Text style={styles.autoRenewTitle}>Renovación manual</Text>
                 <Text style={styles.autoRenewText}>
-                  {isIOS
-                    ? 'Cuando llegue el vencimiento, te vamos a avisar por mail para que revises la continuidad de la cuenta con soporte.'
-                    : 'Cuando llegue el vencimiento, te vamos a avisar por mail y vas a poder renovar desde la web con el link directo.'}
+                  Cuando llegue el vencimiento, te vamos a avisar por mail y vas a poder renovar desde la web con el link directo.
                 </Text>
               </View>
-            )}
+            ) : null}
             <View style={styles.renewalHintCard}>
               <Text style={styles.renewalHintTitle}>
-                {subscription?.status === 'past_due' || subscription?.status === 'cancelled'
-                  ? 'Estado de renovación'
-                  : 'Próximo vencimiento'}
+                {isIOS
+                  ? 'Estado de la cuenta'
+                  : subscription?.status === 'past_due' || subscription?.status === 'cancelled'
+                    ? 'Estado de renovación'
+                    : 'Próximo vencimiento'}
               </Text>
               <View style={styles.renewalMetaList}>
                 <View style={styles.renewalMetaRow}>
@@ -480,26 +605,28 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
                 </View>
                 <View style={styles.renewalMetaRow}>
                   <Text style={styles.renewalMetaLabel}>
-                    {hasAutomaticRenewal ? 'Próximo cobro' : 'Vence'}
+                    {isIOS ? 'Vencimiento' : hasAutomaticRenewal ? 'Próximo cobro' : 'Vence'}
                   </Text>
                   <Text style={styles.renewalMetaValue}>
                     {formatDateLabel(nextRelevantBillingDate)}
                   </Text>
                 </View>
-                <View style={styles.renewalMetaRow}>
-                  <Text style={styles.renewalMetaLabel}>Modo</Text>
-                  <Text style={styles.renewalMetaValue}>
-                    {hasAutomaticRenewal ? 'Renovación automática' : 'Renovación manual'}
-                  </Text>
-                </View>
+                {!isIOS ? (
+                  <View style={styles.renewalMetaRow}>
+                    <Text style={styles.renewalMetaLabel}>Modo</Text>
+                    <Text style={styles.renewalMetaValue}>
+                      {hasAutomaticRenewal ? 'Renovación automática' : 'Renovación manual'}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
               <Text style={styles.renewalHintText}>{getRenewalHint()}</Text>
             </View>
             {isIOS ? (
               <View style={styles.iosNoticeCard}>
-                <Text style={styles.iosNoticeTitle}>Gestión comercial fuera de la app</Text>
+                <Text style={styles.iosNoticeTitle}>Soporte para esta cuenta</Text>
                 <Text style={styles.iosNoticeText}>
-                  Si necesitás activar, renovar o modificar esta cuenta, contactá a soporte comercial.
+                  Si necesitás ayuda con el acceso, el estado o el vencimiento de esta cuenta, contactá a soporte.
                 </Text>
               </View>
             ) : (

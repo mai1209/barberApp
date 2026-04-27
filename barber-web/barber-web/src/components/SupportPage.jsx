@@ -28,12 +28,17 @@ export default function SupportPage() {
             +54 9 3425 54-3308
           </a>
         </p>
+        <p>Entidad responsable: Codex Corporation &amp; Business</p>
         <p>Sitio web: BarberAppByCodex</p>
+
+        <h2>Horario y respuesta</h2>
+        <p>Lunes a viernes, de 9:00 a 18:00 (Argentina).</p>
+        <p>Intentamos responder consultas de soporte dentro de 1 día hábil.</p>
 
         <h2>Para qué podés escribirnos</h2>
         <ul>
           <li>Problemas para iniciar sesión o usar tu cuenta.</li>
-          <li>Consultas sobre activación, renovación o estado del plan.</li>
+          <li>Consultas sobre acceso, estado de la cuenta o funciones disponibles.</li>
           <li>Ayuda con reservas, cobros o configuración de la barbería.</li>
           <li>Solicitudes de privacidad o eliminación de cuenta.</li>
         </ul>

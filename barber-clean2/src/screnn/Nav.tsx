@@ -28,7 +28,6 @@ const HIDDEN_ROUTES = new Set([
   'Subscription-Settings',
   'Change-Password',
   'Recover-Password',
-  'Account-Deletion-Request',
 ]);
 
 function resolveActiveRoute(
@@ -44,7 +43,8 @@ function resolveActiveRoute(
       routeName === 'Notification-Settings' ||
       routeName === 'Usage-Guide' ||
       routeName === 'Change-Password' ||
-      routeName === 'Recover-Password'
+      routeName === 'Recover-Password' ||
+      routeName === 'Account-Deletion-Request'
     ) {
       return 'Settings';
     }
@@ -69,7 +69,8 @@ function resolveActiveRoute(
     routeName === 'Notification-Settings' ||
     routeName === 'Shop-Closure-Settings' ||
     routeName === 'Change-Password' ||
-    routeName === 'Recover-Password'
+    routeName === 'Recover-Password' ||
+    routeName === 'Account-Deletion-Request'
   ) {
     return 'Settings';
   }

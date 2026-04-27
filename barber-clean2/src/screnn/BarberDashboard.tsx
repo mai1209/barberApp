@@ -1020,7 +1020,7 @@ const makeStyles = (theme: Theme) =>
       justifyContent: 'center',
     },
     btnMain: { backgroundColor: theme.primary },
-    btnMainText: { color: theme.secondary, fontSize: 13, fontWeight: '800' },
+    btnMainText: { color: '#fff', fontSize: 13, fontWeight: '800' },
     btnSec: { backgroundColor: theme.surfaceAlt, borderWidth: 1, borderColor: hexToRgba(theme.primary, 0.18) },
     btnSecText: { color: theme.textPrimary, fontSize: 13, fontWeight: '700' },
     swipeAction: {

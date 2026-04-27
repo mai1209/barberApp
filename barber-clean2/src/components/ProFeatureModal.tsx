@@ -66,12 +66,12 @@ export default function ProFeatureModal({
   const styles = useMemo(() => createStyles(theme), [theme]);
   const copy = COPY[variant];
   const isIOS = Platform.OS === 'ios';
-  const ctaLabel = isIOS ? 'Ver estado comercial' : copy.cta;
+  const ctaLabel = isIOS ? 'Revisar cuenta' : copy.cta;
   const titleText = isIOS
-    ? 'Función disponible según el plan activo'
+    ? 'Función no disponible en esta cuenta'
     : copy.title;
   const bodyText = isIOS
-    ? 'Esta sección depende del plan activo de la cuenta. En iPhone, la activación comercial se resuelve fuera de la app.'
+    ? 'Para revisar el acceso disponible en esta cuenta desde iPhone, abrí la cuenta o contactá a soporte.'
     : copy.body;
 
   return (

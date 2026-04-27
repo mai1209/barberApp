@@ -34,6 +34,7 @@ import {
 import { resolveUserRole } from '../services/subscriptionAccess';
 
 const SUPPORT_EMAIL = 'barberappbycodex@gmail.com';
+const SUPPORT_URL = 'https://barberappbycodex.com/soporte';
 const PRIVACY_POLICY_URL = 'https://barberappbycodex.com/politica-de-privacidad';
 const ACCOUNT_DELETION_URL = 'https://barberappbycodex.com/eliminacion-de-cuenta';
 
@@ -133,13 +134,10 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
   };
 
   const handleSupportMail = async () => {
-    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
-      'Soporte BarberApp',
-    )}`;
     try {
-      await Linking.openURL(url);
+      await Linking.openURL(SUPPORT_URL);
     } catch (_error) {
-      Alert.alert('No pudimos abrir el mail', SUPPORT_EMAIL);
+      Alert.alert('No pudimos abrir el soporte', SUPPORT_URL);
     }
   };
 
@@ -232,12 +230,16 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
             />
           </View>
 
-          <Text style={styles.sectionLabel}>Plan</Text>
+          <Text style={styles.sectionLabel}>{isIOS ? 'Cuenta' : 'Plan'}</Text>
           <View style={styles.groupCard}>
             <MenuItem
               icon={Crown}
-              label="Plan y suscripción"
-              description="Estado del plan, vencimiento y comparación de opciones."
+              label={isIOS ? 'Estado de cuenta' : 'Plan y suscripción'}
+              description={
+                isIOS
+                  ? 'Estado actual y acceso disponible en la cuenta.'
+                  : 'Estado del plan, vencimiento y comparación de opciones.'
+              }
               onPress={() => navigation.navigate('Subscription-Settings')}
               theme={theme}
               styles={styles}
@@ -321,7 +323,7 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
         <MenuItem
           icon={Mail}
           label="Comunicate con soporte"
-          description="Abrí un mail y te ayudamos con la configuración."
+          description="Abrí la página de soporte con mail, WhatsApp y contacto."
           onPress={handleSupportMail}
           theme={theme}
           styles={styles}
