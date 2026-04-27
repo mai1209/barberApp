@@ -8,6 +8,9 @@ let serviceAccount;
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   try {
     serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    if (typeof serviceAccount?.private_key === "string") {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
+    }
     console.log("✅ Usando Firebase desde Variable de Entorno");
   } catch (error) {
     console.error("❌ Error parseando JSON de FIREBASE_SERVICE_ACCOUNT:", error);
