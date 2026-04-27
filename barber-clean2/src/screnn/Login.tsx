@@ -30,6 +30,8 @@ const AUTH_THEME = {
   background: '#121212',
   logo: require('../assets/logoBarber.png'),
 } as const;
+const ANDROID_REGISTER_URL =
+  'https://barberappbycodex.com/registro';
 const IOS_SUPPORT_WHATSAPP_URL =
   'https://barberappbycodex.com/soporte';
 
@@ -50,6 +52,14 @@ function Login({ navigation }: any) {
       await Linking.openURL(IOS_SUPPORT_WHATSAPP_URL);
     } catch (_error) {
       setError('No pudimos abrir la página de soporte');
+    }
+  };
+
+  const handleOpenAndroidRegister = async () => {
+    try {
+      await Linking.openURL(ANDROID_REGISTER_URL);
+    } catch (_error) {
+      setError('No pudimos abrir la web de registro');
     }
   };
 
@@ -122,7 +132,7 @@ function Login({ navigation }: any) {
               <View style={styles.iosInfoCard}>
                 <Text style={styles.iosInfoTitle}>Acceso con cuenta existente</Text>
                 <Text style={styles.iosInfoText}>
-                  Esta app funciona con cuentas ya habilitadas. Si necesitás ayuda para
+                  Las cuentas se administran fuera de la app. Si necesitás ayuda para
                   acceder o revisar el estado de tu cuenta, podés hablar con soporte.
                 </Text>
                 <Pressable
@@ -207,6 +217,18 @@ function Login({ navigation }: any) {
                 <Text style={styles.recoverTextBold}>Recuperarla</Text>
               </Text>
             </Pressable>
+
+            {!isIOS ? (
+              <Pressable
+                onPress={handleOpenAndroidRegister}
+                style={styles.registerBtn}
+              >
+                <Text style={styles.registerText}>
+                  ¿No tenés cuenta?{' '}
+                  <Text style={styles.registerTextBold}>Creala por web</Text>
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
           <Text style={styles.codexText}>BarberApp by CODEX®</Text>
         </ScrollView>
