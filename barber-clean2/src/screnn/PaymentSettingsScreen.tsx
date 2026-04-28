@@ -62,6 +62,7 @@ function normalizeFormFromUser(user: any): FormState {
 export default function PaymentSettingsScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const isIOS = Platform.OS === 'ios';
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -99,12 +100,16 @@ export default function PaymentSettingsScreen() {
 
   const advanceHelper = useMemo(() => {
     if (!form.advancePaymentEnabled) return 'El cliente solo ve pago en el local.';
-    if (form.mercadoPagoConnectionStatus !== 'connected') return 'Para mostrar el pago online, conectá Mercado Pago.';
+    if (form.mercadoPagoConnectionStatus !== 'connected') {
+      return isIOS
+        ? 'Para habilitar esta opción, completá la configuración del proveedor de pagos.'
+        : 'Para mostrar el pago online, conectá Mercado Pago.';
+    }
     if (form.advanceMode === 'full') return 'El cliente paga el turno completo antes de confirmar.';
     return form.advanceType === 'fixed'
       ? `El cliente paga ${form.advanceValue || '0'} pesos por adelantado.`
       : `El cliente paga ${form.advanceValue || '0'}% por adelantado.`;
-  }, [form]);
+  }, [form, isIOS]);
 
   const mercadoPagoStatusLabel = useMemo(() => {
     if (form.mercadoPagoConnectionStatus === 'connected') {
@@ -193,7 +198,11 @@ export default function PaymentSettingsScreen() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.scrollContent}>
       <View style={styles.header}>
         <Text style={styles.title}>Cobros</Text>
-        <Text style={styles.subtitle}>Elegí cómo querés que tus clientes paguen sus turnos.</Text>
+        <Text style={styles.subtitle}>
+          {isIOS
+            ? 'Definí los medios de cobro disponibles para registrar reservas y cobros en tu cuenta.'
+            : 'Elegí cómo querés que tus clientes paguen sus turnos.'}
+        </Text>
       </View>
 
       {!!error && <Text style={styles.errorText}>{error}</Text>}
@@ -210,7 +219,11 @@ export default function PaymentSettingsScreen() {
         <View style={styles.separator} />
         <RowSwitch
           label="Aceptar pago online"
-          description="Cobro adelantado vía Mercado Pago."
+          description={
+            isIOS
+              ? 'Habilita el cobro anticipado cuando la cuenta de pagos esté lista.'
+              : 'Cobro adelantado vía Mercado Pago.'
+          }
           value={form.advancePaymentEnabled}
           onValueChange={(v: boolean) =>
             setForm(c => ({ ...c, advancePaymentEnabled: v }))
@@ -250,7 +263,9 @@ export default function PaymentSettingsScreen() {
 
       {form.advancePaymentEnabled ? (
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Mercado Pago</Text>
+          <Text style={styles.sectionTitle}>
+            {isIOS ? 'Cuenta de pagos' : 'Mercado Pago'}
+          </Text>
           <View
             style={[
               styles.statusNotice,
@@ -291,8 +306,8 @@ export default function PaymentSettingsScreen() {
             </Text>
           </View>
           <View style={styles.actionStack}>
-            <SegmentButton
-              label={connecting ? 'Abriendo...' : 'Conectar'}
+              <SegmentButton
+              label={connecting ? 'Abriendo...' : isIOS ? 'Configurar cuenta' : 'Conectar'}
               active={false}
               onPress={handleConnectMercadoPago}
               theme={theme}

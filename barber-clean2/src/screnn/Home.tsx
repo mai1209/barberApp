@@ -148,6 +148,7 @@ function getPaymentSnapshot(appointment: Appointment) {
 
 function Home({ navigation }: Props) {
   const { theme, shopSlug } = useTheme();
+  const isIOS = Platform.OS === 'ios';
   const [fullName, setFullName] = useState('');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -332,7 +333,9 @@ function Home({ navigation }: Props) {
 
       let paymentLabel = 'Revisá tus métodos de cobro.';
       if (mercadoPagoConnected && advanceEnabled) {
-        paymentLabel = 'Mercado Pago conectado y cobro online activo.';
+        paymentLabel = isIOS
+          ? 'La cuenta de cobros ya está lista para registrar pagos anticipados.'
+          : 'Mercado Pago conectado y cobro online activo.';
       } else if (cashEnabled) {
         paymentLabel = 'Tenés cobro en el local activo.';
       }
@@ -385,7 +388,9 @@ function Home({ navigation }: Props) {
           paymentReady: cashEnabled || mercadoPagoConnected,
           paymentLabel:
             mercadoPagoConnected && advanceEnabled
-              ? 'Mercado Pago conectado y cobro online activo.'
+              ? isIOS
+                ? 'La cuenta de cobros ya está lista para registrar pagos anticipados.'
+                : 'Mercado Pago conectado y cobro online activo.'
               : cashEnabled
                 ? 'Tenés cobro en el local activo.'
                 : 'Revisá tus métodos de cobro.',
@@ -857,47 +862,49 @@ function Home({ navigation }: Props) {
           </View>
         ) : null}
 
-        <View style={styles.compactCardsRow}>
-          <Pressable
-            style={[
-              styles.dualCompactCard,
-              !hasProAccess && styles.dualCompactCardLocked,
-            ]}
-            onPress={() =>
-              hasProAccess
-                ? navigation.navigate('Owner-Metrics')
-                : handleOpenProModal('metrics')
-            }
-          >
-            <View style={styles.metricsIconBox}>
-              <TrendingUp size={20} color={theme.primary} />
-            </View>
-            <Text style={styles.metricsTitleCompact}>Métricas</Text>
-            {!hasProAccess ? (
-              <Text style={styles.proBadgeCompact}>PRO</Text>
-            ) : null}
-          </Pressable>
+        {(Platform.OS !== 'ios' || hasProAccess) ? (
+          <View style={styles.compactCardsRow}>
+            <Pressable
+              style={[
+                styles.dualCompactCard,
+                !hasProAccess && styles.dualCompactCardLocked,
+              ]}
+              onPress={() =>
+                hasProAccess
+                  ? navigation.navigate('Owner-Metrics')
+                  : handleOpenProModal('metrics')
+              }
+            >
+              <View style={styles.metricsIconBox}>
+                <TrendingUp size={20} color={theme.primary} />
+              </View>
+              <Text style={styles.metricsTitleCompact}>Métricas</Text>
+              {!hasProAccess ? (
+                <Text style={styles.proBadgeCompact}>PRO</Text>
+              ) : null}
+            </Pressable>
 
-          <Pressable
-            style={[
-              styles.dualCompactCard,
-              !hasProAccess && styles.dualCompactCardLocked,
-            ]}
-            onPress={() =>
-              hasProAccess
-                ? navigation.navigate('Customer-History')
-                : handleOpenProModal('history')
-            }
-          >
-            <View style={styles.metricsIconBox}>
-              <Users size={20} color={theme.primary} />
-            </View>
-            <Text style={styles.metricsTitleCompact}>Historial</Text>
-            {!hasProAccess ? (
-              <Text style={styles.proBadgeCompact}>PRO</Text>
-            ) : null}
-          </Pressable>
-        </View>
+            <Pressable
+              style={[
+                styles.dualCompactCard,
+                !hasProAccess && styles.dualCompactCardLocked,
+              ]}
+              onPress={() =>
+                hasProAccess
+                  ? navigation.navigate('Customer-History')
+                  : handleOpenProModal('history')
+              }
+            >
+              <View style={styles.metricsIconBox}>
+                <Users size={20} color={theme.primary} />
+              </View>
+              <Text style={styles.metricsTitleCompact}>Historial</Text>
+              {!hasProAccess ? (
+                <Text style={styles.proBadgeCompact}>PRO</Text>
+              ) : null}
+            </Pressable>
+          </View>
+        ) : null}
 
         <View style={styles.section}>
           <View style={styles.agendaTopRow}>
@@ -985,13 +992,15 @@ function Home({ navigation }: Props) {
           </View>
         </View>
       </ScrollView>
-      <ProFeatureModal
-        visible={proModalVariant != null}
-        variant={proModalVariant ?? 'metrics'}
-        theme={theme}
-        onClose={handleCloseProModal}
-        onOpenPlan={handleOpenSubscriptionSettings}
-      />
+      {(Platform.OS !== 'ios' || hasProAccess) ? (
+        <ProFeatureModal
+          visible={proModalVariant != null}
+          variant={proModalVariant ?? 'metrics'}
+          theme={theme}
+          onClose={handleCloseProModal}
+          onOpenPlan={handleOpenSubscriptionSettings}
+        />
+      ) : null}
       <Modal
         visible={welcomeModalVisible}
         transparent

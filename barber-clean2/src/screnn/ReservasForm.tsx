@@ -721,7 +721,9 @@ function ReservasForm({ navigation, route }: any) {
                     }
                   </Text>
                   <Text style={styles.paymentMiniNote}>
-                    En la app solo dejamos cobro presencial. El pago online queda para las reservas desde la web.
+                    {Platform.OS === 'ios'
+                      ? 'Elegí el medio disponible para esta reserva.'
+                      : 'En la app solo dejamos cobro presencial. El pago online queda para las reservas desde la web.'}
                   </Text>
                 </>
               ) : (

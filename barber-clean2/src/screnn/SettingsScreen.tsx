@@ -223,7 +223,11 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
             <MenuItem
               icon={CreditCard}
               label="Configurar cobros"
-              description="Efectivo, seña online y estado de Mercado Pago."
+              description={
+                isIOS
+                  ? 'Medios de cobro disponibles y estado general de la cuenta de pagos.'
+                  : 'Efectivo, seña online y estado de Mercado Pago.'
+              }
               onPress={() => navigation.navigate('Payment-Settings')}
               theme={theme}
               styles={styles}

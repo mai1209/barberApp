@@ -691,25 +691,27 @@ function BarberDashboard({ route, navigation }: Props) {
                 </Pressable>
               ) : null}
 
-              <Pressable
-                onPress={() =>
-                  hasProAccess
-                    ? navigation.navigate('Metrics', {
-                        barberId: activeBarberId ?? undefined,
-                        barberName:
-                          barberProfile?.fullName || resolvedBarberName,
-                      })
-                    : handleProFeaturePress()
-                }
-                style={({ pressed }) => [
-                  styles.secondaryActionBtn,
-                  !hasProAccess && styles.secondaryActionBtnLocked,
-                  pressed && { backgroundColor: hexToRgba(theme.primary, 0.2) },
-                ]}
-              >
-                <BarChart2 size={14} color={theme.primary} />
-                <Text style={styles.secondaryActionText}>Métricas</Text>
-              </Pressable>
+              {(Platform.OS !== 'ios' || hasProAccess) ? (
+                <Pressable
+                  onPress={() =>
+                    hasProAccess
+                      ? navigation.navigate('Metrics', {
+                          barberId: activeBarberId ?? undefined,
+                          barberName:
+                            barberProfile?.fullName || resolvedBarberName,
+                        })
+                      : handleProFeaturePress()
+                  }
+                  style={({ pressed }) => [
+                    styles.secondaryActionBtn,
+                    !hasProAccess && styles.secondaryActionBtnLocked,
+                    pressed && { backgroundColor: hexToRgba(theme.primary, 0.2) },
+                  ]}
+                >
+                  <BarChart2 size={14} color={theme.primary} />
+                  <Text style={styles.secondaryActionText}>Métricas</Text>
+                </Pressable>
+              ) : null}
             </View>
           </View>
         </View>
@@ -801,13 +803,15 @@ function BarberDashboard({ route, navigation }: Props) {
           </View>
         </View>
       </ScrollView>
-      <ProFeatureModal
-        visible={showProModal}
-        variant="barber-metrics"
-        theme={theme}
-        onClose={handleCloseProModal}
-        onOpenPlan={handleOpenSubscriptionSettings}
-      />
+      {(Platform.OS !== 'ios' || hasProAccess) ? (
+        <ProFeatureModal
+          visible={showProModal}
+          variant="barber-metrics"
+          theme={theme}
+          onClose={handleCloseProModal}
+          onOpenPlan={handleOpenSubscriptionSettings}
+        />
+      ) : null}
     </KeyboardAvoidingView>
   );
 }

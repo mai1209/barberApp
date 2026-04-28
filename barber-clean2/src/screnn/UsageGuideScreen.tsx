@@ -101,6 +101,7 @@ export default function UsageGuideScreen({ navigation }: Props) {
   const { theme, shopSlug } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [currentUser, setCurrentUser] = useState<any | null>(null);
+  const isIOS = Platform.OS === 'ios';
 
   useEffect(() => {
     let mounted = true;
@@ -183,7 +184,7 @@ export default function UsageGuideScreen({ navigation }: Props) {
           <StepCard
             step="2"
             title="Cargá turnos manuales"
-            description="Si alguien te pide un turno por fuera de la web, podés cargarlo desde Nuevo turno."
+            description="Si alguien te pide un turno por otro canal, podés cargarlo desde Nuevo turno."
             icon={Users}
             actionLabel="Nuevo turno"
             onPress={() => navigation.navigate('Reservas')}
@@ -227,7 +228,11 @@ export default function UsageGuideScreen({ navigation }: Props) {
           <StepCard
             step="3"
             title="Configurá cómo cobrás"
-            description="Definí si aceptás efectivo, transferencia o seña online con Mercado Pago para que el cliente vea las opciones correctas."
+            description={
+              isIOS
+                ? 'Definí los medios de cobro disponibles para que la agenda quede bien configurada.'
+                : 'Definí si aceptás efectivo, transferencia o seña online con Mercado Pago para que el cliente vea las opciones correctas.'
+            }
             icon={CreditCard}
             actionLabel="Ir a cobros"
             onPress={() => navigation.navigate('Payment-Settings')}
@@ -237,7 +242,11 @@ export default function UsageGuideScreen({ navigation }: Props) {
           <StepCard
             step="4"
             title="Compartí tu enlace de turnos"
-            description="Copiá tu link y mandalo por WhatsApp, Instagram o donde quieras. Ese link abre la web para que tus clientes pidan turnos solos."
+            description={
+              isIOS
+                ? 'Copiá tu link y compartilo con tus clientes por el canal que prefieras.'
+                : 'Copiá tu link y mandalo por WhatsApp, Instagram o donde quieras. Ese link abre la web para que tus clientes pidan turnos solos.'
+            }
             icon={Link2}
             actionLabel="Copiar enlace"
             onPress={handleCopyLink}
@@ -278,7 +287,11 @@ export default function UsageGuideScreen({ navigation }: Props) {
             <TipRow
               icon={Store}
               title="Ajustes"
-              text="Acá tenés colores, servicios, notificaciones, cierre de barbería, pagos, suscripción y seguridad."
+              text={
+                isIOS
+                  ? 'Acá tenés colores, servicios, notificaciones, cierre de barbería, cobros y seguridad.'
+                  : 'Acá tenés colores, servicios, notificaciones, cierre de barbería, pagos, suscripción y seguridad.'
+              }
               styles={styles}
               theme={theme}
             />
@@ -308,7 +321,9 @@ export default function UsageGuideScreen({ navigation }: Props) {
         <Text style={styles.noteText}>
           {isBarberUser
             ? 'Si necesitás cambiar horarios, foto, servicios o datos de tu perfil, pedíselo al administrador de la barbería.'
-            : 'Primero cargá servicios. Después sumá barberos. Recién ahí configurá cobros y compartí el link. Así evitás que el cliente entre a una web incompleta.'}
+            : isIOS
+              ? 'Primero cargá servicios. Después sumá barberos. Recién ahí configurá cobros y compartí el link. Así dejás la cuenta lista para trabajar.'
+              : 'Primero cargá servicios. Después sumá barberos. Recién ahí configurá cobros y compartí el link. Así evitás que el cliente entre a una web incompleta.'}
         </Text>
       </View>
     </ScrollView>
