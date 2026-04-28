@@ -402,6 +402,22 @@ const resolveBarberScheduleForDate = (barber, date) => {
   };
 };
 
+const uniqueServicesById = (list) => {
+  const seen = new Set();
+  return (list || []).filter((item) => {
+    const id = String(item?._id || item?.serviceId || "").trim();
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+};
+
+const buildServiceSummary = (list) => {
+  if (!list?.length) return "Seleccionar servicio";
+  if (list.length === 1) return list[0].name;
+  return list.map((item) => item.name).join(" + ");
+};
+
 function BookingForm({ shopSlug, onNotFound }) {
   // 1. TODOS LOS USESTATE PRIMERO
   const [slugReady] = useState(() => {
@@ -423,7 +439,7 @@ function BookingForm({ shopSlug, onNotFound }) {
   const [shopInfo, setShopInfo] = useState(null);
   const [shopLoading, setShopLoading] = useState(true);
   const [services, setServices] = useState([]);
-  const [selectedService, setSelectedService] = useState(null);
+  const [selectedServices, setSelectedServices] = useState([]);
   const [servicePickerOpen, setServicePickerOpen] = useState(false);
   const [email, setEmail] = useState(""); // <-- AGREGAR ESTO
   const [emailConfirmation, setEmailConfirmation] = useState("");
@@ -434,8 +450,27 @@ function BookingForm({ shopSlug, onNotFound }) {
   const [shopUnavailable, setShopUnavailable] = useState(false);
   const [closedDayNotice, setClosedDayNotice] = useState("");
 
-  const currentDuration =
-    selectedService?.durationMinutes ?? SLOT_INTERVAL_MINUTES;
+  const selectedServiceSummary = useMemo(
+    () => buildServiceSummary(selectedServices),
+    [selectedServices],
+  );
+
+  const currentDuration = useMemo(() => {
+    const total = selectedServices.reduce(
+      (sum, item) => sum + Number(item?.durationMinutes || 0),
+      0,
+    );
+    return total || SLOT_INTERVAL_MINUTES;
+  }, [selectedServices]);
+
+  const currentServicePrice = useMemo(
+    () =>
+      selectedServices.reduce(
+        (sum, item) => sum + Number(item?.price || 0),
+        0,
+      ),
+    [selectedServices],
+  );
 
   // 2. USEMEMO
   const selectedBarberData = useMemo(
@@ -627,7 +662,7 @@ function BookingForm({ shopSlug, onNotFound }) {
         const res = await fetchServices();
         const list = res?.services ?? [];
         setServices(list);
-        setSelectedService(list[0] ?? null);
+        setSelectedServices(list[0] ? [list[0]] : []);
       } catch (err) {
         console.error("Error servicios:", err?.message, err?.status);
         if (err?.status === 404) {
@@ -773,13 +808,26 @@ function BookingForm({ shopSlug, onNotFound }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const serviceName = selectedService?.name || "Servicio";
+    const normalizedServices = uniqueServicesById(selectedServices);
+    const serviceName = buildServiceSummary(normalizedServices);
 
     // Detectamos si estamos en localhost
     const isDev = window.location.hostname === "localhost";
 
     if (!selectedBarber || !selectedSlot) {
       alert("Por favor selecciona barbero y horario");
+      return;
+    }
+
+    if (!normalizedServices.length) {
+      alert("Seleccioná al menos un servicio para reservar.");
+      return;
+    }
+
+    if (currentDuration > 240) {
+      alert(
+        "La combinación de servicios supera las 4 horas. Ajustá la selección para continuar.",
+      );
       return;
     }
 
@@ -806,9 +854,15 @@ function BookingForm({ shopSlug, onNotFound }) {
         barberId: selectedBarber,
         customerName: customerName.trim(),
         service: serviceName,
+        serviceItems: normalizedServices.map((item) => ({
+          serviceId: item._id,
+          name: item.name,
+          durationMinutes: Number(item.durationMinutes || 0),
+          price: Number(item.price || 0),
+        })),
         startTime: finalDateUTC,
         durationMinutes: currentDuration,
-        servicePrice: selectedService?.price ?? 0,
+        servicePrice: currentServicePrice,
         notes: phone.trim(),
         email: emailReview.normalized,
         paymentMethod,
@@ -911,10 +965,15 @@ function BookingForm({ shopSlug, onNotFound }) {
                 <button
                   type="button"
                   key={service._id}
-                  className={`${styles.serviceItem} ${selectedService?._id === service._id ? styles.serviceItemActive : ""}`}
+                  className={`${styles.serviceItem} ${selectedServices.some((item) => item._id === service._id) ? styles.serviceItemActive : ""}`}
                   onClick={() => {
-                    setSelectedService(service);
-                    setServicePickerOpen(false);
+                    setSelectedServices((prev) => {
+                      const exists = prev.some((item) => item._id === service._id);
+                      if (exists) {
+                        return prev.filter((item) => item._id !== service._id);
+                      }
+                      return uniqueServicesById([...prev, service]);
+                    });
                   }}
                 >
                   <div>
@@ -926,8 +985,27 @@ function BookingForm({ shopSlug, onNotFound }) {
                       {formatPrice(service.price)}
                     </span>
                   </div>
+                  <span className={styles.serviceItemState}>
+                    {selectedServices.some((item) => item._id === service._id)
+                      ? "Seleccionado"
+                      : "Sumar"}
+                  </span>
                 </button>
               ))}
+            </div>
+            <div className={styles.modalFooter}>
+              <p className={styles.modalFooterSummary}>
+                {selectedServices.length
+                  ? `${selectedServices.length} servicio(s) · ${currentDuration} min · ${formatPrice(currentServicePrice)}`
+                  : "Seleccioná al menos un servicio."}
+              </p>
+              <button
+                type="button"
+                className={styles.modalFooterAction}
+                onClick={() => setServicePickerOpen(false)}
+              >
+                Confirmar selección
+              </button>
             </div>
           </div>
         </div>
@@ -993,11 +1071,13 @@ function BookingForm({ shopSlug, onNotFound }) {
           >
             <div>
               <span className={styles.selectorMainText}>
-                {selectedService?.name || "Seleccionar servicio"}
+                {selectedServiceSummary}
               </span>
               <span className={styles.selectorSubText}>
                 {currentDuration} minutos ·{" "}
-                {selectedService ? formatPrice(selectedService.price) : "..."}
+                {selectedServices.length
+                  ? formatPrice(currentServicePrice)
+                  : "..."}
               </span>
             </div>
             <span className={styles.arrowIcon}>▼</span>

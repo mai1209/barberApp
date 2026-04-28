@@ -302,6 +302,81 @@ async function resolveServicePrice({ ownerId, serviceName, providedPrice }) {
   return Number(serviceDoc?.price || 0);
 }
 
+async function resolvePublicAppointmentServices({
+  ownerId,
+  serviceName,
+  durationMinutes,
+  providedPrice,
+  serviceItems,
+}) {
+  const normalizedItems = Array.isArray(serviceItems)
+    ? serviceItems
+        .map((item) => ({
+          serviceId: String(item?.serviceId || item?._id || "").trim(),
+          name: String(item?.name || "").trim(),
+        }))
+        .filter((item) => item.serviceId)
+    : [];
+
+  if (!normalizedItems.length) {
+    return {
+      serviceLabel: String(serviceName || "Servicio").trim() || "Servicio",
+      totalDurationMinutes: Number(durationMinutes) || 30,
+      totalServicePrice: await resolveServicePrice({
+        ownerId,
+        serviceName,
+        providedPrice,
+      }),
+    };
+  }
+
+  const serviceIds = [...new Set(normalizedItems.map((item) => item.serviceId))];
+  const serviceDocs = await ServiceModel.find({
+    _id: { $in: serviceIds },
+    owner: ownerId,
+    isActive: true,
+  })
+    .select({ _id: 1, name: 1, durationMinutes: 1, price: 1 })
+    .lean();
+
+  if (serviceDocs.length !== serviceIds.length) {
+    const error = new Error("Uno o más servicios seleccionados ya no están disponibles.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const byId = new Map(serviceDocs.map((doc) => [String(doc._id), doc]));
+  const orderedServices = serviceIds.map((id) => byId.get(id)).filter(Boolean);
+  const totalDurationMinutes = orderedServices.reduce(
+    (sum, item) => sum + Number(item.durationMinutes || 0),
+    0,
+  );
+  const totalServicePrice = orderedServices.reduce(
+    (sum, item) => sum + Number(item.price || 0),
+    0,
+  );
+
+  if (!orderedServices.length) {
+    const error = new Error("Necesitamos al menos un servicio válido para reservar.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (totalDurationMinutes < 15 || totalDurationMinutes > 240) {
+    const error = new Error(
+      "La combinación de servicios debe durar entre 15 minutos y 4 horas.",
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return {
+    serviceLabel: orderedServices.map((item) => item.name).join(" + "),
+    totalDurationMinutes,
+    totalServicePrice,
+  };
+}
+
 export async function publicGetShop(req, res, next) {
   try {
     const shop = await findActiveShop(req.params.shopSlug);
@@ -696,6 +771,7 @@ export async function publicCreateAppointment(req, res, next) {
       barberId,
       customerName,
       service,
+      serviceItems,
       startTime,
       durationMinutes,
       notes,
@@ -736,9 +812,32 @@ export async function publicCreateAppointment(req, res, next) {
       return res.status(400).json({ error: "El barbero no trabaja este día." });
     }
 
-    // --- VALIDACIÓN DE SOLAPAMIENTO (mismo criterio que la app) ---
+    let normalizedPaymentMethod;
+    try {
+      normalizedPaymentMethod = validatePublicPaymentSelection(shop, paymentMethod);
+    } catch (validationError) {
+      return res.status(400).json({ error: validationError.message });
+    }
+
+    let resolvedServices;
+    try {
+      resolvedServices = await resolvePublicAppointmentServices({
+        ownerId,
+        serviceName: service,
+        durationMinutes,
+        providedPrice: servicePrice,
+        serviceItems,
+      });
+    } catch (serviceError) {
+      return res.status(serviceError.statusCode || 400).json({
+        error: serviceError.message,
+      });
+    }
+
+    // Validamos solapamiento con la duración final ya normalizada por el servidor.
     const endTime = new Date(
-      appointmentDate.getTime() + (Number(durationMinutes) || 30) * 60000,
+      appointmentDate.getTime() +
+        resolvedServices.totalDurationMinutes * 60000,
     );
     const overlappingCandidates = await AppointmentModel.find({
       owner: ownerId,
@@ -761,31 +860,19 @@ export async function publicCreateAppointment(req, res, next) {
       return res.status(409).json({ error: "El horario ya está ocupado" });
     }
 
-    let normalizedPaymentMethod;
-    try {
-      normalizedPaymentMethod = validatePublicPaymentSelection(shop, paymentMethod);
-    } catch (validationError) {
-      return res.status(400).json({ error: validationError.message });
-    }
-    const resolvedServicePrice = await resolveServicePrice({
-      ownerId,
-      serviceName: service,
-      providedPrice: servicePrice,
-    });
-
     // Guardamos en la base de datos
     const appointment = await AppointmentModel.create({
       owner: ownerId,
       barber: barberId,
       customerName: customerName.trim(),
       customerEmail: email ? String(email).trim().toLowerCase() : null,
-      service,
+      service: resolvedServices.serviceLabel,
       startTime: appointmentDate,
-      durationMinutes: Number(durationMinutes) || 30,
-      servicePrice: resolvedServicePrice,
-      amountTotal: resolvedServicePrice,
+      durationMinutes: resolvedServices.totalDurationMinutes,
+      servicePrice: resolvedServices.totalServicePrice,
+      amountTotal: resolvedServices.totalServicePrice,
       amountPaid: 0,
-      amountPending: resolvedServicePrice,
+      amountPending: resolvedServices.totalServicePrice,
       notes,
       paymentMethod: normalizedPaymentMethod,
       paymentMethodCollected: null,
@@ -824,8 +911,8 @@ export async function publicCreateAppointment(req, res, next) {
                 : "💈¡Nuevo Turno (Web)!",
             body:
               normalizedPaymentMethod === "transfer"
-                ? `${customerName} inició ${service} con ${barber.fullName} el ${dateLabel} a las ${timeLabel} desde la web. Esperando pago.`
-                : `${customerName} reservó ${service} con ${barber.fullName} el ${dateLabel} a las ${timeLabel} desde la web.`,
+                ? `${customerName} inició ${resolvedServices.serviceLabel} con ${barber.fullName} el ${dateLabel} a las ${timeLabel} desde la web. Esperando pago.`
+                : `${customerName} reservó ${resolvedServices.serviceLabel} con ${barber.fullName} el ${dateLabel} a las ${timeLabel} desde la web.`,
           },
           android: { priority: "high" },
         };
@@ -883,7 +970,7 @@ export async function publicCreateAppointment(req, res, next) {
         </p>
         <p style="margin: 10px 0; color: #ccc; font-size: 15px;">
           <span style="color: #B89016; margin-right: 5px;">◈</span> <strong>Servicio:</strong> 
-          <span style="color: #FF1493; font-weight: bold;">${service}</span>
+          <span style="color: #FF1493; font-weight: bold;">${resolvedServices.serviceLabel}</span>
         </p>
         <p style="margin: 10px 0; color: #ccc; font-size: 15px;">
           <span style="color: #B89016; margin-right: 5px;">◈</span> <strong>Fecha:</strong> 
@@ -916,7 +1003,7 @@ export async function publicCreateAppointment(req, res, next) {
       try {
         await sendAppMail({
           to: email,
-          subject: `✅ Turno Confirmado: ${service}`,
+          subject: `✅ Turno Confirmado: ${resolvedServices.serviceLabel}`,
           html: mailHtml,
         });
         console.log("✅ Email de confirmacion enviado a:", email);
