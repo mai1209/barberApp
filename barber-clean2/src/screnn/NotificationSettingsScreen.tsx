@@ -46,6 +46,7 @@ export default function NotificationSettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<NotificationSettings>({
+    barberInstantBookingEnabled: true,
     barberReminderEnabled: true,
     barberReminderMinutesBefore: 60,
     customerSameDayEmailEnabled: true,
@@ -60,6 +61,8 @@ export default function NotificationSettingsScreen() {
         if (!active) return;
         const settings = res?.user?.notificationSettings ?? {};
         setForm({
+          barberInstantBookingEnabled:
+            settings.barberInstantBookingEnabled !== false,
           barberReminderEnabled: settings.barberReminderEnabled !== false,
           barberReminderMinutesBefore: settings.barberReminderMinutesBefore ?? 60,
           customerSameDayEmailEnabled:
@@ -116,9 +119,62 @@ export default function NotificationSettingsScreen() {
     >
       <View style={styles.header}>
         <Text style={styles.title}>Notificaciones</Text>
-        <Text style={styles.subtitle}>
-          Elegí si querés recordatorios para vos y mails automáticos para el cliente.
+       
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionLabel}>Nuevo turno al barbero</Text>
+        <Text style={styles.sectionHint}>
+          Cuando entra una reserva nueva, el admin la recibe siempre y al barbero se la mandamos si esto está activado.
         </Text>
+
+        <View style={styles.toggleRow}>
+          <Pressable
+            style={[
+              styles.toggleChip,
+              form.barberInstantBookingEnabled && styles.toggleChipActive,
+            ]}
+            onPress={() =>
+              setForm(current => ({
+                ...current,
+                barberInstantBookingEnabled: true,
+              }))
+            }
+          >
+            <Text
+              style={[
+                styles.toggleChipText,
+                form.barberInstantBookingEnabled && styles.toggleChipTextActive,
+              ]}
+            >
+              Activado
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={[
+              styles.toggleChip,
+              form.barberInstantBookingEnabled === false &&
+                styles.toggleChipActive,
+            ]}
+            onPress={() =>
+              setForm(current => ({
+                ...current,
+                barberInstantBookingEnabled: false,
+              }))
+            }
+          >
+            <Text
+              style={[
+                styles.toggleChipText,
+                form.barberInstantBookingEnabled === false &&
+                  styles.toggleChipTextActive,
+              ]}
+            >
+              Desactivado
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.card}>
@@ -295,6 +351,7 @@ function createStyles(theme: Theme) {
       gap: 16,
     },
     header: {
+      marginTop:30,
       gap: 8,
       marginBottom: 8,
     },
@@ -303,11 +360,7 @@ function createStyles(theme: Theme) {
       fontSize: 32,
       fontWeight: '800',
     },
-    subtitle: {
-      color: hexToRgba(theme.primary, 0.56),
-      fontSize: 14,
-      lineHeight: 20,
-    },
+
     card: {
       backgroundColor: theme.card,
       borderRadius: 22,

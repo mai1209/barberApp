@@ -15,6 +15,11 @@ import {
   serializeBarberClosure,
 } from "../utils/barberClosures.js";
 import {
+  normalizeBarberTimeBlocks,
+  resolveBarberTimeBlocksForDate,
+  serializeBarberTimeBlocks,
+} from "../utils/barberTimeBlocks.js";
+import {
   resolveShopClosureForDate,
   serializeShopClosure,
 } from "../utils/shopClosures.js";
@@ -36,6 +41,8 @@ function serializeBarber(doc, accessByBarberId = new Map()) {
     scheduleRanges: normalizeScheduleRanges(doc.scheduleRanges),
     dayScheduleOverrides: normalizeDayScheduleOverrides(doc.dayScheduleOverrides),
     barberClosedDays: normalizeBarberClosedDays(doc.barberClosedDays),
+    bookingBufferMinutes: Number(doc.bookingBufferMinutes || 0),
+    barberTimeBlocks: serializeBarberTimeBlocks(doc.barberTimeBlocks),
     workDays: Array.from(new Set(doc.workDays || []))
       .map(Number)
       .sort(),
@@ -120,6 +127,11 @@ export async function createBarber(req, res, next) {
       req.body?.dayScheduleOverrides,
     );
     const barberClosedDays = normalizeBarberClosedDays(req.body?.barberClosedDays);
+    const bookingBufferMinutes = Math.max(
+      0,
+      Math.min(120, Number(req.body?.bookingBufferMinutes ?? 0) || 0),
+    );
+    const barberTimeBlocks = normalizeBarberTimeBlocks(req.body?.barberTimeBlocks);
 
 
     if (!fullName) {
@@ -139,6 +151,8 @@ export async function createBarber(req, res, next) {
       scheduleRange: scheduleRange,
       scheduleRanges,
       dayScheduleOverrides,
+      bookingBufferMinutes,
+      barberTimeBlocks,
       barberClosedDays,
       workDays: cleanWorkDays,
       isActive: true,
@@ -192,6 +206,11 @@ export async function updateBarber(req, res, next) {
       req.body?.dayScheduleOverrides,
     );
     const barberClosedDays = normalizeBarberClosedDays(req.body?.barberClosedDays);
+    const bookingBufferMinutes = Math.max(
+      0,
+      Math.min(120, Number(req.body?.bookingBufferMinutes ?? 0) || 0),
+    );
+    const barberTimeBlocks = normalizeBarberTimeBlocks(req.body?.barberTimeBlocks);
 
     if (!fullName) {
       return res
@@ -220,6 +239,8 @@ export async function updateBarber(req, res, next) {
         scheduleRange: scheduleRange ?? null,
         scheduleRanges,
         dayScheduleOverrides,
+        bookingBufferMinutes,
+        barberTimeBlocks,
         barberClosedDays,
         workDays: cleanWorkDays,
       },
@@ -304,6 +325,10 @@ export async function listBarberAppointments(req, res, next) {
       barber,
       effectiveDate || date || new Date(),
     );
+    const barberTimeBlocks = resolveBarberTimeBlocksForDate(
+      barber,
+      effectiveDate || date || new Date(),
+    );
 
     // Buscamos los turnos ya ocupados para ese día
     const appointments = await AppointmentModel.find({
@@ -330,6 +355,7 @@ export async function listBarberAppointments(req, res, next) {
         : resolvedSchedule,
       shopClosure: serializeShopClosure(shopClosure),
       barberClosure: serializeBarberClosure(barberClosure),
+      barberTimeBlocks: serializeBarberTimeBlocks(barberTimeBlocks),
       appointments,
     });
   } catch (err) {

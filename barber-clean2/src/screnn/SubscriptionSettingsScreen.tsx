@@ -11,22 +11,35 @@ import {
   Text,
   View,
 } from 'react-native';
-import { getCurrentUser, getPlanPricing, updateSubscriptionSettings } from '../services/api';
+import { deepLinkToSubscriptions, ErrorCode, useIAP } from 'react-native-iap';
+import {
+  getCurrentUser,
+  getPlanPricing,
+  syncStoreSubscription,
+  updateSubscriptionSettings,
+} from '../services/api';
 import { saveUserProfile } from '../services/authStorage';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
+import {
+  buildStoreSyncPayloadFromActiveSubscription,
+  buildStoreSyncPayloadFromPurchase,
+  getStoreSubscriptionSkus,
+  inferPlanFromProductId,
+  isStoreBillingPlatform,
+  pickPrimaryActiveSubscription,
+  STORE_SUBSCRIPTION_PRODUCTS,
+} from '../services/storeBilling';
 
 const COMMERCIAL_EMAIL = 'barberappbycodex@gmail.com';
 const SUPPORT_URL = 'https://barberappbycodex.com/soporte';
-const CUSTOM_PLAN_URL =
-  'https://wa.me/543425543308?text=Hola%20quiero%20consultar%20por%20el%20plan%20personalizable%20de%20BarberApp';
-const PLANS_WEBSITE_URL = 'https://barberappbycodex.com/planes';
 
 type SubscriptionState = {
   plan?: 'basic' | 'pro' | 'custom';
   status?: 'trial' | 'active' | 'past_due' | 'cancelled';
   billingCycle?: 'monthly' | 'yearly' | 'custom' | null;
   renewalMode?: 'manual' | 'automatic';
+  provider?: 'mercadopago' | 'apple' | 'google' | null;
   customPriceArs?: number | null;
   customPriceUsdReference?: number | null;
   couponCode?: string | null;
@@ -41,6 +54,15 @@ type SubscriptionState = {
   mercadoPagoPreapprovalId?: string | null;
   mercadoPagoPreapprovalStatus?: string | null;
   nextBillingAt?: string | null;
+  storeProductId?: string | null;
+  storeCurrentPlanId?: string | null;
+  storePurchaseToken?: string | null;
+  storeTransactionId?: string | null;
+  storeOriginalTransactionId?: string | null;
+  storeEnvironment?: string | null;
+  storeLastSyncedAt?: string | null;
+  storeAutoRenewing?: boolean;
+  storeStatus?: string | null;
 };
 
 const PLAN_COPY: Record<
@@ -144,14 +166,90 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const isIOS = Platform.OS === 'ios';
+  const usesStoreBilling = isStoreBillingPlatform();
   const [subscription, setSubscription] = useState<SubscriptionState | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingRenewalMode, setUpdatingRenewalMode] = useState(false);
+  const [billingBusy, setBillingBusy] = useState(false);
+  const [billingSyncing, setBillingSyncing] = useState(false);
   const [priceOverrides, setPriceOverrides] = useState({
     basic: { ars: 25000, usdReference: 25 },
     pro: { ars: 35000, usdReference: 35 },
   });
+  const {
+    connected: billingConnected,
+    subscriptions: storeSubscriptions,
+    fetchProducts,
+    requestPurchase,
+    finishTransaction,
+    getActiveSubscriptions,
+    restorePurchases,
+  } = useIAP({
+    onPurchaseSuccess: async purchase => {
+      const payload = buildStoreSyncPayloadFromPurchase(purchase);
+      if (!payload) {
+        Alert.alert('Compra recibida', 'Recibimos la compra, pero no pudimos asociarla a un plan válido.');
+        return;
+      }
+
+      try {
+        setBillingBusy(true);
+        const response = await syncStoreSubscription(payload);
+        await saveUserProfile(response.user);
+        setSubscription(response.user?.subscription ?? null);
+        await finishTransaction({ purchase, isConsumable: false });
+        Alert.alert('Plan activado', 'La suscripción del negocio quedó activa en esta cuenta.');
+      } catch (error: any) {
+        Alert.alert(
+          'No pudimos activar el plan',
+          error?.message ?? 'La compra se registró, pero no pudimos sincronizarla con tu cuenta.',
+        );
+      } finally {
+        setBillingBusy(false);
+      }
+    },
+    onPurchaseError: error => {
+      if (error.code !== ErrorCode.UserCancelled) {
+        Alert.alert('No pudimos completar la compra', error.message || 'Probá de nuevo.');
+      }
+      setBillingBusy(false);
+    },
+    onError: error => {
+      console.log('Store billing error', error);
+    },
+  });
+
+  const syncActiveStoreSubscription = useCallback(async () => {
+    if (!usesStoreBilling || !billingConnected) return false;
+
+    try {
+      setBillingSyncing(true);
+      const activeSubscriptions = await getActiveSubscriptions(getStoreSubscriptionSkus());
+      const primarySubscription = pickPrimaryActiveSubscription(
+        activeSubscriptions.filter(item => item.isActive),
+      );
+
+      if (!primarySubscription) {
+        return false;
+      }
+
+      const payload = buildStoreSyncPayloadFromActiveSubscription(primarySubscription);
+      if (!payload) {
+        return false;
+      }
+
+      const response = await syncStoreSubscription(payload);
+      await saveUserProfile(response.user);
+      setSubscription(response.user?.subscription ?? null);
+      return true;
+    } catch (error) {
+      console.log('No se pudo sincronizar la suscripción activa del store', error);
+      return false;
+    } finally {
+      setBillingSyncing(false);
+    }
+  }, [billingConnected, getActiveSubscriptions, usesStoreBilling]);
 
   const loadSubscription = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -182,6 +280,21 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
   useEffect(() => {
     loadSubscription();
   }, [loadSubscription]);
+
+  useEffect(() => {
+    if (!usesStoreBilling || !billingConnected) return;
+
+    fetchProducts({ skus: getStoreSubscriptionSkus(), type: 'subs' }).catch(error => {
+      console.log('No se pudieron cargar los planes del store', error);
+    });
+  }, [billingConnected, fetchProducts, usesStoreBilling]);
+
+  useEffect(() => {
+    if (!usesStoreBilling || !billingConnected) return;
+    syncActiveStoreSubscription().catch(error => {
+      console.log('No se pudo sincronizar la suscripción activa', error);
+    });
+  }, [billingConnected, syncActiveStoreSubscription, usesStoreBilling]);
 
   const planKey = subscription?.plan ?? 'basic';
   const planInfo = PLAN_COPY[planKey];
@@ -256,18 +369,28 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
     subscription?.renewalMode === 'automatic' && Boolean(subscription?.mercadoPagoPreapprovalId);
   const nextRelevantBillingDate =
     subscription?.nextBillingAt || subscription?.expiresAt || null;
+  const currentStoreProductId = String(subscription?.storeProductId || '').trim() || null;
+  const currentStorePlan = inferPlanFromProductId(currentStoreProductId) ?? planKey;
+  const basicStoreProduct = storeSubscriptions.find(product => product.id === STORE_SUBSCRIPTION_PRODUCTS.basic);
+  const proStoreProduct = storeSubscriptions.find(product => product.id === STORE_SUBSCRIPTION_PRODUCTS.pro);
+  const currentGooglePurchaseToken =
+    subscription?.storePurchaseToken || null;
 
   const getRenewalHint = () => {
-    if (isIOS) {
-      if (subscription?.status === 'past_due' || subscription?.status === 'cancelled') {
-        return 'Revisá el estado de esta cuenta con soporte para continuar usando la app.';
+    if (usesStoreBilling) {
+      if (subscription?.status === 'past_due') {
+        return 'La suscripción del negocio quedó con pago pendiente. Revisala desde el store o restaurá la compra.';
+      }
+
+      if (subscription?.status === 'cancelled') {
+        return 'La suscripción del negocio está cancelada. Podés reactivarla comprando nuevamente el plan.';
       }
 
       if (!expiresAtDate || Number.isNaN(expiresAtDate.getTime())) {
-        return 'Si necesitás ayuda con esta cuenta, contactá a soporte.';
+        return 'Comprá o restaurá tu plan para habilitar el acceso operativo completo.';
       }
 
-      return 'Si necesitás ayuda con el acceso o con el vencimiento de esta cuenta, contactá a soporte.';
+      return 'Gestioná la suscripción del negocio desde tu store cuando necesites cambiar, renovar o restaurar el plan.';
     }
 
     if (!expiresAtDate || Number.isNaN(expiresAtDate.getTime())) {
@@ -293,27 +416,15 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
     return 'Tu plan está activo. Si querés, podés renovarlo antes del vencimiento.';
   };
 
-  const openCustomContact = async () => {
-    try {
-      await Linking.openURL(CUSTOM_PLAN_URL);
-    } catch (_error) {
-      Alert.alert('No pudimos abrir el contacto comercial', CUSTOM_PLAN_URL);
-    }
-  };
-
   const openSupportMail = async () => {
     try {
-      await Linking.openURL(isIOS ? SUPPORT_URL : `mailto:${COMMERCIAL_EMAIL}?subject=${encodeURIComponent('Consulta sobre plan BarberApp')}`);
+      await Linking.openURL(
+        usesStoreBilling
+          ? SUPPORT_URL
+          : `mailto:${COMMERCIAL_EMAIL}?subject=${encodeURIComponent('Consulta sobre plan BarberApp')}`,
+      );
     } catch (_error) {
-      Alert.alert('No pudimos abrir el soporte', isIOS ? SUPPORT_URL : COMMERCIAL_EMAIL);
-    }
-  };
-
-  const openPlansWebsite = async () => {
-    try {
-      await Linking.openURL(PLANS_WEBSITE_URL);
-    } catch (_error) {
-      Alert.alert('No pudimos abrir el sitio de planes', PLANS_WEBSITE_URL);
+      Alert.alert('No pudimos abrir el soporte', usesStoreBilling ? SUPPORT_URL : COMMERCIAL_EMAIL);
     }
   };
 
@@ -336,6 +447,108 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
     }
   };
 
+  const handlePurchasePlan = async (targetPlan: 'basic' | 'pro') => {
+    if (!usesStoreBilling) {
+      Alert.alert('Plan no disponible', 'Este flujo ahora se gestiona con la tienda del dispositivo.');
+      return;
+    }
+
+    const targetProductId = STORE_SUBSCRIPTION_PRODUCTS[targetPlan];
+    const product = storeSubscriptions.find(item => item.id === targetProductId);
+
+    if (!product) {
+      Alert.alert('Plan no disponible', 'Todavía no pudimos cargar este plan desde la tienda.');
+      return;
+    }
+
+    try {
+      setBillingBusy(true);
+
+      if (Platform.OS === 'ios') {
+        await requestPurchase({
+          type: 'subs',
+          request: {
+            apple: {
+              sku: targetProductId,
+            },
+          },
+        });
+        return;
+      }
+
+      const androidProduct = product.platform === 'android' ? product : null;
+      const firstOfferToken =
+        androidProduct?.subscriptionOffers?.[0]?.offerTokenAndroid ||
+        androidProduct?.subscriptionOfferDetailsAndroid?.[0]?.offerToken ||
+        null;
+
+      await requestPurchase({
+        type: 'subs',
+        request: {
+          google: {
+            skus: [targetProductId],
+            ...(firstOfferToken
+              ? {
+                  subscriptionOffers: [
+                    {
+                      sku: targetProductId,
+                      offerToken: firstOfferToken,
+                    },
+                  ],
+                }
+              : {}),
+            ...(currentStoreProductId &&
+            currentStorePlan &&
+            currentStorePlan !== targetPlan &&
+            currentGooglePurchaseToken
+              ? {
+                  purchaseToken: currentGooglePurchaseToken,
+                  subscriptionProductReplacementParams: {
+                    oldProductId: currentStoreProductId,
+                    replacementMode: 'with-time-proration',
+                  },
+                }
+              : {}),
+          },
+        },
+      });
+    } catch (error: any) {
+      setBillingBusy(false);
+      Alert.alert('No pudimos abrir la compra', error?.message ?? 'Probá de nuevo.');
+    }
+  };
+
+  const handleRestorePurchases = async () => {
+    if (!usesStoreBilling) return;
+
+    try {
+      setBillingBusy(true);
+      await restorePurchases();
+      const synced = await syncActiveStoreSubscription();
+      if (synced) {
+        Alert.alert('Compra restaurada', 'La suscripción del negocio volvió a quedar activa.');
+      } else {
+        Alert.alert('Sin compras activas', 'No encontramos una suscripción activa para esta cuenta.');
+      }
+    } catch (error: any) {
+      Alert.alert('No pudimos restaurar la compra', error?.message ?? 'Probá de nuevo.');
+    } finally {
+      setBillingBusy(false);
+    }
+  };
+
+  const handleManageStoreSubscription = async () => {
+    try {
+      await deepLinkToSubscriptions(
+        Platform.OS === 'android' && currentStoreProductId
+          ? { skuAndroid: currentStoreProductId }
+          : undefined,
+      );
+    } catch (error: any) {
+      Alert.alert('No pudimos abrir la suscripción', error?.message ?? 'Probá de nuevo.');
+    }
+  };
+
   if (isIOS) {
     return (
       <ScrollView
@@ -347,11 +560,11 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.eyebrow}>CUENTA</Text>
-          <Text style={styles.title}>Estado de la cuenta</Text>
+          <Text style={styles.eyebrow}>PLAN Y SUSCRIPCIÓN</Text>
+          <Text style={styles.title}>Suscripción del negocio</Text>
           <Text style={styles.subtitle}>
-            Acá ves el estado actual de la cuenta y los datos necesarios para seguir usando la
-            app.
+            Comprá o restaurá el plan del negocio desde Apple y seguí usando la app con acceso
+            completo.
           </Text>
         </View>
 
@@ -367,8 +580,8 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
                 <Text style={styles.lockedEyebrow}>ACCESO LIMITADO</Text>
                 <Text style={styles.lockedTitle}>Esta cuenta tiene acceso limitado</Text>
                 <Text style={styles.lockedText}>
-                  El acceso operativo no está disponible en este momento. Si necesitás revisar la
-                  cuenta o recuperar acceso, contactá a soporte.
+                  Comprá o restaurá la suscripción del negocio para volver a habilitar el acceso
+                  operativo completo.
                 </Text>
               </View>
             ) : null}
@@ -376,8 +589,8 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
             <View style={styles.statusCard}>
               <View style={styles.statusTopRow}>
                 <View>
-                  <Text style={styles.planLabel}>Cuenta</Text>
-                  <Text style={styles.planValue}>Acceso disponible</Text>
+                  <Text style={styles.planLabel}>Plan actual</Text>
+                  <Text style={styles.planValue}>{planInfo.label}</Text>
                 </View>
                 <View style={[styles.statusBadge, { backgroundColor: `${statusInfo.color}22` }]}>
                   <Text style={[styles.statusBadgeText, { color: statusInfo.color }]}>
@@ -387,7 +600,7 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
               </View>
 
               <Text style={styles.planSummary}>
-                Información general del acceso disponible en esta cuenta.
+                El plan del negocio se administra con tu suscripción de la App Store.
               </Text>
 
               <View style={styles.metaGrid}>
@@ -396,6 +609,10 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
                   <Text style={[styles.metaValue, { color: statusInfo.color }]}>
                     {statusInfo.label}
                   </Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Text style={styles.metaLabel}>Plan</Text>
+                  <Text style={styles.metaValue}>{planInfo.label}</Text>
                 </View>
                 <View style={styles.metaItem}>
                   <Text style={styles.metaLabel}>Inicio</Text>
@@ -409,9 +626,9 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
             </View>
 
             <View style={styles.actionsCard}>
-              <Text style={styles.sectionTitle}>Ayuda y soporte</Text>
+              <Text style={styles.sectionTitle}>Administrar plan</Text>
               <View style={styles.renewalHintCard}>
-                <Text style={styles.renewalHintTitle}>Estado de la cuenta</Text>
+                <Text style={styles.renewalHintTitle}>Suscripción actual</Text>
                 <View style={styles.renewalMetaList}>
                   <View style={styles.renewalMetaRow}>
                     <Text style={styles.renewalMetaLabel}>Estado</Text>
@@ -429,16 +646,50 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
                 <Text style={styles.renewalHintText}>{getRenewalHint()}</Text>
               </View>
 
+              <View style={styles.includesCard}>
+                <Text style={styles.sectionTitle}>Elegí un plan</Text>
+                <Pressable
+                  style={[styles.primaryButton, billingBusy && styles.primaryButtonDisabled]}
+                  onPress={() => handlePurchasePlan('basic')}
+                  disabled={billingBusy || billingSyncing}
+                >
+                  <Text style={styles.primaryButtonText}>
+                    {billingBusy && currentStorePlan !== 'pro' ? 'Abriendo compra...' : `Activar Básico${basicStoreProduct?.displayPrice ? ` · ${basicStoreProduct.displayPrice}` : ''}`}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.primaryButton, billingBusy && styles.primaryButtonDisabled]}
+                  onPress={() => handlePurchasePlan('pro')}
+                  disabled={billingBusy || billingSyncing}
+                >
+                  <Text style={styles.primaryButtonText}>
+                    {billingBusy && currentStorePlan === 'pro' ? 'Abriendo compra...' : `Activar Pro${proStoreProduct?.displayPrice ? ` · ${proStoreProduct.displayPrice}` : ''}`}
+                  </Text>
+                </Pressable>
+              </View>
+
               <View style={styles.iosNoticeCard}>
-                <Text style={styles.iosNoticeTitle}>Soporte para esta cuenta</Text>
+                <Text style={styles.iosNoticeTitle}>Restaurar o gestionar</Text>
                 <Text style={styles.iosNoticeText}>
-                  Si necesitás ayuda con el acceso, el estado o el vencimiento de esta cuenta,
-                  contactá a soporte.
+                  Si ya compraste un plan, podés restaurarlo. Si necesitás cambiar o cancelar, lo
+                  gestionás desde Apple.
                 </Text>
               </View>
 
-              <Pressable style={styles.secondaryButton} onPress={openSupportMail}>
-                <Text style={styles.secondaryButtonText}>Contactar soporte</Text>
+              <Pressable
+                style={[styles.secondaryButton, billingBusy && styles.primaryButtonDisabled]}
+                onPress={handleRestorePurchases}
+                disabled={billingBusy || billingSyncing}
+              >
+                <Text style={styles.secondaryButtonText}>Restaurar compra</Text>
+              </Pressable>
+
+              <Pressable style={styles.secondaryButton} onPress={handleManageStoreSubscription}>
+                <Text style={styles.secondaryButtonText}>Gestionar suscripción</Text>
+              </Pressable>
+
+              <Pressable style={styles.ghostButton} onPress={openSupportMail}>
+                <Text style={styles.ghostButtonText}>Hablar con soporte</Text>
               </Pressable>
             </View>
           </>
@@ -565,26 +816,17 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
               <View style={styles.autoRenewCard}>
                 <Text style={styles.autoRenewTitle}>Renovación automática activa</Text>
                 <Text style={styles.autoRenewText}>
-                  Mercado Pago va a intentar renovar este plan todos los meses automáticamente.
+                  Google Play va a gestionar la renovación automática de este plan.
                 </Text>
                 <Text style={styles.autoRenewMeta}>
                   Próximo intento: {formatDateLabel(subscription?.nextBillingAt || subscription?.expiresAt)}
                 </Text>
-                <Pressable
-                  style={[styles.secondaryButton, updatingRenewalMode && styles.primaryButtonDisabled]}
-                  onPress={handleSwitchToManualRenewal}
-                  disabled={updatingRenewalMode}
-                >
-                  <Text style={styles.secondaryButtonText}>
-                    {updatingRenewalMode ? 'Cambiando modo...' : 'Pasar a renovación manual'}
-                  </Text>
-                </Pressable>
               </View>
             ) : !isIOS ? (
               <View style={styles.autoRenewCard}>
-                <Text style={styles.autoRenewTitle}>Renovación manual</Text>
+                <Text style={styles.autoRenewTitle}>Compra desde Google Play</Text>
                 <Text style={styles.autoRenewText}>
-                  Cuando llegue el vencimiento, te vamos a avisar por mail y vas a poder renovar desde la web con el link directo.
+                  La suscripción del negocio se compra, restaura y gestiona desde Google Play.
                 </Text>
               </View>
             ) : null}
@@ -631,18 +873,33 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
               </View>
             ) : (
               <>
-                {isRestrictedAccount ? (
-                  <Pressable style={styles.primaryButton} onPress={openPlansWebsite}>
-                    <Text style={styles.primaryButtonText}>Ver sitio de planes</Text>
-                  </Pressable>
-                ) : null}
-                {!isRestrictedAccount ? (
-                  <Pressable style={styles.primaryButton} onPress={openPlansWebsite}>
-                    <Text style={styles.primaryButtonText}>Entrar al panel de planes</Text>
-                  </Pressable>
-                ) : null}
-                <Pressable style={styles.ghostButton} onPress={openCustomContact}>
-                  <Text style={styles.ghostButtonText}>Consultar plan personalizable</Text>
+                <Pressable
+                  style={[styles.primaryButton, billingBusy && styles.primaryButtonDisabled]}
+                  onPress={() => handlePurchasePlan('basic')}
+                  disabled={billingBusy || billingSyncing}
+                >
+                  <Text style={styles.primaryButtonText}>
+                    Activar Básico{basicStoreProduct?.displayPrice ? ` · ${basicStoreProduct.displayPrice}` : ''}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.primaryButton, billingBusy && styles.primaryButtonDisabled]}
+                  onPress={() => handlePurchasePlan('pro')}
+                  disabled={billingBusy || billingSyncing}
+                >
+                  <Text style={styles.primaryButtonText}>
+                    Activar Pro{proStoreProduct?.displayPrice ? ` · ${proStoreProduct.displayPrice}` : ''}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.secondaryButton, billingBusy && styles.primaryButtonDisabled]}
+                  onPress={handleRestorePurchases}
+                  disabled={billingBusy || billingSyncing}
+                >
+                  <Text style={styles.secondaryButtonText}>Restaurar compra</Text>
+                </Pressable>
+                <Pressable style={styles.ghostButton} onPress={handleManageStoreSubscription}>
+                  <Text style={styles.ghostButtonText}>Gestionar suscripción en Google Play</Text>
                 </Pressable>
               </>
             )}

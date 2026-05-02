@@ -4,6 +4,8 @@ import { BarberModel } from "../models/Barber.js";
 import { UserModel } from "../models/User.js";
 import { sendAppMail } from "./mailer.js";
 import { SHOP_TIME_ZONE, getTimeZoneLabel } from "../utils/timezone.js";
+import { buildAppointmentCancellationWhatsAppUrl } from "../utils/whatsapp.js";
+import { resolveAssignedBarberPushTarget } from "../utils/pushRecipients.js";
 
 function getNotificationSettings(userDoc) {
   return {
@@ -37,7 +39,13 @@ function buildCustomerReminderMailHtml({
     hour12: false,
     timeZone: SHOP_TIME_ZONE,
   });
-  const cancelPhone = String(barberPhone || "").replace(/\s+/g, "");
+  const cancelAppointmentUrl = buildAppointmentCancellationWhatsAppUrl({
+    phone: barberPhone,
+    customerName,
+    dateLabel,
+    timeLabel,
+    whenLabel: "de hoy",
+  });
 
   return `
     <div style="background-color: #121212; color: #ffffff; padding: 30px; font-family: sans-serif; border-radius: 15px; max-width: 500px; margin: auto; border: 1px solid #B89016;">
@@ -64,8 +72,8 @@ function buildCustomerReminderMailHtml({
       </p>
 
       <div style="text-align: center; margin-top: 16px;">
-        ${cancelPhone ? `
-        <a href="https://wa.me/${cancelPhone}?text=Hola!%20Soy%20${encodeURIComponent(customerName)},%20te%20escribo%20por%20mi%20turno%20de%20hoy%20${encodeURIComponent(dateLabel)}%20a%20las%20${encodeURIComponent(timeLabel)}%20para%20cancelarlo"
+        ${cancelAppointmentUrl ? `
+        <a href="${cancelAppointmentUrl}"
           style="background-color: #FF1493; color: white; padding: 12px 18px; text-decoration: none; border-radius: 8px; font-weight: 700; display: inline-block; font-size: 14px; border: 1px solid #ff4d4d; margin-bottom: 8px;">
           CANCELAR TURNO
         </a>
@@ -97,9 +105,9 @@ function canSendCustomerReminder({ appointment, settings, now }) {
   return true;
 }
 
-function canSendBarberReminder({ appointment, settings, userDoc, now }) {
+function canSendBarberReminder({ appointment, settings, pushToken, now }) {
   if (!settings.barberReminderEnabled) return false;
-  if (!userDoc?.pushToken) return false;
+  if (!pushToken) return false;
   if (appointment.barberReminderSentAt) return false;
   if (appointment.status !== "pending") return false;
 
@@ -145,9 +153,13 @@ export async function processAppointmentReminders({ now = new Date() } = {}) {
 
   for (const appointment of appointments) {
     processed += 1;
-    const [userDoc, barberDoc] = await Promise.all([
+    const [userDoc, barberDoc, pushTarget] = await Promise.all([
       UserModel.findById(appointment.owner).lean(),
       BarberModel.findById(appointment.barber).select({ fullName: 1, phone: 1 }).lean(),
+      resolveAssignedBarberPushTarget({
+        ownerId: appointment.owner,
+        barberId: appointment.barber,
+      }),
     ]);
 
     if (!userDoc || userDoc.isActive === false) continue;
@@ -167,10 +179,17 @@ export async function processAppointmentReminders({ now = new Date() } = {}) {
       timeZone: SHOP_TIME_ZONE,
     });
 
-    if (canSendBarberReminder({ appointment, settings, userDoc, now })) {
+    if (
+      canSendBarberReminder({
+        appointment,
+        settings,
+        pushToken: pushTarget?.token,
+        now,
+      })
+    ) {
       try {
         await admin.messaging().send({
-          token: userDoc.pushToken,
+          token: pushTarget.token,
           notification: {
             title: "💈Recordatorio de turno",
             body: `${appointment.customerName} tiene ${appointment.service} con ${barberDoc?.fullName || "su barbero"} el ${dateLabel} a las ${timeLabel}.`,

@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   StyleSheet,
   Text,
@@ -17,18 +23,17 @@ import {
 } from 'react-native';
 import { CalendarDays } from 'lucide-react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
-import {
-  Barber,
-  createBarber,
-  updateBarber,
-} from '../services/api';
+import { Barber, createBarber, updateBarber } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
 import DateSelectModal from '../components/DateSelectModal';
 
 const hexToRgba = (hex: string, alpha: number) => {
   const sanitized = hex.replace('#', '');
-  const bigint = parseInt(sanitized.length === 3 ? sanitized.repeat(2) : sanitized, 16);
+  const bigint = parseInt(
+    sanitized.length === 3 ? sanitized.repeat(2) : sanitized,
+    16,
+  );
   const r = (bigint >> 16) & 255;
   const g = (bigint >> 8) & 255;
   const b = bigint & 255;
@@ -98,6 +103,13 @@ type BarberClosedDay = {
   message?: string | null;
 };
 
+type BarberTimeBlock = {
+  date: string;
+  start: string;
+  end: string;
+  message?: string | null;
+};
+
 type ActivePicker =
   | 'start'
   | 'end'
@@ -111,7 +123,26 @@ type ActivePicker =
   | 'overrideMorningEnd'
   | 'overrideAfternoonStart'
   | 'overrideAfternoonEnd'
+  | 'blockStart'
+  | 'blockEnd'
   | null;
+
+const TIME_PICKER_MINUTES = [0, 5, 10, 15, 30, 45] as const;
+
+function getNextSelectableMinutes(totalMinutes: number) {
+  const currentHour = Math.floor(totalMinutes / 60);
+  const currentMinute = totalMinutes % 60;
+  const nextMinuteInHour = TIME_PICKER_MINUTES.find(
+    value => value > currentMinute,
+  );
+
+  if (nextMinuteInHour != null) {
+    return currentHour * 60 + nextMinuteInHour;
+  }
+
+  const nextHour = Math.min(currentHour + 1, 23);
+  return nextHour * 60 + TIME_PICKER_MINUTES[0];
+}
 
 function resolveActiveDayOverride(
   overrides: DayScheduleOverride[],
@@ -137,6 +168,16 @@ const normalizeClosedDayDate = (value?: string | null) => {
 };
 
 const normalizeClosedDayMessage = (value?: string | null) => {
+  const text = String(value ?? '').trim();
+  return text.slice(0, 220);
+};
+
+const normalizeTimeBlockTime = (value?: string | null) => {
+  const text = String(value ?? '').trim();
+  return /^\d{2}:\d{2}$/.test(text) ? text : '';
+};
+
+const normalizeTimeBlockMessage = (value?: string | null) => {
   const text = String(value ?? '').trim();
   return text.slice(0, 220);
 };
@@ -201,18 +242,36 @@ function RegisterEmployed({ navigation, route }: Props) {
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
-  const [dayScheduleOverrides, setDayScheduleOverrides] = useState<DayScheduleOverride[]>([]);
-  const [barberClosedDays, setBarberClosedDays] = useState<BarberClosedDay[]>([]);
+  const [dayScheduleOverrides, setDayScheduleOverrides] = useState<
+    DayScheduleOverride[]
+  >([]);
+  const [barberClosedDays, setBarberClosedDays] = useState<BarberClosedDay[]>(
+    [],
+  );
+  const [bookingBufferMinutesInput, setBookingBufferMinutesInput] =
+    useState('0');
+  const [barberTimeBlocks, setBarberTimeBlocks] = useState<BarberTimeBlock[]>(
+    [],
+  );
   const [closedDateInput, setClosedDateInput] = useState('');
   const [closedMessageInput, setClosedMessageInput] = useState('');
-  const [isClosedDateModalVisible, setIsClosedDateModalVisible] = useState(false);
-  const [selectedOverrideDay, setSelectedOverrideDay] = useState<number | null>(null);
+  const [isClosedDateModalVisible, setIsClosedDateModalVisible] =
+    useState(false);
+  const [blockDateInput, setBlockDateInput] = useState('');
+  const [blockStartMinutes, setBlockStartMinutes] = useState(9 * 60);
+  const [blockEndMinutes, setBlockEndMinutes] = useState(10 * 60);
+  const [blockMessageInput, setBlockMessageInput] = useState('');
+  const [isBlockDateModalVisible, setIsBlockDateModalVisible] = useState(false);
+  const [selectedOverrideDay, setSelectedOverrideDay] = useState<number | null>(
+    null,
+  );
   const [multiEditMode, setMultiEditMode] = useState(false);
   const [multiEditDays, setMultiEditDays] = useState<number[]>([]);
   const todayDateLabel = useMemo(() => getTodayDateLabel(), []);
   const selectedDaysRef = useRef<number[]>([]);
   const dayScheduleOverridesRef = useRef<DayScheduleOverride[]>([]);
   const barberClosedDaysRef = useRef<BarberClosedDay[]>([]);
+  const barberTimeBlocksRef = useRef<BarberTimeBlock[]>([]);
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   useEffect(() => {
@@ -235,9 +294,27 @@ function RegisterEmployed({ navigation, route }: Props) {
       .sort((a, b) => a.date.localeCompare(b.date));
     setBarberClosedDays(nextClosedDays);
     barberClosedDaysRef.current = nextClosedDays;
+    setBookingBufferMinutesInput(
+      String(Math.max(0, Number(barberToEdit.bookingBufferMinutes || 0))),
+    );
+    const nextTimeBlocks = (barberToEdit.barberTimeBlocks || [])
+      .map(item => ({
+        date: normalizeClosedDayDate(item.date),
+        start: normalizeTimeBlockTime(item.start),
+        end: normalizeTimeBlockTime(item.end),
+        message: normalizeTimeBlockMessage(item.message),
+      }))
+      .filter(item => item.date && item.start && item.end)
+      .sort(
+        (a, b) =>
+          a.date.localeCompare(b.date) || a.start.localeCompare(b.start),
+      );
+    setBarberTimeBlocks(nextTimeBlocks);
+    barberTimeBlocksRef.current = nextTimeBlocks;
 
     const hasSplitShift =
-      Array.isArray(barberToEdit.scheduleRanges) && barberToEdit.scheduleRanges.length > 0;
+      Array.isArray(barberToEdit.scheduleRanges) &&
+      barberToEdit.scheduleRanges.length > 0;
 
     setSplitShift(hasSplitShift);
 
@@ -306,9 +383,93 @@ function RegisterEmployed({ navigation, route }: Props) {
   }, []);
 
   const removeClosedDay = useCallback((date: string) => {
-    const nextState = barberClosedDaysRef.current.filter(item => item.date !== date);
+    const nextState = barberClosedDaysRef.current.filter(
+      item => item.date !== date,
+    );
     barberClosedDaysRef.current = nextState;
     setBarberClosedDays(nextState);
+  }, []);
+
+  const upsertTimeBlock = useCallback(
+    (
+      date: string,
+      startMinutesValue: number,
+      endMinutesValue: number,
+      message: string,
+    ) => {
+      const normalizedDate = normalizeClosedDayDate(date);
+      if (!normalizedDate) {
+        Alert.alert(
+          'Fecha inválida',
+          'Elegí una fecha válida para el bloqueo.',
+        );
+        return;
+      }
+
+      if (
+        !Number.isFinite(startMinutesValue) ||
+        !Number.isFinite(endMinutesValue)
+      ) {
+        Alert.alert(
+          'Horario inválido',
+          'Elegí una hora de inicio y fin válida.',
+        );
+        return;
+      }
+
+      if (endMinutesValue <= startMinutesValue) {
+        Alert.alert(
+          'Rango inválido',
+          'La hora de fin tiene que ser posterior a la hora de inicio.',
+        );
+        return;
+      }
+
+      const normalizedMessage =
+        normalizeTimeBlockMessage(message) ||
+        'Este horario no está disponible para reservas.';
+      const nextItem = {
+        date: normalizedDate,
+        start: formatMinutes(startMinutesValue),
+        end: formatMinutes(endMinutesValue),
+        message: normalizedMessage,
+      };
+      const nextState = [...barberTimeBlocksRef.current]
+        .filter(
+          item =>
+            !(
+              item.date === nextItem.date &&
+              item.start === nextItem.start &&
+              item.end === nextItem.end
+            ),
+        )
+        .concat(nextItem)
+        .sort(
+          (a, b) =>
+            a.date.localeCompare(b.date) || a.start.localeCompare(b.start),
+        );
+
+      barberTimeBlocksRef.current = nextState;
+      setBarberTimeBlocks(nextState);
+      setBlockDateInput('');
+      setBlockStartMinutes(9 * 60);
+      setBlockEndMinutes(10 * 60);
+      setBlockMessageInput('');
+    },
+    [],
+  );
+
+  const removeTimeBlock = useCallback((block: BarberTimeBlock) => {
+    const nextState = barberTimeBlocksRef.current.filter(
+      item =>
+        !(
+          item.date === block.date &&
+          item.start === block.start &&
+          item.end === block.end
+        ),
+    );
+    barberTimeBlocksRef.current = nextState;
+    setBarberTimeBlocks(nextState);
   }, []);
 
   useEffect(() => {
@@ -316,13 +477,13 @@ function RegisterEmployed({ navigation, route }: Props) {
   }, [selectedDays]);
 
   const toggleDay = (id: number) => {
-    setSelectedDays(prev =>
-      {
-        const next = prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id];
-        selectedDaysRef.current = next;
-        return next;
-      },
-    );
+    setSelectedDays(prev => {
+      const next = prev.includes(id)
+        ? prev.filter(d => d !== id)
+        : [...prev, id];
+      selectedDaysRef.current = next;
+      return next;
+    });
   };
 
   const formattedRange = useMemo(
@@ -402,9 +563,17 @@ function RegisterEmployed({ navigation, route }: Props) {
   );
 
   const overrideSingleRange = useMemo(() => {
-    const fallback = parseScheduleRange(baseDayOverride.scheduleRange, startMinutes, endMinutes);
+    const fallback = parseScheduleRange(
+      baseDayOverride.scheduleRange,
+      startMinutes,
+      endMinutes,
+    );
     if (!selectedOverrideConfig?.scheduleRange) return fallback;
-    return parseScheduleRange(selectedOverrideConfig.scheduleRange, fallback[0], fallback[1]);
+    return parseScheduleRange(
+      selectedOverrideConfig.scheduleRange,
+      fallback[0],
+      fallback[1],
+    );
   }, [selectedOverrideConfig, baseDayOverride, startMinutes, endMinutes]);
 
   const overrideMorningRange = useMemo(() => {
@@ -454,6 +623,10 @@ function RegisterEmployed({ navigation, route }: Props) {
         return 'Día especial — Tarde inicio';
       case 'overrideAfternoonEnd':
         return 'Día especial — Tarde fin';
+      case 'blockStart':
+        return 'Bloqueo — Inicio';
+      case 'blockEnd':
+        return 'Bloqueo — Fin';
       default:
         return '';
     }
@@ -486,6 +659,10 @@ function RegisterEmployed({ navigation, route }: Props) {
         return overrideAfternoonRange[0];
       case 'overrideAfternoonEnd':
         return overrideAfternoonRange[1];
+      case 'blockStart':
+        return blockStartMinutes;
+      case 'blockEnd':
+        return blockEndMinutes;
       default:
         return 0;
     }
@@ -500,6 +677,8 @@ function RegisterEmployed({ navigation, route }: Props) {
     overrideSingleRange,
     overrideMorningRange,
     overrideAfternoonRange,
+    blockStartMinutes,
+    blockEndMinutes,
   ]);
 
   const buildDayOverrideEntry = (
@@ -514,8 +693,8 @@ function RegisterEmployed({ navigation, route }: Props) {
       scheduleRange: next.useBase
         ? null
         : next.scheduleRanges?.length
-          ? null
-          : next.scheduleRange ?? null,
+        ? null
+        : next.scheduleRange ?? null,
       scheduleRanges: next.useBase ? [] : next.scheduleRanges ?? [],
     };
   };
@@ -636,9 +815,9 @@ function RegisterEmployed({ navigation, route }: Props) {
 
     if (selectedOverrideIsSplit) {
       applyOverrideToEditingDays({
-        scheduleRange: `${formatMinutes(overrideMorningRange[0])} - ${formatMinutes(
-          overrideAfternoonRange[1],
-        )}`,
+        scheduleRange: `${formatMinutes(
+          overrideMorningRange[0],
+        )} - ${formatMinutes(overrideAfternoonRange[1])}`,
         scheduleRanges: [],
       });
       return;
@@ -694,9 +873,9 @@ function RegisterEmployed({ navigation, route }: Props) {
       case 'overrideEnd':
         if (editingOverrideDays.length) {
           applyOverrideToEditingDays({
-            scheduleRange: `${formatMinutes(overrideSingleRange[0])} - ${formatMinutes(
-              minutes,
-            )}`,
+            scheduleRange: `${formatMinutes(
+              overrideSingleRange[0],
+            )} - ${formatMinutes(minutes)}`,
             scheduleRanges: [],
           });
         }
@@ -777,6 +956,17 @@ function RegisterEmployed({ navigation, route }: Props) {
           });
         }
         break;
+      case 'blockStart':
+        setBlockStartMinutes(minutes);
+        if (minutes >= blockEndMinutes) {
+          setBlockEndMinutes(
+            Math.min(getNextSelectableMinutes(minutes), 23 * 60 + 45),
+          );
+        }
+        break;
+      case 'blockEnd':
+        setBlockEndMinutes(minutes);
+        break;
     }
     setActivePicker(null);
   };
@@ -793,7 +983,23 @@ function RegisterEmployed({ navigation, route }: Props) {
 
     try {
       setLoading(true);
-      const cleanDays = Array.from(new Set(selectedDaysRef.current)).sort((a, b) => a - b);
+      const parsedBookingBufferMinutes = Number(
+        bookingBufferMinutesInput || '0',
+      );
+      if (
+        !Number.isFinite(parsedBookingBufferMinutes) ||
+        parsedBookingBufferMinutes < 0 ||
+        parsedBookingBufferMinutes > 120
+      ) {
+        Alert.alert(
+          'Buffer inválido',
+          'El buffer general del barbero tiene que estar entre 0 y 120 minutos.',
+        );
+        return;
+      }
+      const cleanDays = Array.from(new Set(selectedDaysRef.current)).sort(
+        (a, b) => a - b,
+      );
       const cleanOverrides = dayScheduleOverridesRef.current
         .filter(item => cleanDays.includes(Number(item.day)))
         .map(item => ({
@@ -819,6 +1025,22 @@ function RegisterEmployed({ navigation, route }: Props) {
         }))
         .filter(item => item.date)
         .sort((a, b) => a.date.localeCompare(b.date));
+      const cleanTimeBlocks = barberTimeBlocksRef.current
+        .map(item => ({
+          date: normalizeClosedDayDate(item.date),
+          start: normalizeTimeBlockTime(item.start),
+          end: normalizeTimeBlockTime(item.end),
+          message:
+            normalizeTimeBlockMessage(item.message) ||
+            'Este horario no está disponible para reservas.',
+        }))
+        .filter(
+          item => item.date && item.start && item.end && item.end > item.start,
+        )
+        .sort(
+          (a, b) =>
+            a.date.localeCompare(b.date) || a.start.localeCompare(b.start),
+        );
 
       const payload = {
         fullName: fullName.trim(),
@@ -840,6 +1062,8 @@ function RegisterEmployed({ navigation, route }: Props) {
               },
             ]
           : [],
+        bookingBufferMinutes: parsedBookingBufferMinutes,
+        barberTimeBlocks: cleanTimeBlocks,
         barberClosedDays: cleanClosedDays,
         dayScheduleOverrides: cleanOverrides,
         workDays: cleanDays,
@@ -898,7 +1122,10 @@ function RegisterEmployed({ navigation, route }: Props) {
       if (result.didCancel) return;
 
       if (result.errorCode) {
-        Alert.alert('Error', result.errorMessage || 'No se pudo abrir la galería.');
+        Alert.alert(
+          'Error',
+          result.errorMessage || 'No se pudo abrir la galería.',
+        );
         return;
       }
 
@@ -956,7 +1183,9 @@ function RegisterEmployed({ navigation, route }: Props) {
                   </Pressable>
                   <Pressable onPress={handlePickPhoto}>
                     <Text style={styles.photoPreviewHint}>
-                      {photoUrl.trim() ? 'Cambiar foto' : 'Tocar para elegir foto'}
+                      {photoUrl.trim()
+                        ? 'Cambiar foto'
+                        : 'Tocar para elegir foto'}
                     </Text>
                   </Pressable>
                   {photoUrl.trim() ? (
@@ -1008,46 +1237,54 @@ function RegisterEmployed({ navigation, route }: Props) {
               </View>
 
               {!selfEdit ? (
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Acceso del barbero a la app</Text>
-              
-                {isEditing ? (
-                  <>
-                    <View style={styles.accessSummaryCard}>
-                      <Text style={styles.sectionHelperMuted}>
-                        Estado: {resolveAccessStateLabel(barberToEdit?.loginAccess)}
-                      </Text>
-                      <Text style={styles.sectionHelperMuted}>
-                        Último acceso:{' '}
-                        {formatLastAccessLabel(barberToEdit?.loginAccess?.lastLoginAt)}
-                      </Text>
-                      <Text style={styles.sectionHelperMuted}>
-                        Email:{' '}
-                        {barberToEdit?.loginAccess?.email?.trim() || 'Sin acceso creado'}
-                      </Text>
-                    </View>
-                    <Pressable
-                      onPress={() => {
-                        if (!barberToEdit) return;
-                        navigation.navigate('Barber-Access', { barber: barberToEdit });
-                      }}
-                      style={({ pressed }) => [
-                        styles.accessManageButton,
-                        pressed && styles.accessManageButtonPressed,
-                      ]}
-                    >
-                      <Text style={styles.accessManageButtonText}>
-                        Gestionar acceso del barbero
-                      </Text>
-                    </Pressable>
-                  </>
-                ) : (
-                  <Text style={styles.sectionHelperMuted}>
-                    Guardá primero el barbero. Después podés crearle el acceso desde
-                    la pantalla de gestión.
+                <View style={styles.section}>
+                  <Text style={styles.sectionLabel}>
+                    Acceso del barbero a la app
                   </Text>
-                )}
-              </View>
+
+                  {isEditing ? (
+                    <>
+                      <View style={styles.accessSummaryCard}>
+                        <Text style={styles.sectionHelperMuted}>
+                          Estado:{' '}
+                          {resolveAccessStateLabel(barberToEdit?.loginAccess)}
+                        </Text>
+                        <Text style={styles.sectionHelperMuted}>
+                          Último acceso:{' '}
+                          {formatLastAccessLabel(
+                            barberToEdit?.loginAccess?.lastLoginAt,
+                          )}
+                        </Text>
+                        <Text style={styles.sectionHelperMuted}>
+                          Email:{' '}
+                          {barberToEdit?.loginAccess?.email?.trim() ||
+                            'Sin acceso creado'}
+                        </Text>
+                      </View>
+                      <Pressable
+                        onPress={() => {
+                          if (!barberToEdit) return;
+                          navigation.navigate('Barber-Access', {
+                            barber: barberToEdit,
+                          });
+                        }}
+                        style={({ pressed }) => [
+                          styles.accessManageButton,
+                          pressed && styles.accessManageButtonPressed,
+                        ]}
+                      >
+                        <Text style={styles.accessManageButtonText}>
+                          Gestionar acceso del barbero
+                        </Text>
+                      </Pressable>
+                    </>
+                  ) : (
+                    <Text style={styles.sectionHelperMuted}>
+                      Guardá primero el barbero. Después podés crearle el acceso
+                      desde la pantalla de gestión.
+                    </Text>
+                  )}
+                </View>
               ) : null}
 
               {/* DÍAS */}
@@ -1097,7 +1334,7 @@ function RegisterEmployed({ navigation, route }: Props) {
                         splitShift && styles.splitToggleTextActive,
                       ]}
                     >
-                       Doble Jornada
+                      Doble Jornada
                     </Text>
                   </Pressable>
                 </View>
@@ -1183,12 +1420,16 @@ function RegisterEmployed({ navigation, route }: Props) {
               <View style={styles.section}>
                 <View style={styles.overrideHeader}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.sectionLabel}>Horario especial por día</Text>
+                    <Text style={styles.sectionLabel}>
+                      Horario especial por día
+                    </Text>
                     <Text style={styles.overrideHeaderText}>
-                      Si un día trabaja distinto, podés personalizarlo sin tocar el horario base.
+                      Si un día trabaja distinto, podés personalizarlo sin tocar
+                      el horario base.
                     </Text>
                     <Text style={styles.overrideHeaderSubtext}>
-                      Los cambios nuevos se aplican desde hoy y no modifican fechas anteriores.
+                      Los cambios nuevos se aplican desde hoy y no modifican
+                      fechas anteriores.
                     </Text>
                   </View>
                 </View>
@@ -1234,9 +1475,13 @@ function RegisterEmployed({ navigation, route }: Props) {
                               {DAY_NAMES[day]}
                             </Text>
                             {hasCustom ? (
-                              <Text style={styles.overrideDayChipMeta}>Personalizado</Text>
+                              <Text style={styles.overrideDayChipMeta}>
+                                Personalizado
+                              </Text>
                             ) : (
-                              <Text style={styles.overrideDayChipMeta}>Base</Text>
+                              <Text style={styles.overrideDayChipMeta}>
+                                Base
+                              </Text>
                             )}
                           </Pressable>
                         );
@@ -1247,7 +1492,9 @@ function RegisterEmployed({ navigation, route }: Props) {
                       <View style={styles.bulkApplyHeader}>
                         <View style={{ flex: 1 }}>
                           <Text style={styles.bulkApplyTitle}>
-                            {multiEditMode ? 'Editando varios días' : 'Editar un solo día'}
+                            {multiEditMode
+                              ? 'Editando varios días'
+                              : 'Editar un solo día'}
                           </Text>
                           <Text style={styles.bulkApplyHint}>
                             {multiEditMode
@@ -1265,7 +1512,9 @@ function RegisterEmployed({ navigation, route }: Props) {
                               const next = !prev;
                               if (next) {
                                 setMultiEditDays(
-                                  selectedOverrideDay != null ? [selectedOverrideDay] : [],
+                                  selectedOverrideDay != null
+                                    ? [selectedOverrideDay]
+                                    : [],
                                 );
                               } else {
                                 setMultiEditDays([]);
@@ -1307,8 +1556,8 @@ function RegisterEmployed({ navigation, route }: Props) {
                               {multiEditMode
                                 ? 'Los cambios que hagas acá se aplican a todos los días marcados.'
                                 : selectedOverrideHasCustomSchedule
-                                  ? 'Este día usa un horario distinto al base.'
-                                  : 'Este día usa el horario base actual.'}
+                                ? 'Este día usa un horario distinto al base.'
+                                : 'Este día usa el horario base actual.'}
                             </Text>
                           </View>
                           <Pressable
@@ -1342,7 +1591,8 @@ function RegisterEmployed({ navigation, route }: Props) {
                             <Pressable
                               style={[
                                 styles.splitToggle,
-                                selectedOverrideIsSplit && styles.splitToggleActive,
+                                selectedOverrideIsSplit &&
+                                  styles.splitToggleActive,
                               ]}
                               onPress={toggleSelectedDayOverrideMode}
                             >
@@ -1363,7 +1613,9 @@ function RegisterEmployed({ navigation, route }: Props) {
                               <View style={[styles.timeRow, { marginTop: 12 }]}>
                                 <Pressable
                                   style={styles.timeCard}
-                                  onPress={() => setActivePicker('overrideStart')}
+                                  onPress={() =>
+                                    setActivePicker('overrideStart')
+                                  }
                                 >
                                   <Text style={styles.timeLabel}>Inicio</Text>
                                   <Text style={styles.timeValue}>
@@ -1382,8 +1634,12 @@ function RegisterEmployed({ navigation, route }: Props) {
                               </View>
                             ) : (
                               <>
-                                <View style={[styles.shiftBlock, { marginTop: 12 }]}>
-                                  <Text style={styles.shiftLabel}>☀️ Mañana</Text>
+                                <View
+                                  style={[styles.shiftBlock, { marginTop: 12 }]}
+                                >
+                                  <Text style={styles.shiftLabel}>
+                                    ☀️ Mañana
+                                  </Text>
                                   <View style={styles.timeRow}>
                                     <Pressable
                                       style={styles.timeCard}
@@ -1391,9 +1647,13 @@ function RegisterEmployed({ navigation, route }: Props) {
                                         setActivePicker('overrideMorningStart')
                                       }
                                     >
-                                      <Text style={styles.timeLabel}>Inicio</Text>
+                                      <Text style={styles.timeLabel}>
+                                        Inicio
+                                      </Text>
                                       <Text style={styles.timeValue}>
-                                        {formatMinutesAmPm(overrideMorningRange[0])}
+                                        {formatMinutesAmPm(
+                                          overrideMorningRange[0],
+                                        )}
                                       </Text>
                                     </Pressable>
                                     <Pressable
@@ -1404,7 +1664,9 @@ function RegisterEmployed({ navigation, route }: Props) {
                                     >
                                       <Text style={styles.timeLabel}>Fin</Text>
                                       <Text style={styles.timeValue}>
-                                        {formatMinutesAmPm(overrideMorningRange[1])}
+                                        {formatMinutesAmPm(
+                                          overrideMorningRange[1],
+                                        )}
                                       </Text>
                                     </Pressable>
                                   </View>
@@ -1413,17 +1675,25 @@ function RegisterEmployed({ navigation, route }: Props) {
                                 <View style={styles.shiftDivider} />
 
                                 <View style={styles.shiftBlock}>
-                                  <Text style={styles.shiftLabel}>🌙 Tarde</Text>
+                                  <Text style={styles.shiftLabel}>
+                                    🌙 Tarde
+                                  </Text>
                                   <View style={styles.timeRow}>
                                     <Pressable
                                       style={styles.timeCard}
                                       onPress={() =>
-                                        setActivePicker('overrideAfternoonStart')
+                                        setActivePicker(
+                                          'overrideAfternoonStart',
+                                        )
                                       }
                                     >
-                                      <Text style={styles.timeLabel}>Inicio</Text>
+                                      <Text style={styles.timeLabel}>
+                                        Inicio
+                                      </Text>
                                       <Text style={styles.timeValue}>
-                                        {formatMinutesAmPm(overrideAfternoonRange[0])}
+                                        {formatMinutesAmPm(
+                                          overrideAfternoonRange[0],
+                                        )}
                                       </Text>
                                     </Pressable>
                                     <Pressable
@@ -1434,7 +1704,9 @@ function RegisterEmployed({ navigation, route }: Props) {
                                     >
                                       <Text style={styles.timeLabel}>Fin</Text>
                                       <Text style={styles.timeValue}>
-                                        {formatMinutesAmPm(overrideAfternoonRange[1])}
+                                        {formatMinutesAmPm(
+                                          overrideAfternoonRange[1],
+                                        )}
                                       </Text>
                                     </Pressable>
                                   </View>
@@ -1448,15 +1720,19 @@ function RegisterEmployed({ navigation, route }: Props) {
                   </>
                 ) : (
                   <Text style={styles.overrideEmptyText}>
-                    Primero elegí al menos un día de atención para habilitar horarios especiales.
+                    Primero elegí al menos un día de atención para habilitar
+                    horarios especiales.
                   </Text>
                 )}
               </View>
 
               <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Días no disponibles del barbero</Text>
+                <Text style={styles.sectionLabel}>
+                  Días no disponibles del barbero
+                </Text>
                 <Text style={styles.closedDaysHint}>
-                  Si la barbería abre pero este barbero falta, cargá la fecha acá para bloquear nuevos turnos y el motivo de falta.
+                  Si la barbería abre pero este barbero falta, cargá la fecha
+                  acá para bloquear nuevos turnos y el motivo de falta.
                 </Text>
 
                 <View style={styles.closedDaysQuickRow}>
@@ -1472,7 +1748,10 @@ function RegisterEmployed({ navigation, route }: Props) {
                       const nextDate = new Date(`${todayDateLabel}T12:00:00`);
                       nextDate.setDate(nextDate.getDate() + 1);
                       const yyyy = nextDate.getFullYear();
-                      const mm = String(nextDate.getMonth() + 1).padStart(2, '0');
+                      const mm = String(nextDate.getMonth() + 1).padStart(
+                        2,
+                        '0',
+                      );
                       const dd = String(nextDate.getDate()).padStart(2, '0');
                       setClosedDateInput(`${yyyy}-${mm}-${dd}`);
                     }}
@@ -1510,9 +1789,13 @@ function RegisterEmployed({ navigation, route }: Props) {
 
                 <Pressable
                   style={styles.closedDaysSaveButton}
-                  onPress={() => upsertClosedDay(closedDateInput, closedMessageInput)}
+                  onPress={() =>
+                    upsertClosedDay(closedDateInput, closedMessageInput)
+                  }
                 >
-                  <Text style={styles.closedDaysSaveButtonText}>Agregar día no disponible</Text>
+                  <Text style={styles.closedDaysSaveButtonText}>
+                    Agregar día no disponible
+                  </Text>
                 </Pressable>
 
                 {barberClosedDays.length ? (
@@ -1523,7 +1806,9 @@ function RegisterEmployed({ navigation, route }: Props) {
                           <Text style={styles.closedDayItemTitle}>
                             {formatClosedDayLabel(item.date)}
                           </Text>
-                          <Text style={styles.closedDayItemDate}>{item.date}</Text>
+                          <Text style={styles.closedDayItemDate}>
+                            {item.date}
+                          </Text>
                           <Text style={styles.closedDayItemMessage}>
                             {item.message ||
                               'Este barbero no atenderá ese día. Elegí otro profesional o seleccioná otra fecha.'}
@@ -1533,7 +1818,9 @@ function RegisterEmployed({ navigation, route }: Props) {
                           style={styles.closedDayDeleteButton}
                           onPress={() => removeClosedDay(item.date)}
                         >
-                          <Text style={styles.closedDayDeleteButtonText}>Quitar</Text>
+                          <Text style={styles.closedDayDeleteButtonText}>
+                            Quitar
+                          </Text>
                         </Pressable>
                       </View>
                     ))}
@@ -1545,6 +1832,153 @@ function RegisterEmployed({ navigation, route }: Props) {
                 )}
               </View>
 
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Bloqueos por horario</Text>
+                <Text style={styles.closedDaysHint}>
+                  Usalo para cortar solo un tramo del día. Ejemplo: descanso,
+                  enfermedad o salida anticipada.
+                </Text>
+
+                <View style={styles.closedDaysQuickRow}>
+                  <Pressable
+                    style={styles.closedDaysQuickChip}
+                    onPress={() => setBlockDateInput(todayDateLabel)}
+                  >
+                    <Text style={styles.closedDaysQuickChipText}>Hoy</Text>
+                  </Pressable>
+                  <Pressable
+                    style={styles.closedDaysQuickChip}
+                    onPress={() => setIsBlockDateModalVisible(true)}
+                  >
+                    <Text style={styles.closedDaysQuickChipText}>
+                      Elegir fecha
+                    </Text>
+                  </Pressable>
+                </View>
+
+                <Pressable
+                  style={styles.closedDateInput}
+                  onPress={() => setIsBlockDateModalVisible(true)}
+                >
+                  <View style={styles.closedDateInputIcon}>
+                    <CalendarDays size={16} color={theme.primary} />
+                  </View>
+                  <View style={styles.closedDateInputBody}>
+                    <Text style={styles.closedDateInputValue}>
+                      {blockDateInput
+                        ? formatClosedDayLabel(blockDateInput)
+                        : 'Elegir fecha'}
+                    </Text>
+                    <Text style={styles.closedDateInputMeta}>
+                      {blockDateInput || 'Tocá para abrir el calendario'}
+                    </Text>
+                  </View>
+                </Pressable>
+
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={{ flex: 1, gap: 8 }}>
+                    <Text style={styles.sectionLabel}>Desde</Text>
+                    <Pressable
+                      style={styles.input}
+                      onPress={() => setActivePicker('blockStart')}
+                    >
+                      <Text style={styles.closedDateInputValue}>
+                        {formatMinutes(blockStartMinutes)}
+                      </Text>
+                    </Pressable>
+                  </View>
+                  <View style={{ flex: 1, gap: 8 }}>
+                    <Text style={styles.sectionLabel}>Hasta</Text>
+                    <Pressable
+                      style={styles.input}
+                      onPress={() => setActivePicker('blockEnd')}
+                    >
+                      <Text style={styles.closedDateInputValue}>
+                        {formatMinutes(blockEndMinutes)}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+
+                <TextInput
+                  style={[styles.input, styles.closedDaysMessageInput]}
+                  placeholder="Motivo o mensaje para mostrar en la reserva"
+                  placeholderTextColor={theme.placeholder}
+                  value={blockMessageInput}
+                  onChangeText={setBlockMessageInput}
+                  multiline
+                />
+
+                <Pressable
+                  style={styles.closedDaysSaveButton}
+                  onPress={() =>
+                    upsertTimeBlock(
+                      blockDateInput,
+                      blockStartMinutes,
+                      blockEndMinutes,
+                      blockMessageInput,
+                    )
+                  }
+                >
+                  <Text style={styles.closedDaysSaveButtonText}>
+                    Agregar bloqueo horario
+                  </Text>
+                </Pressable>
+
+                {barberTimeBlocks.length ? (
+                  <View style={styles.closedDaysList}>
+                    {barberTimeBlocks.map(item => (
+                      <View
+                        key={`${item.date}-${item.start}-${item.end}`}
+                        style={styles.closedDayItem}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.closedDayItemTitle}>
+                            {formatClosedDayLabel(item.date)}
+                          </Text>
+                          <Text style={styles.closedDayItemDate}>
+                            {item.date} · {item.start} - {item.end}
+                          </Text>
+                          <Text style={styles.closedDayItemMessage}>
+                            {item.message ||
+                              'Este horario no está disponible para reservas.'}
+                          </Text>
+                        </View>
+                        <Pressable
+                          style={styles.closedDayDeleteButton}
+                          onPress={() => removeTimeBlock(item)}
+                        >
+                          <Text style={styles.closedDayDeleteButtonText}>
+                            Quitar
+                          </Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.closedDaysEmptyText}>
+                    No hay bloqueos parciales cargados para este barbero.
+                  </Text>
+                )}
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>
+                  Buffer general del barbero
+                </Text>
+                <Text style={styles.closedDaysHint}>
+                  Si este barbero necesita tiempo fijo para limpiar o descansar
+                  entre turnos, cargalo acá como minutos extra.
+                </Text>
+                <TextInput
+                  style={[styles.input, { marginTop: 12 }]}
+                  placeholder="0"
+                  placeholderTextColor={theme.placeholder}
+                  keyboardType="numeric"
+                  value={bookingBufferMinutesInput}
+                  onChangeText={setBookingBufferMinutesInput}
+                />
+              </View>
               {/* SUBMIT */}
               <View style={{ marginTop: 10 }}>
                 <Pressable
@@ -1581,9 +2015,20 @@ function RegisterEmployed({ navigation, route }: Props) {
         title="Elegir fecha no disponible"
         theme={theme}
         onClose={() => setIsClosedDateModalVisible(false)}
-        onConfirm={(date) => {
+        onConfirm={date => {
           setClosedDateInput(date);
           setIsClosedDateModalVisible(false);
+        }}
+      />
+      <DateSelectModal
+        visible={isBlockDateModalVisible}
+        value={blockDateInput || todayDateLabel}
+        title="Elegir fecha del bloqueo"
+        theme={theme}
+        onClose={() => setIsBlockDateModalVisible(false)}
+        onConfirm={date => {
+          setBlockDateInput(date);
+          setIsBlockDateModalVisible(false);
         }}
       />
     </>
@@ -1603,7 +2048,7 @@ function TimeSelectModal({
   const [hour, setHour] = useState(9);
   const [minute, setMinute] = useState(0);
   const HOURS = useMemo(() => Array.from({ length: 12 }, (_, i) => i + 1), []);
-  const MINUTES = useMemo(() => [0, 15, 30, 45], []);
+  const MINUTES = useMemo(() => [...TIME_PICKER_MINUTES], []);
 
   useEffect(() => {
     if (!visible) return;
@@ -1770,12 +2215,12 @@ function pickerPartsToMinutes({
   return hours24 * 60 + minute;
 }
 
-function parseTimeToMinutes(value: string | undefined | null, fallback: number) {
+function parseTimeToMinutes(
+  value: string | undefined | null,
+  fallback: number,
+) {
   if (!value) return fallback;
-  const [hour, minute] = String(value)
-    .trim()
-    .split(':')
-    .map(Number);
+  const [hour, minute] = String(value).trim().split(':').map(Number);
 
   if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
     return fallback;
@@ -1784,7 +2229,11 @@ function parseTimeToMinutes(value: string | undefined | null, fallback: number) 
   return hour * 60 + minute;
 }
 
-function parseScheduleRange(value: string | undefined | null, fallbackStart: number, fallbackEnd: number) {
+function parseScheduleRange(
+  value: string | undefined | null,
+  fallbackStart: number,
+  fallbackEnd: number,
+) {
   if (!value) return [fallbackStart, fallbackEnd] as const;
   const parts = String(value).split('-');
   if (parts.length < 2) return [fallbackStart, fallbackEnd] as const;
@@ -1814,7 +2263,12 @@ const createStyles = (theme: Theme) =>
       fontWeight: '700',
       letterSpacing: 2,
     },
-    headerTitle: { color: theme.textPrimary, fontSize: 32, fontWeight: '800', marginTop: 5 },
+    headerTitle: {
+      color: theme.textPrimary,
+      fontSize: 32,
+      fontWeight: '800',
+      marginTop: 5,
+    },
     mainCard: {
       marginHorizontal: 15,
       backgroundColor: theme.card,
@@ -1826,13 +2280,15 @@ const createStyles = (theme: Theme) =>
     },
     section: { gap: 12 },
     sectionLabel: {
-      color: theme.textMuted,
+      color: '#1C1C1C1',
       fontSize: 11,
       fontWeight: '700',
       textTransform: 'uppercase',
       marginLeft: 4,
+      textDecorationLine: 'underline',
+      textDecorationColor: '#1C1C1C1',
     },
- 
+
     sectionHelperMuted: {
       color: theme.textMuted,
       fontSize: 12,
@@ -1922,7 +2378,10 @@ const createStyles = (theme: Theme) =>
       borderWidth: 1,
       borderColor: theme.border,
     },
-    dayCircleActive: { backgroundColor: theme.primary, borderColor: theme.primary },
+    dayCircleActive: {
+      backgroundColor: theme.primary,
+      borderColor: theme.primary,
+    },
     dayText: { color: theme.textMuted, fontSize: 13, fontWeight: '700' },
     dayTextActive: { color: theme.textOnPrimary },
     timeRow: { flexDirection: 'row', gap: 12 },
@@ -1934,8 +2393,17 @@ const createStyles = (theme: Theme) =>
       borderWidth: 1,
       borderColor: theme.border,
     },
-    timeLabel: { color: theme.textMuted, fontSize: 11, textTransform: 'uppercase' },
-    timeValue: { color: theme.textPrimary, fontSize: 18, fontWeight: '700', marginTop: 4 },
+    timeLabel: {
+      color: theme.textMuted,
+      fontSize: 11,
+      textTransform: 'uppercase',
+    },
+    timeValue: {
+      color: theme.textPrimary,
+      fontSize: 18,
+      fontWeight: '700',
+      marginTop: 4,
+    },
 
     // TURNO CORTADO
     shiftHeader: {
@@ -1972,7 +2440,11 @@ const createStyles = (theme: Theme) =>
       textTransform: 'uppercase',
       letterSpacing: 1,
     },
-    shiftDivider: { height: 1, backgroundColor: theme.border, marginVertical: 4 },
+    shiftDivider: {
+      height: 1,
+      backgroundColor: theme.border,
+      marginVertical: 4,
+    },
     overrideHeader: {
       flexDirection: 'row',
       alignItems: 'flex-start',
@@ -2152,7 +2624,7 @@ const createStyles = (theme: Theme) =>
     overrideCardHint: {
       color: theme.textMuted,
       fontSize: 12,
-      lineHeight:17,
+      lineHeight: 17,
       marginTop: 4,
     },
     overrideToggle: {
@@ -2316,7 +2788,11 @@ const createStyles = (theme: Theme) =>
       paddingVertical: 18,
       alignItems: 'center',
     },
-    submitBtnText: { color: theme.textOnPrimary, fontSize: 16, fontWeight: '800' },
+    submitBtnText: {
+      color: theme.textOnPrimary,
+      fontSize: 16,
+      fontWeight: '800',
+    },
     modalBackdrop: {
       flex: 1,
       backgroundColor: theme.overlay,
@@ -2426,7 +2902,11 @@ const createStyles = (theme: Theme) =>
       borderRadius: 16,
       alignItems: 'center',
     },
-    modalBtnText: { color: theme.textOnPrimary, fontWeight: '800', fontSize: 16 },
+    modalBtnText: {
+      color: theme.textOnPrimary,
+      fontWeight: '800',
+      fontSize: 16,
+    },
   });
 
 export default RegisterEmployed;

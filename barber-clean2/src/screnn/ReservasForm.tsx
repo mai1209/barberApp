@@ -144,6 +144,13 @@ type ResolvedBarberSchedule = {
   scheduleRange: string | null;
   scheduleRanges: { label: string; start: string; end: string }[];
 };
+type OccupiedRange = { start: number; end: number };
+type BarberTimeBlock = {
+  date: string;
+  start: string;
+  end: string;
+  message?: string | null;
+};
 
 type PaymentOption = {
   value: PaymentMethod;
@@ -176,6 +183,22 @@ function normalizeScheduleRanges(input?: ResolvedBarberSchedule['scheduleRanges'
 function normalizeOverrideValidFrom(value?: string | null) {
   const text = String(value ?? '').trim();
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '1970-01-01';
+}
+
+function uniqueServicesById(list: ServiceOption[]) {
+  const seen = new Set<string>();
+  return (list || []).filter(item => {
+    const id = String(item?._id || '').trim();
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+function buildServiceSummary(list: ServiceOption[]) {
+  if (!list?.length) return 'Seleccionar...';
+  if (list.length === 1) return list[0].name;
+  return list.map(item => item.name).join(' + ');
 }
 
 function resolveBarberScheduleForDate(
@@ -231,14 +254,15 @@ function ReservasForm({ navigation, route }: any) {
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [selectedBarber, setSelectedBarber] = useState<string | null>(null);
   const [services, setServices] = useState<ServiceOption[]>([]);
-  const [selectedService, setSelectedService] = useState<ServiceOption | null>(null);
+  const [selectedServices, setSelectedServices] = useState<ServiceOption[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [paymentOptions, setPaymentOptions] = useState<PaymentOption[]>([]);
   const [servicePickerVisible, setServicePickerVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
-  const [bookedSlots, setBookedSlots] = useState<Set<string>>(() => new Set());
+  const [occupiedRanges, setOccupiedRanges] = useState<OccupiedRange[]>([]);
+  const [barberTimeBlocks, setBarberTimeBlocks] = useState<BarberTimeBlock[]>([]);
   const [selectedBarberSchedule, setSelectedBarberSchedule] =
     useState<ResolvedBarberSchedule | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -284,7 +308,7 @@ function ReservasForm({ navigation, route }: any) {
         } else if (ownBarberId) {
           setSelectedBarber(ownBarberId);
         }
-        if (resS.services?.length > 0) setSelectedService(resS.services[0]);
+        if (resS.services?.length > 0) setSelectedServices([resS.services[0]]);
 
         const paymentSettings =
           currentUserRes?.user?.paymentSettings ??
@@ -316,23 +340,20 @@ function ReservasForm({ navigation, route }: any) {
               'Este barbero no atenderá ese día. Elegí otro profesional o seleccioná otra fecha.'
             : '';
         setClosedDayNotice(closureMessage);
-        const blocked = new Set<string>();
-        const blockStep = 30; // bloquear en intervalos de 30 min para todos los turnos
+        const busyRanges: OccupiedRange[] = [];
         res.appointments.forEach(a => {
           const label = formatTimeInShopTZ(a.startTime);
           const [h, m] = label.split(':').map(Number);
           const startMin = h * 60 + m;
-          const occupiedDuration = a.durationMinutes || 30;
-          for (let offset = 0; offset < occupiedDuration; offset += blockStep) {
-            const blockMin = startMin + offset;
-            blocked.add(
-              `${String(Math.floor(blockMin / 60)).padStart(2, '0')}:${String(
-                blockMin % 60,
-              ).padStart(2, '0')}`,
-            );
-          }
+          const occupiedDuration =
+            (a.durationMinutes || 30) + (a.bufferAfterMinutesApplied || 0);
+          busyRanges.push({
+            start: startMin,
+            end: startMin + occupiedDuration,
+          });
         });
-        setBookedSlots(blocked);
+        setOccupiedRanges(busyRanges);
+        setBarberTimeBlocks(res.barberTimeBlocks || []);
         if (res.resolvedSchedule) {
           setSelectedBarberSchedule({
             scheduleRange: res.resolvedSchedule.scheduleRange ?? null,
@@ -354,12 +375,36 @@ function ReservasForm({ navigation, route }: any) {
     if (!selectedBarber) {
       setSelectedBarberSchedule(null);
       setClosedDayNotice('');
+      setBarberTimeBlocks([]);
+      setOccupiedRanges([]);
     }
   }, [selectedBarber]);
 
   const selectedBarberData = useMemo(
     () => barbers.find(b => b._id === selectedBarber) || null,
     [barbers, selectedBarber],
+  );
+
+  const selectedServiceSummary = useMemo(
+    () => buildServiceSummary(selectedServices),
+    [selectedServices],
+  );
+
+  const currentDuration = useMemo(() => {
+    const total = selectedServices.reduce(
+      (sum, item) => sum + Number(item?.durationMinutes || 0),
+      0,
+    );
+    return total || 30;
+  }, [selectedServices]);
+
+  const currentServicePrice = useMemo(
+    () =>
+      selectedServices.reduce(
+        (sum, item) => sum + Number(item?.price || 0),
+        0,
+      ),
+    [selectedServices],
   );
 
   const isWorkDay = useMemo(() => {
@@ -384,7 +429,7 @@ function ReservasForm({ navigation, route }: any) {
   const horarioGroups = useMemo((): SlotGroup[] => {
     if (!isWorkDay || !selectedBarberData) return [];
 
-    const step = selectedService?.durationMinutes ?? 30;
+    const step = currentDuration;
 
     const buildSlots = (startStr: string, endStr: string): string[] => {
       const parse = (t: string) => {
@@ -418,7 +463,7 @@ function ReservasForm({ navigation, route }: any) {
     const parts = range.split('-');
     if (parts.length < 2) return [];
     return [{ label: '', slots: buildSlots(parts[0], parts[1]) }];
-  }, [isWorkDay, selectedBarberData, selectedService, resolvedBarberSchedule]);
+  }, [currentDuration, isWorkDay, selectedBarberData, resolvedBarberSchedule]);
 
   // Lista plana para validaciones
   const allSlots = useMemo(
@@ -438,11 +483,30 @@ function ReservasForm({ navigation, route }: any) {
 
   const isSlotUnavailable = useCallback(
     (label: string) => {
-      if (bookedSlots.has(label)) return true;
+      const startMinutes = labelToMinutes(label);
+      const endMinutes = startMinutes + currentDuration;
+      const overlapsAppointment = occupiedRanges.some(
+        range => range.start < endMinutes && range.end > startMinutes,
+      );
+      if (overlapsAppointment) return true;
+
+      const overlapsBlockedTime = barberTimeBlocks.some(block => {
+        const blockStart = labelToMinutes(block.start);
+        const blockEnd = labelToMinutes(block.end);
+        return blockStart < endMinutes && blockEnd > startMinutes;
+      });
+      if (overlapsBlockedTime) return true;
+
       if (!isTodayInShop) return false;
-      return labelToMinutes(label) <= currentMinutesInShop;
+      return startMinutes <= currentMinutesInShop;
     },
-    [bookedSlots, isTodayInShop, currentMinutesInShop],
+    [
+      barberTimeBlocks,
+      currentMinutesInShop,
+      isTodayInShop,
+      occupiedRanges,
+      currentDuration,
+    ],
   );
 
   useEffect(() => {
@@ -464,8 +528,21 @@ function ReservasForm({ navigation, route }: any) {
   }, [paymentMethod, paymentOptions]);
 
   const handleSubmit = async () => {
+    const normalizedServices = uniqueServicesById(selectedServices);
+
     if (!customerName.trim() || !selectedSlot) {
       Alert.alert('Error', 'Por favor ingresa tu nombre y elige un horario.');
+      return;
+    }
+    if (!normalizedServices.length) {
+      Alert.alert('Error', 'Seleccioná al menos un servicio para cargar el turno.');
+      return;
+    }
+    if (currentDuration > 240) {
+      Alert.alert(
+        'Duración inválida',
+        'La combinación de servicios no puede superar las 4 horas.',
+      );
       return;
     }
     if (closedDayNotice) {
@@ -484,12 +561,18 @@ function ReservasForm({ navigation, route }: any) {
       await createAppointment({
         barberId: selectedBarber!,
         customerName: customerName.trim(),
-        service: selectedService?.name || 'Corte',
+        service: buildServiceSummary(normalizedServices),
+        serviceItems: normalizedServices.map(item => ({
+          serviceId: item._id,
+          name: item.name,
+          durationMinutes: Number(item.durationMinutes || 0),
+          price: Number(item.price || 0),
+        })),
         startTime: buildIsoFromShopDateAndTime(selectedDate, selectedSlot),
-        servicePrice: selectedService?.price ?? 0,
+        servicePrice: currentServicePrice,
         notes: phone,
         email: customerEmail.trim(),
-        durationMinutes: selectedService?.durationMinutes ?? 30,
+        durationMinutes: currentDuration,
         paymentMethod,
       });
       Alert.alert('¡Reserva Exitosa!', 'Tu turno ha sido agendado.', [
@@ -537,7 +620,7 @@ function ReservasForm({ navigation, route }: any) {
                     isBooked && styles.timeTextBooked,
                   ]}
                 >
-                  {selectedService?.durationMinutes ?? 30}min
+                  {currentDuration}min
                 </Text>
               </Pressable>
             );
@@ -578,33 +661,54 @@ function ReservasForm({ navigation, route }: any) {
               {services.map(s => (
                 <Pressable
                   key={s._id}
-                  style={styles.serviceItem}
+                  style={[
+                    styles.serviceItem,
+                    selectedServices.some(item => item._id === s._id) &&
+                      styles.serviceItemActive,
+                  ]}
                   onPress={() => {
-                    setSelectedService(s);
-                    setServicePickerVisible(false);
+                    setSelectedServices(prev => {
+                      const exists = prev.some(item => item._id === s._id);
+                      if (exists) {
+                        return prev.filter(item => item._id !== s._id);
+                      }
+                      return uniqueServicesById([...prev, s]);
+                    });
                   }}
                 >
-                  <Text style={styles.serviceItemText}>{s.name}</Text>
-                  <Text style={{ color: hexToRgba(theme.primary, 0.52) }}>
-                    {s.durationMinutes} min · {formatPrice(s.price)}
+                  <View style={styles.serviceItemInfo}>
+                    <Text style={styles.serviceItemText}>{s.name}</Text>
+                    <Text style={styles.serviceItemMeta}>
+                      {s.durationMinutes} min · {formatPrice(s.price)}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[
+                      styles.serviceItemState,
+                      selectedServices.some(item => item._id === s._id) &&
+                        styles.serviceItemStateActive,
+                    ]}
+                  >
+                    {selectedServices.some(item => item._id === s._id)
+                      ? '✓ Agregado'
+                      : 'Agregar'}
                   </Text>
                 </Pressable>
               ))}
             </ScrollView>
-            <Pressable
-              onPress={() => setServicePickerVisible(false)}
-              style={{ marginTop: 10 }}
-            >
-              <Text
-                style={{
-                  color: theme.primary,
-                  textAlign: 'center',
-                  fontWeight: 'bold',
-                }}
-              >
-                CERRAR
+            <View style={styles.modalFooter}>
+              <Text style={styles.modalFooterSummary}>
+                {selectedServices.length
+                  ? `${selectedServices.length} servicio(s) · ${currentDuration} min · ${formatPrice(currentServicePrice)}`
+                  : 'Seleccioná al menos un servicio.'}
               </Text>
-            </Pressable>
+              <Pressable
+                onPress={() => setServicePickerVisible(false)}
+                style={styles.modalFooterAction}
+              >
+                <Text style={styles.modalFooterActionText}>Confirmar</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -630,11 +734,11 @@ function ReservasForm({ navigation, route }: any) {
               >
                 <View style={{ flex: 1 }}>
                   <Text style={styles.selectorMainText}>
-                    {selectedService?.name || 'Seleccionar...'}
+                    {selectedServiceSummary}
                   </Text>
-                  {selectedService ? (
+                  {selectedServices.length ? (
                     <Text style={styles.selectorMeta}>
-                      {selectedService.durationMinutes} min · {formatPrice(selectedService.price)}
+                      {currentDuration} min · {formatPrice(currentServicePrice)}
                     </Text>
                   ) : null}
                 </View>
@@ -1090,7 +1194,7 @@ const createStyles = (theme: Theme) =>
       borderWidth: 1,
       borderColor: theme.border,
     },
-    timeChipActive: { backgroundColor: theme.primary, borderColor: theme.primary },
+    timeChipActive: { backgroundColor: '#00000081', borderColor: theme.primary },
     timeChipBooked: {
       backgroundColor: theme.surfaceAlt,
       borderColor: theme.border,
@@ -1167,11 +1271,63 @@ const createStyles = (theme: Theme) =>
     serviceItem: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      paddingVertical: 18,
+      alignItems: 'center',
+      paddingVertical: 16,
+      paddingHorizontal: 4,
       borderBottomWidth: 1,
       borderBottomColor: theme.border,
+      gap: 12,
+    },
+    serviceItemActive: {
+      backgroundColor: hexToRgba(theme.primary, 0.08),
+      borderRadius: 16,
+      marginHorizontal: -4,
+      paddingHorizontal: 12,
+    },
+    serviceItemInfo: {
+      flex: 1,
+      gap: 3,
     },
     serviceItemText: { color: theme.textPrimary, fontSize: 16, fontWeight: '600' },
+    serviceItemMeta: {
+      color: hexToRgba(theme.primary, 0.52),
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    serviceItemState: {
+      color: theme.textMuted,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    serviceItemStateActive: {
+      color: theme.primary,
+    },
+    modalFooter: {
+      marginTop: 14,
+      paddingTop: 14,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      gap: 12,
+    },
+    modalFooterSummary: {
+      color: theme.textMuted,
+      fontSize: 13,
+      lineHeight: 18,
+      textAlign: 'center',
+    },
+    modalFooterAction: {
+      backgroundColor: theme.primary,
+      borderRadius: 14,
+      paddingVertical: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    modalFooterActionText: {
+      color: theme.textOnPrimary,
+      fontSize: 14,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+    },
   });
 
 export default ReservasForm;

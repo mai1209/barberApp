@@ -55,6 +55,11 @@ export default function WhatsAppCampaignScreen() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [message, setMessage] = useState(DEFAULT_MESSAGE);
+  const [frequencySort, setFrequencySort] = useState<
+    'recent' | 'most_frequent' | 'least_frequent'
+  >('most_frequent');
+  const [minVisitsInput, setMinVisitsInput] = useState('');
+  const [maxVisitsInput, setMaxVisitsInput] = useState('');
 
   const loadContacts = useCallback(async () => {
     try {
@@ -86,15 +91,43 @@ export default function WhatsAppCampaignScreen() {
 
   const filteredContacts = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return contacts;
-    return contacts.filter(contact => {
+    const minVisits = Number(minVisitsInput);
+    const maxVisits = Number(maxVisitsInput);
+    const matches = contacts.filter(contact => {
+      const visits = Number(contact.appointmentsCount || 0);
+      const matchesMin =
+        !Number.isFinite(minVisits) || minVisits <= 0 || visits >= minVisits;
+      const matchesMax =
+        !Number.isFinite(maxVisits) || maxVisits <= 0 || visits <= maxVisits;
+      if (!matchesMin || !matchesMax) return false;
+      if (!term) return true;
       return (
         contact.customerName.toLowerCase().includes(term) ||
         String(contact.phone || '').toLowerCase().includes(term) ||
         String(contact.lastService || '').toLowerCase().includes(term)
       );
     });
-  }, [contacts, search]);
+    return [...matches].sort((a, b) => {
+      if (frequencySort === 'most_frequent') {
+        return (
+          Number(b.appointmentsCount || 0) - Number(a.appointmentsCount || 0) ||
+          new Date(b.lastAppointmentAt || 0).getTime() -
+            new Date(a.lastAppointmentAt || 0).getTime()
+        );
+      }
+      if (frequencySort === 'least_frequent') {
+        return (
+          Number(a.appointmentsCount || 0) - Number(b.appointmentsCount || 0) ||
+          new Date(b.lastAppointmentAt || 0).getTime() -
+            new Date(a.lastAppointmentAt || 0).getTime()
+        );
+      }
+      return (
+        new Date(b.lastAppointmentAt || 0).getTime() -
+        new Date(a.lastAppointmentAt || 0).getTime()
+      );
+    });
+  }, [contacts, frequencySort, maxVisitsInput, minVisitsInput, search]);
 
   const handleOpenWhatsApp = async (contact: CustomerContact) => {
     const phone = normalizeWhatsAppPhone(contact.normalizedPhone || contact.phone);
@@ -175,6 +208,84 @@ export default function WhatsAppCampaignScreen() {
           placeholder="Buscar cliente, teléfono o servicio"
           placeholderTextColor={hexToRgba(theme.primary, 0.44)}
         />
+      </View>
+
+      <View style={styles.filtersCard}>
+        <Text style={styles.filtersTitle}>Frecuencia</Text>
+        <View style={styles.sortRow}>
+          <Pressable
+            onPress={() => setFrequencySort('most_frequent')}
+            style={[
+              styles.filterChip,
+              frequencySort === 'most_frequent' && styles.filterChipActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                frequencySort === 'most_frequent' && styles.filterChipTextActive,
+              ]}
+            >
+              Más frecuente
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setFrequencySort('least_frequent')}
+            style={[
+              styles.filterChip,
+              frequencySort === 'least_frequent' && styles.filterChipActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                frequencySort === 'least_frequent' && styles.filterChipTextActive,
+              ]}
+            >
+              Menos frecuente
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setFrequencySort('recent')}
+            style={[
+              styles.filterChip,
+              frequencySort === 'recent' && styles.filterChipActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                frequencySort === 'recent' && styles.filterChipTextActive,
+              ]}
+            >
+              Más reciente
+            </Text>
+          </Pressable>
+        </View>
+        <View style={styles.visitsRow}>
+          <View style={styles.visitBox}>
+            <Text style={styles.visitLabel}>Mín. veces</Text>
+            <TextInput
+              style={styles.visitInput}
+              value={minVisitsInput}
+              onChangeText={setMinVisitsInput}
+              keyboardType="number-pad"
+              placeholder="0"
+              placeholderTextColor={hexToRgba(theme.primary, 0.44)}
+            />
+          </View>
+          <View style={styles.visitBox}>
+            <Text style={styles.visitLabel}>Máx. veces</Text>
+            <TextInput
+              style={styles.visitInput}
+              value={maxVisitsInput}
+              onChangeText={setMaxVisitsInput}
+              keyboardType="number-pad"
+              placeholder="Sin tope"
+              placeholderTextColor={hexToRgba(theme.primary, 0.44)}
+            />
+          </View>
+        </View>
       </View>
 
       {loading ? (
@@ -281,6 +392,70 @@ function makeStyles(theme: Theme) {
       color: hexToRgba(theme.primary, 0.48),
       fontSize: 12,
       lineHeight: 18,
+    },
+    filtersCard: {
+      backgroundColor: theme.card,
+      borderRadius: 22,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: hexToRgba(theme.primary, 0.12),
+      gap: 12,
+    },
+    filtersTitle: {
+      color: theme.textPrimary,
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    sortRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    filterChip: {
+      borderWidth: 1,
+      borderColor: hexToRgba(theme.primary, 0.16),
+      backgroundColor: hexToRgba(theme.primary, 0.05),
+      borderRadius: 999,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+    },
+    filterChipActive: {
+      backgroundColor: theme.primary,
+      borderColor: theme.primary,
+    },
+    filterChipText: {
+      color: theme.textPrimary,
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    filterChipTextActive: {
+      color: theme.textOnPrimary,
+    },
+    visitsRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    visitBox: {
+      flex: 1,
+      gap: 6,
+    },
+    visitLabel: {
+      color: hexToRgba(theme.primary, 0.56),
+      fontSize: 11,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    visitInput: {
+      borderWidth: 1,
+      borderColor: hexToRgba(theme.primary, 0.14),
+      backgroundColor: hexToRgba(theme.primary, 0.05),
+      color: theme.textPrimary,
+      borderRadius: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 14,
+      fontWeight: '600',
     },
     searchBox: {
       flexDirection: 'row',

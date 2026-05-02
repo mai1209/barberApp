@@ -53,6 +53,7 @@ import {
   CreditCard,
   Link2,
   CircleDashed,
+  MessageCircle,
 } from 'lucide-react-native';
 
 type Props = {
@@ -110,6 +111,16 @@ function buildCancellationMessage({
   });
   const timeLabel = formatTimeOnly(startTime);
   return `Hola ${customerName}, te escribimos de ${shopName}. Tuvimos que cancelar tu turno de ${service} del ${dateLabel} a las ${timeLabel}. Responde este mensaje y te ofrecemos un nuevo horario.`;
+}
+
+function buildWaitingReminderMessage({
+  shopName,
+  customerName,
+}: {
+  shopName: string;
+  customerName: string;
+}) {
+  return `Hola ${customerName}, te escribimos de ${shopName}. No te olvides de tu turno, ya te estamos esperando.`;
 }
 
 function getPaymentSnapshot(appointment: Appointment) {
@@ -216,7 +227,9 @@ function Home({ navigation }: Props) {
         title: 'Cargá tus servicios',
         description:
           setupSummary.serviceCount > 0
-            ? `${setupSummary.serviceCount} servicio${setupSummary.serviceCount === 1 ? '' : 's'} cargado${setupSummary.serviceCount === 1 ? '' : 's'}.`
+            ? `${setupSummary.serviceCount} servicio${
+                setupSummary.serviceCount === 1 ? '' : 's'
+              } cargado${setupSummary.serviceCount === 1 ? '' : 's'}.`
             : 'Definí nombre, duración y precio para que el cliente pueda reservar.',
         complete: setupSummary.serviceCount > 0,
         actionLabel: 'Servicios',
@@ -228,7 +241,9 @@ function Home({ navigation }: Props) {
         title: 'Sumá tus barberos',
         description:
           setupSummary.barberCount > 0
-            ? `${setupSummary.barberCount} barbero${setupSummary.barberCount === 1 ? '' : 's'} cargado${setupSummary.barberCount === 1 ? '' : 's'}.`
+            ? `${setupSummary.barberCount} barbero${
+                setupSummary.barberCount === 1 ? '' : 's'
+              } cargado${setupSummary.barberCount === 1 ? '' : 's'}.`
             : 'Creá al menos un perfil con horarios para empezar a tomar turnos.',
         complete: setupSummary.barberCount > 0,
         actionLabel: 'Barberos',
@@ -392,8 +407,8 @@ function Home({ navigation }: Props) {
                 ? 'La cuenta de cobros ya está lista para registrar pagos anticipados.'
                 : 'Mercado Pago conectado y cobro online activo.'
               : cashEnabled
-                ? 'Tenés cobro en el local activo.'
-                : 'Revisá tus métodos de cobro.',
+              ? 'Tenés cobro en el local activo.'
+              : 'Revisá tus métodos de cobro.',
         }));
       }
     })();
@@ -440,8 +455,8 @@ function Home({ navigation }: Props) {
           mercadoPagoConnected && advanceEnabled
             ? 'Mercado Pago conectado y cobro online activo.'
             : cashEnabled
-              ? 'Tenés cobro en el local activo.'
-              : 'Revisá tus métodos de cobro.',
+            ? 'Tenés cobro en el local activo.'
+            : 'Revisá tus métodos de cobro.',
       }));
     });
   }, []);
@@ -633,6 +648,28 @@ function Home({ navigation }: Props) {
     ]);
   };
 
+  const handleWaitingReminder = async (appointment: Appointment) => {
+    try {
+      if (!appointment?.notes) {
+        Alert.alert(
+          'Sin contacto',
+          'No hay WhatsApp registrado para este cliente.',
+        );
+        return;
+      }
+      const phone = sanitizeWhatsappNumber(appointment.notes);
+      const message = buildWaitingReminderMessage({
+        shopName: greetingName,
+        customerName: appointment.customerName,
+      });
+      await Linking.openURL(
+        `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+      );
+    } catch (_err) {
+      Alert.alert('Error', 'No pudimos abrir WhatsApp.');
+    }
+  };
+
   const datePanResponder = useMemo(
     () =>
       PanResponder.create({
@@ -744,6 +781,15 @@ function Home({ navigation }: Props) {
             >
               <Text style={styles.btnSecText}>Liberar</Text>
             </Pressable>
+            <Pressable
+              style={[styles.btnAction, styles.btnSec, styles.btnWhatsapp]}
+              onPress={() => handleWaitingReminder(appointment)}
+            >
+              <View style={styles.btnWhatsappCopy}>
+                <Image style={styles.btnWhatsappImage} source={require('../assets/wp.png')} />
+                <Text style={styles.btnWhatsappHint}>Recordatorio</Text>
+              </View>
+            </Pressable>
           </View>
         )}
       </View>
@@ -781,7 +827,11 @@ function Home({ navigation }: Props) {
           <Text style={styles.welcomeText}>¡Hola,</Text>
           <Text style={styles.nameText}>{greetingName}!</Text>
         </View>
-        <Image source={theme.logo} style={styles.logo as any} resizeMode="contain" />
+        <Image
+          source={theme.logo}
+          style={styles.logo as any}
+          resizeMode="contain"
+        />
       </View>
 
       <ScrollView
@@ -849,11 +899,18 @@ function Home({ navigation }: Props) {
                     </View>
                     <View style={styles.setupBody}>
                       <Text style={styles.setupItemTitle}>{item.title}</Text>
-                      <Text style={styles.setupItemText}>{item.description}</Text>
+                      <Text style={styles.setupItemText}>
+                        {item.description}
+                      </Text>
                     </View>
-                    <Pressable style={styles.setupActionBtn} onPress={item.onPress}>
+                    <Pressable
+                      style={styles.setupActionBtn}
+                      onPress={item.onPress}
+                    >
                       <Icon size={14} color={theme.primary} />
-                      <Text style={styles.setupActionText}>{item.actionLabel}</Text>
+                      <Text style={styles.setupActionText}>
+                        {item.actionLabel}
+                      </Text>
                     </Pressable>
                   </View>
                 );
@@ -862,7 +919,7 @@ function Home({ navigation }: Props) {
           </View>
         ) : null}
 
-        {(Platform.OS !== 'ios' || hasProAccess) ? (
+        {Platform.OS !== 'ios' || hasProAccess ? (
           <View style={styles.compactCardsRow}>
             <Pressable
               style={[
@@ -992,7 +1049,7 @@ function Home({ navigation }: Props) {
           </View>
         </View>
       </ScrollView>
-      {(Platform.OS !== 'ios' || hasProAccess) ? (
+      {Platform.OS !== 'ios' || hasProAccess ? (
         <ProFeatureModal
           visible={proModalVariant != null}
           variant={proModalVariant ?? 'metrics'}
@@ -1059,8 +1116,11 @@ const capitalize = (text: string) =>
 
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.background ,      paddingBottom: 120,
-},
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+      paddingBottom: 120,
+    },
     topHeader: {
       paddingHorizontal: 25,
       paddingTop: Platform.OS === 'ios' ? 60 : 20,
@@ -1301,7 +1361,11 @@ const createStyles = (theme: Theme) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    metricsTitleCompact: { color: theme.textPrimary, fontSize: 13, fontWeight: '800' },
+    metricsTitleCompact: {
+      color: theme.textPrimary,
+      fontSize: 13,
+      fontWeight: '800',
+    },
     dualCompactCardLocked: {
       opacity: 0.82,
       borderColor: hexToRgba(theme.primary, 0.25),
@@ -1357,8 +1421,16 @@ const createStyles = (theme: Theme) =>
       fontWeight: '700',
     },
     dateHeroTextWrap: { flex: 1, alignItems: 'center' },
-    dateHeroTitle: { color: theme.textPrimary, fontSize: 18, fontWeight: '800' },
-    dateHeroSubtitle: { color: theme.textMuted, fontSize: 11, fontWeight: '500' },
+    dateHeroTitle: {
+      color: theme.textPrimary,
+      fontSize: 18,
+      fontWeight: '800',
+    },
+    dateHeroSubtitle: {
+      color: theme.textMuted,
+      fontSize: 11,
+      fontWeight: '500',
+    },
     weekStripContent: { paddingHorizontal: 14, paddingTop: 15 },
     weekDayChip: {
       width: 55,
@@ -1376,7 +1448,11 @@ const createStyles = (theme: Theme) =>
     },
     weekDayName: { color: theme.textMuted, fontSize: 10, fontWeight: '700' },
     weekDayNameActive: { color: theme.primary },
-    weekDayNumber: { color: theme.textPrimary, fontSize: 16, fontWeight: '800' },
+    weekDayNumber: {
+      color: theme.textPrimary,
+      fontSize: 16,
+      fontWeight: '800',
+    },
     weekDayNumberActive: { color: theme.primary },
 
     // NUEVO DISEÑO DE CARD DE TURNO
@@ -1435,7 +1511,11 @@ const createStyles = (theme: Theme) =>
       alignItems: 'center',
       marginBottom: 8,
     },
-    serviceNameText: { color: theme.textSecondary, fontSize: 14, fontWeight: '600' },
+    serviceNameText: {
+      color: theme.textSecondary,
+      fontSize: 14,
+      fontWeight: '600',
+    },
     dotSeparator: { color: theme.textMuted, marginHorizontal: 8 },
     durationText: { color: theme.textMuted, fontSize: 13 },
     barberSubText: { color: theme.textMuted, fontSize: 12, fontWeight: '500' },
@@ -1459,7 +1539,11 @@ const createStyles = (theme: Theme) =>
       backgroundColor: 'rgba(148, 163, 184, 0.12)',
       borderColor: 'rgba(148, 163, 184, 0.28)',
     },
-    paymentInfoText: { color: theme.textSecondary, fontSize: 11, fontWeight: '700' },
+    paymentInfoText: {
+      color: theme.textSecondary,
+      fontSize: 11,
+      fontWeight: '700',
+    },
 
     cardActions: {
       flexDirection: 'row',
@@ -1470,15 +1554,44 @@ const createStyles = (theme: Theme) =>
     },
     btnAction: {
       flex: 1,
-      height: 42,
+      paddingHorizontal: 1,
+      paddingVertical: 4,
       borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    btnMain: { backgroundColor: theme.primary },
-    btnMainText: { color: theme.textOnPrimary, fontSize: 13, fontWeight: '800' },
-    btnSec: { backgroundColor: theme.surfaceAlt, borderWidth: 1, borderColor: theme.border },
+    btnMain: { backgroundColor: theme.primary, flex: 1.18 },
+    btnMainText: {
+      color: theme.textOnPrimary,
+      fontSize: 12,
+      fontWeight: '800',
+      textAlign: 'center',
+      lineHeight: 15,
+    },
+    btnSec: {
+      backgroundColor: theme.surfaceAlt,
+      borderWidth: 1,
+      borderColor: theme.border,
+      flex: 0.92,
+    },
     btnSecText: { color: theme.textPrimary, fontSize: 13, fontWeight: '700' },
+    btnWhatsapp: {
+      borderColor: hexToRgba('#25D366', 0.34),
+      backgroundColor: hexToRgba('#25D366', 0.08),
+      flex: 1.08,
+    },
+
+    btnWhatsappCopy: {
+      alignItems: 'center',
+    },
+
+    btnWhatsappHint: {
+      color: theme.textMuted,
+      fontSize: 8,
+      fontWeight: '600',
+      marginTop: 1,
+      lineHeight: 11,
+    },
 
     swipeAction: {
       width: 90,
@@ -1505,6 +1618,7 @@ const createStyles = (theme: Theme) =>
     emptyTitle: { color: theme.textMuted, fontSize: 14, fontWeight: '600' },
     errorText: { color: '#ff7b7b', textAlign: 'center', marginBottom: 10 },
     logo: { width: 55, height: 55 },
+    btnWhatsappImage: { width: 20, height: 20 },
   });
 
 export default Home;

@@ -4,6 +4,7 @@ import { Platform, StyleSheet, View } from 'react-native';
 import type { Barber } from '../services/api';
 
 import Login from '../screnn/Login';
+import Register from '../screnn/Register';
 import Home from '../screnn/Home';
 import ReservasForm from '../screnn/ReservasForm';
 import RegisterEmployed from '../screnn/RegisterEmployed';
@@ -121,6 +122,7 @@ export default function StackNavigator({
           }}
         >
           <Stack.Screen name="Login" component={Login} />
+          <Stack.Screen name="Register" component={Register} />
           <Stack.Screen name="Subscription-Settings" component={SubscriptionSettingsScreen} />
           <Stack.Screen name="Change-Password" component={ChangePasswordScreen} />
           <Stack.Screen name="Recover-Password" component={RecoverPasswordScreen} />

@@ -42,6 +42,12 @@ const appointmentSchema = new mongoose.Schema(
       min: 15,
       max: 240,
     },
+    bufferAfterMinutesApplied: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 120,
+    },
     servicePrice: {
       type: Number,
       default: 0,

@@ -11,7 +11,6 @@ import {
   Text,
   TextInput,
   View,
-  Image,
 } from 'react-native';
 import RNFS from 'react-native-fs';
 import Share from 'react-native-share';
@@ -34,6 +33,7 @@ import type { Theme } from '../context/ThemeContext';
 import {
   CustomerHistoryResponse,
   ServiceOption,
+  fetchAppointmentMetrics,
   fetchCustomerHistory,
   fetchServices,
 } from '../services/api';
@@ -47,6 +47,18 @@ type PickerType = 'barber' | 'service' | 'month' | null;
 type PickerOption = {
   key: string;
   label: string;
+};
+
+type CustomerRow = {
+  key: string;
+  customerName: string;
+  phone: string;
+  visitsCount: number;
+  lastVisitAt: string;
+  lastBarberName: string;
+  lastService: string;
+  lastPaymentMethod: 'cash' | 'transfer';
+  totalRevenue: number;
 };
 
 const MONTH_LABELS = [
@@ -65,13 +77,13 @@ const MONTH_LABELS = [
 ];
 
 const TABLE_COLUMNS = [
-  { key: 'date', label: 'Fecha', width: 140 },
-  { key: 'customer', label: 'Cliente', width: 150 },
-  { key: 'barber', label: 'Barbero', width: 120 },
-  { key: 'service', label: 'Servicio', width: 170 },
-  { key: 'phone', label: 'Teléfono', width: 135 },
-  { key: 'payment', label: 'Pago', width: 120 },
-  { key: 'price', label: 'Precio', width: 110 },
+  { key: 'customer', label: 'Cliente', width: 180 },
+  { key: 'visits', label: 'Visitas', width: 90 },
+  { key: 'lastVisit', label: 'Última visita', width: 150 },
+  { key: 'barber', label: 'Último barbero', width: 150 },
+  { key: 'service', label: 'Último servicio', width: 180 },
+  { key: 'payment', label: 'Último pago', width: 130 },
+  { key: 'price', label: 'Total gastado', width: 120 },
 ];
 
 const formatCurrency = (value: number) =>
@@ -137,15 +149,6 @@ const getPaymentLabel = (value: 'all' | 'cash' | 'transfer') => {
 const getPaymentMethodLabel = (value: string) =>
   value === 'transfer' ? 'Transferencia' : 'Efectivo';
 
-const parseDataUrl = (value: string) => {
-  const match = value.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
-  if (!match) return null;
-  return {
-    mimeType: match[1].toLowerCase(),
-    base64: match[2],
-  };
-};
-
 const sanitizePdfText = (value: string | number | null | undefined) =>
   String(value ?? '')
     .replace(/[\u202f\u00a0]/g, ' ')
@@ -180,8 +183,10 @@ function CustomerHistoryScreen({ navigation }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const now = useMemo(() => new Date(), []);
+  const currentMonth = now.getMonth() + 1;
 
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
+  const [monthTouched, setMonthTouched] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState<CustomerHistoryResponse | null>(null);
@@ -192,6 +197,13 @@ function CustomerHistoryScreen({ navigation }: Props) {
   const [selectedBarber, setSelectedBarber] = useState('all');
   const [selectedService, setSelectedService] = useState('all');
   const [searchInput, setSearchInput] = useState('');
+  const [visitsFilterInput, setVisitsFilterInput] = useState('');
+  const [customerSegment, setCustomerSegment] = useState<
+    'all' | 'new' | 'recurrent'
+  >('all');
+  const [customerSort, setCustomerSort] = useState<'recent' | 'most' | 'least'>(
+    'most',
+  );
   const [activePicker, setActivePicker] = useState<PickerType>(null);
 
   const monthOptions = useMemo<PickerOption[]>(
@@ -207,7 +219,7 @@ function CustomerHistoryScreen({ navigation }: Props) {
     async (isRefresh = false) => {
       try {
         if (!isRefresh) setLoading(true);
-        const [historyResponse, servicesResponse] = await Promise.all([
+        let [historyResponse, servicesResponse] = await Promise.all([
           fetchCustomerHistory({
             year: now.getFullYear(),
             month: selectedMonth,
@@ -215,6 +227,39 @@ function CustomerHistoryScreen({ navigation }: Props) {
           }),
           fetchServices(),
         ]);
+
+        if (
+          !monthTouched &&
+          selectedMonth === currentMonth &&
+          (historyResponse?.items?.length ?? 0) === 0
+        ) {
+          const annualMetrics = await fetchAppointmentMetrics({
+            year: now.getFullYear(),
+            annual: true,
+          });
+
+          const latestMonthWithActivity = [...(annualMetrics.monthly ?? [])]
+            .reverse()
+            .find(item => Number(item.appointmentsCount || 0) > 0);
+
+          const fallbackMonth = latestMonthWithActivity?.key
+            ? Number(String(latestMonthWithActivity.key).split('-')[1])
+            : null;
+
+          if (
+            fallbackMonth &&
+            Number.isFinite(fallbackMonth) &&
+            fallbackMonth !== selectedMonth
+          ) {
+            historyResponse = await fetchCustomerHistory({
+              year: now.getFullYear(),
+              month: fallbackMonth,
+              paymentMethod: paymentFilter === 'all' ? undefined : paymentFilter,
+            });
+            setSelectedMonth(fallbackMonth);
+          }
+        }
+
         setData(historyResponse);
         setServices(servicesResponse?.services ?? []);
       } catch (err) {
@@ -224,7 +269,7 @@ function CustomerHistoryScreen({ navigation }: Props) {
         setRefreshing(false);
       }
     },
-    [now, paymentFilter, selectedMonth],
+    [currentMonth, monthTouched, now, paymentFilter, selectedMonth],
   );
 
   useFocusEffect(
@@ -258,7 +303,7 @@ function CustomerHistoryScreen({ navigation }: Props) {
 
   const search = searchInput.trim().toLowerCase();
 
-  const filteredItems = useMemo(() => {
+  const visitRows = useMemo(() => {
     return (data?.items ?? []).filter(item => {
       const matchesBarber =
         selectedBarber === 'all' || item.barberName === selectedBarber;
@@ -275,41 +320,101 @@ function CustomerHistoryScreen({ navigation }: Props) {
 
       return matchesBarber && matchesService && matchesSearch;
     });
-  }, [data, search, selectedBarber, selectedService]);
+  }, [
+    data,
+    search,
+    selectedBarber,
+    selectedService,
+  ]);
 
-  const sortedItems = useMemo(
-    () =>
-      [...filteredItems].sort(
-        (a, b) =>
-          new Date(b.startTime).getTime() - new Date(a.startTime).getTime(),
-      ),
-    [filteredItems],
-  );
+  const customerRows = useMemo<CustomerRow[]>(() => {
+    const rows = new Map<string, CustomerRow>();
+
+    visitRows.forEach(item => {
+      const key = `${item.customerName}|${item.phone || ''}`.toLowerCase();
+      const current = rows.get(key);
+      if (!current) {
+        rows.set(key, {
+          key,
+          customerName: item.customerName,
+          phone: item.phone || '',
+          visitsCount: 1,
+          lastVisitAt: item.startTime,
+          lastBarberName: item.barberName,
+          lastService: item.service,
+          lastPaymentMethod: item.paymentMethod,
+          totalRevenue: Number(item.price || 0),
+        });
+        return;
+      }
+
+      current.visitsCount += 1;
+      current.totalRevenue += Number(item.price || 0);
+      if (new Date(item.startTime).getTime() > new Date(current.lastVisitAt).getTime()) {
+        current.lastVisitAt = item.startTime;
+        current.lastBarberName = item.barberName;
+        current.lastService = item.service;
+        current.lastPaymentMethod = item.paymentMethod;
+      }
+    });
+
+    const minVisits = Number(visitsFilterInput);
+
+    return [...rows.values()]
+      .filter(row => {
+        if (customerSegment === 'new') return row.visitsCount === 1;
+        if (customerSegment === 'recurrent') return row.visitsCount > 1;
+        return true;
+      })
+      .filter(row => {
+        if (!Number.isFinite(minVisits) || minVisits <= 1) return true;
+        return row.visitsCount >= minVisits;
+      })
+      .sort((a, b) => {
+        const aLastVisit = new Date(a.lastVisitAt).getTime();
+        const bLastVisit = new Date(b.lastVisitAt).getTime();
+
+        if (customerSort === 'most') {
+          return (
+            b.visitsCount - a.visitsCount ||
+            bLastVisit - aLastVisit ||
+            b.totalRevenue - a.totalRevenue
+          );
+        }
+
+        if (customerSort === 'least') {
+          return (
+            a.visitsCount - b.visitsCount ||
+            bLastVisit - aLastVisit ||
+            b.totalRevenue - a.totalRevenue
+          );
+        }
+
+        return bLastVisit - aLastVisit || b.visitsCount - a.visitsCount;
+      });
+  }, [customerSegment, customerSort, visitRows, visitsFilterInput]);
 
   const summary = useMemo(() => {
-    const totalRevenue = filteredItems.reduce(
+    const totalRevenue = visitRows.reduce(
       (acc, item) => acc + Number(item.price || 0),
       0,
     );
-    const uniqueClients = new Set(
-      filteredItems.map(item => `${item.customerName}|${item.phone || ''}`.toLowerCase()),
-    ).size;
 
     return {
-      servicesCount: filteredItems.length,
-      uniqueClients,
+      servicesCount: visitRows.length,
+      uniqueClients: customerRows.length,
       totalRevenue,
-      cashRevenue: filteredItems
+      cashRevenue: visitRows
         .filter(item => item.paymentMethod === 'cash')
         .reduce((acc, item) => acc + Number(item.price || 0), 0),
-      transferRevenue: filteredItems
+      transferRevenue: visitRows
         .filter(item => item.paymentMethod === 'transfer')
         .reduce((acc, item) => acc + Number(item.price || 0), 0),
-      cashCount: filteredItems.filter(item => item.paymentMethod === 'cash').length,
-      transferCount: filteredItems.filter(item => item.paymentMethod === 'transfer')
+      cashCount: visitRows.filter(item => item.paymentMethod === 'cash').length,
+      transferCount: visitRows.filter(item => item.paymentMethod === 'transfer')
         .length,
     };
-  }, [filteredItems]);
+  }, [customerRows.length, visitRows]);
 
   const activeContextLabel = useMemo(() => {
     if (selectedBarber !== 'all') return `Barbero: ${selectedBarber}`;
@@ -317,11 +422,19 @@ function CustomerHistoryScreen({ navigation }: Props) {
     return 'Vista general';
   }, [selectedBarber, selectedService]);
 
+  const sortLabel = useMemo(() => {
+    if (customerSort === 'most') return 'Más frecuente';
+    if (customerSort === 'least') return 'Menos frecuente';
+    return 'Más reciente';
+  }, [customerSort]);
+
   const hasActiveFilters =
     paymentFilter !== 'all' ||
     selectedBarber !== 'all' ||
     selectedService !== 'all' ||
-    Boolean(searchInput.trim());
+    Boolean(searchInput.trim()) ||
+    Boolean(visitsFilterInput.trim()) ||
+    customerSegment !== 'all';
 
   const pickerOptions = useMemo(() => {
     if (activePicker === 'barber') return barberOptions;
@@ -353,6 +466,7 @@ function CustomerHistoryScreen({ navigation }: Props) {
     } else if (activePicker === 'service') {
       setSelectedService(option.key);
     } else if (activePicker === 'month') {
+      setMonthTouched(true);
       setSelectedMonth(Number(option.key));
     }
     setActivePicker(null);
@@ -363,26 +477,31 @@ function CustomerHistoryScreen({ navigation }: Props) {
     setSelectedBarber('all');
     setSelectedService('all');
     setSearchInput('');
+    setVisitsFilterInput('');
+    setCustomerSegment('all');
+    setCustomerSort('most');
   };
 
   const handleExportExcel = async () => {
     const header = [
-      'Fecha y hora',
       'Cliente',
-      'Barbero',
-      'Servicio',
+      'Visitas',
+      'Última visita',
+      'Último barbero',
+      'Último servicio',
       'Telefono',
-      'Metodo de pago',
-      'Monto',
+      'Último pago',
+      'Total gastado',
     ];
-    const rows = sortedItems.map(item => [
-      formatDateTime(item.startTime),
+    const rows = customerRows.map(item => [
       item.customerName,
-      item.barberName,
-      item.service,
+      item.visitsCount,
+      formatDateTime(item.lastVisitAt),
+      item.lastBarberName,
+      item.lastService,
       item.phone || '',
-      getPaymentMethodLabel(item.paymentMethod),
-      Number(item.price ?? 0),
+      getPaymentMethodLabel(item.lastPaymentMethod),
+      Number(item.totalRevenue ?? 0),
     ]);
 
     try {
@@ -400,7 +519,7 @@ function CustomerHistoryScreen({ navigation }: Props) {
         ['Pago', getPaymentLabel(paymentFilter)],
         ['Busqueda', searchInput.trim() || 'Sin filtro'],
         [],
-        ['Servicios', summary.servicesCount],
+        ['Servicios en el período', summary.servicesCount],
         ['Clientes únicos', summary.uniqueClients],
         ['Ingresos totales', summary.totalRevenue],
         ['Ingresos efectivo', summary.cashRevenue],
@@ -430,10 +549,11 @@ function CustomerHistoryScreen({ navigation }: Props) {
       ];
 
       worksheet['!cols'] = [
+        { wch: 24 },
+        { wch: 10 },
+        { wch: 20 },
         { wch: 20 },
         { wch: 24 },
-        { wch: 20 },
-        { wch: 26 },
         { wch: 18 },
         { wch: 16 },
         { wch: 14 },
@@ -446,7 +566,7 @@ function CustomerHistoryScreen({ navigation }: Props) {
         { hpt: 22 },
       ];
       worksheet['!autofilter'] = {
-        ref: `A5:G${Math.max(5, rows.length + 5)}`,
+        ref: `A5:H${Math.max(5, rows.length + 5)}`,
       };
 
       const workbook = XLSX.utils.book_new();
@@ -485,66 +605,20 @@ function CustomerHistoryScreen({ navigation }: Props) {
       const cardGap = 12;
       const cardWidth = (pageWidth - margin * 2 - cardGap * 2) / 3;
       const primaryColor = hexToPdfRgb(theme.primary);
-      const panelColor = rgb(0.07, 0.08, 0.1);
-      const panelAltColor = rgb(0.09, 0.1, 0.13);
-      const textColor = rgb(0.96, 0.97, 0.98);
-      const mutedColor = rgb(0.68, 0.71, 0.78);
-      const borderColor = rgb(0.16, 0.17, 0.21);
-      const cashBg = rgb(0.08, 0.18, 0.11);
-      const transferBg = rgb(0.11, 0.08, 0.19);
-      const cashText = rgb(0.55, 0.9, 0.63);
-      const priceColor = rgb(0.97, 0.63, 0.28);
+      const pageBackgroundColor = rgb(1, 1, 1);
+      const panelColor = rgb(0.985, 0.988, 0.993);
+      const panelAltColor = rgb(0.94, 0.955, 0.975);
+      const textColor = rgb(0.11, 0.14, 0.18);
+      const mutedColor = rgb(0.42, 0.46, 0.52);
+      const borderColor = rgb(0.83, 0.86, 0.9);
+      const cardFillColor = rgb(0.972, 0.978, 0.988);
+      const cashBg = rgb(0.9, 0.97, 0.92);
+      const transferBg = rgb(0.91, 0.94, 0.99);
+      const cashText = rgb(0.12, 0.48, 0.2);
+      const transferText = rgb(0.18, 0.35, 0.7);
+      const priceColor = rgb(0.73, 0.34, 0.05);
       const paymentLabel = getPaymentLabel(paymentFilter);
-      const themeCardColor = hexToPdfRgb(theme.card);
       const themeSecondaryColor = hexToPdfRgb(theme.secondary);
-
-      let embeddedLogo:
-        | Awaited<ReturnType<PDFDocument['embedPng']>>
-        | Awaited<ReturnType<PDFDocument['embedJpg']>>
-        | null = null;
-
-      const tryEmbedLogo = async () => {
-        try {
-          if (
-            theme.logo &&
-            typeof theme.logo === 'object' &&
-            'uri' in theme.logo &&
-            typeof theme.logo.uri === 'string'
-          ) {
-            const parsed = parseDataUrl(theme.logo.uri);
-            if (parsed) {
-              embeddedLogo = parsed.mimeType.includes('png')
-                ? await pdfDoc.embedPng(parsed.base64)
-                : await pdfDoc.embedJpg(parsed.base64);
-              return;
-            }
-          }
-
-          const resolvedAsset = Image.resolveAssetSource(theme.logo);
-          const assetUri = resolvedAsset?.uri;
-          if (!assetUri) return;
-
-          const response = await fetch(assetUri);
-          const arrayBuffer = await response.arrayBuffer();
-          const bytes = new Uint8Array(arrayBuffer);
-          const lowerUri = assetUri.toLowerCase();
-
-          if (lowerUri.includes('.png')) {
-            embeddedLogo = await pdfDoc.embedPng(bytes);
-            return;
-          }
-
-          if (
-            lowerUri.includes('.jpg') ||
-            lowerUri.includes('.jpeg') ||
-            lowerUri.includes('image/jpeg')
-          ) {
-            embeddedLogo = await pdfDoc.embedJpg(bytes);
-          }
-        } catch (_error) {}
-      };
-
-      await tryEmbedLogo();
 
       const drawPageFrame = (page: any) => {
         page.drawRectangle({
@@ -552,7 +626,7 @@ function CustomerHistoryScreen({ navigation }: Props) {
           y: 0,
           width: pageWidth,
           height: pageHeight,
-          color: rgb(0.03, 0.03, 0.05),
+          color: pageBackgroundColor,
         });
 
         page.drawRectangle({
@@ -566,15 +640,15 @@ function CustomerHistoryScreen({ navigation }: Props) {
         page.drawText(sanitizePdfText('HISTORIAL'), {
           x: margin,
           y: pageHeight - 42,
-          size: 18,
+          size: 16,
           font: fontBold,
-          color: primaryColor,
+          color: textColor,
         });
 
-        page.drawText(sanitizePdfText('Servicios y ventas registradas'), {
+        page.drawText(sanitizePdfText('Reporte de clientes, servicios y ventas'), {
           x: margin,
           y: pageHeight - 58,
-          size: 10,
+          size: 9,
           font: fontRegular,
           color: mutedColor,
         });
@@ -582,38 +656,10 @@ function CustomerHistoryScreen({ navigation }: Props) {
         page.drawText(sanitizePdfText(selectedMonthLabel), {
           x: pageWidth - margin - 120,
           y: pageHeight - 42,
-          size: 11,
-          font: fontBold,
-          color: themeSecondaryColor,
+          size: 10,
+          font: fontRegular,
+          color: mutedColor,
         });
-
-        if (embeddedLogo) {
-          const maxWidth = 44;
-          const maxHeight = 44;
-          const scale = Math.min(
-            maxWidth / embeddedLogo.width,
-            maxHeight / embeddedLogo.height,
-          );
-          const width = embeddedLogo.width * scale;
-          const height = embeddedLogo.height * scale;
-
-          page.drawRectangle({
-            x: pageWidth - margin - 60,
-            y: pageHeight - 60,
-            width: 52,
-            height: 52,
-            color: panelColor,
-            borderColor: primaryColor,
-            borderWidth: 1,
-          });
-
-          page.drawImage(embeddedLogo, {
-            x: pageWidth - margin - 56 + (44 - width) / 2,
-            y: pageHeight - 56 + (44 - height) / 2,
-            width,
-            height,
-          });
-        }
       };
 
       const drawSummaryCard = (
@@ -628,8 +674,8 @@ function CustomerHistoryScreen({ navigation }: Props) {
           y,
           width: cardWidth,
           height: 58,
-          color: themeCardColor,
-          borderColor: primaryColor,
+          color: pageBackgroundColor,
+          borderColor,
           borderWidth: 1,
         });
 
@@ -644,7 +690,7 @@ function CustomerHistoryScreen({ navigation }: Props) {
         page.drawText(sanitizePdfText(value), {
           x: x + 12,
           y: y + 16,
-          size: 17,
+          size: 15,
           font: fontBold,
           color: textColor,
         });
@@ -656,8 +702,8 @@ function CustomerHistoryScreen({ navigation }: Props) {
           y,
           width: pageWidth - margin * 2,
           height: 54,
-          color: themeCardColor,
-          borderColor: primaryColor,
+          color: pageBackgroundColor,
+          borderColor,
           borderWidth: 1,
         });
 
@@ -727,7 +773,7 @@ function CustomerHistoryScreen({ navigation }: Props) {
           width: badgeWidth,
           height: 14,
           color: isTransfer ? transferBg : cashBg,
-          borderColor: isTransfer ? primaryColor : cashText,
+          borderColor: isTransfer ? transferText : cashText,
           borderWidth: 0.6,
         });
         page.drawText(sanitizePdfText(getPaymentMethodLabel(method)), {
@@ -735,7 +781,7 @@ function CustomerHistoryScreen({ navigation }: Props) {
           y: y + 4,
           size: 7,
           font: fontBold,
-          color: isTransfer ? primaryColor : cashText,
+          color: isTransfer ? transferText : cashText,
         });
       };
 
@@ -766,7 +812,7 @@ function CustomerHistoryScreen({ navigation }: Props) {
       drawTableHeader(page, cursorY);
       cursorY -= rowHeight;
 
-      if (!sortedItems.length) {
+      if (!customerRows.length) {
         page.drawText(
           sanitizePdfText('No hay resultados para exportar con el filtro actual.'),
           {
@@ -779,7 +825,7 @@ function CustomerHistoryScreen({ navigation }: Props) {
         );
       }
 
-      sortedItems.forEach((item, index) => {
+      customerRows.forEach((item, index) => {
         if (cursorY < 72) {
           page.drawText(sanitizePdfText(`Página ${pageNumber}`), {
             x: pageWidth - margin - 42,
@@ -807,11 +853,11 @@ function CustomerHistoryScreen({ navigation }: Props) {
         });
 
         const values = [
-          formatDateTime(item.startTime),
           item.customerName,
-          item.barberName,
-          item.service,
-          item.phone || 'Sin teléfono',
+          String(item.visitsCount),
+          formatDateTime(item.lastVisitAt),
+          item.lastBarberName,
+          item.lastService,
         ];
 
         let currentX = tableStartX;
@@ -820,17 +866,17 @@ function CustomerHistoryScreen({ navigation }: Props) {
             x: currentX + 8,
             y: cursorY + 8,
             size: 8,
-            font: valueIndex === 1 ? fontBold : fontRegular,
+            font: valueIndex === 0 ? fontBold : fontRegular,
             color: textColor,
             maxWidth: columnWidths[valueIndex] - 12,
           });
           currentX += columnWidths[valueIndex];
         });
 
-        drawPaymentBadge(page, currentX + 8, cursorY + 5, item.paymentMethod);
+        drawPaymentBadge(page, currentX + 8, cursorY + 5, item.lastPaymentMethod);
         currentX += columnWidths[5];
 
-        page.drawText(sanitizePdfText(formatCurrency(item.price)), {
+        page.drawText(sanitizePdfText(formatCurrency(item.totalRevenue)), {
           x: currentX + 8,
           y: cursorY + 8,
           size: 8,
@@ -1057,15 +1103,144 @@ function CustomerHistoryScreen({ navigation }: Props) {
               transfer
             />
           </View>
+
+          <View style={styles.customerControlsRow}>
+            <View style={styles.visitsFilterBox}>
+              <Text style={styles.selectLabel}>Mín. veces</Text>
+              <TextInput
+                placeholder="1"
+                placeholderTextColor={theme.placeholder}
+                style={styles.visitsFilterInput}
+                value={visitsFilterInput}
+                onChangeText={setVisitsFilterInput}
+                keyboardType="number-pad"
+              />
+            </View>
+
+            <View style={styles.customerSortRow}>
+              <Pressable
+                style={[
+                  styles.frequencyChip,
+                  customerSort === 'most' && styles.frequencyChipActive,
+                ]}
+                onPress={() => setCustomerSort('most')}
+              >
+                <Text
+                  style={[
+                    styles.frequencyChipText,
+                    customerSort === 'most' && styles.frequencyChipTextActive,
+                  ]}
+                >
+                  Más frecuente
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.frequencyChip,
+                  customerSort === 'least' && styles.frequencyChipActive,
+                ]}
+                onPress={() => setCustomerSort('least')}
+              >
+                <Text
+                  style={[
+                    styles.frequencyChipText,
+                    customerSort === 'least' && styles.frequencyChipTextActive,
+                  ]}
+                >
+                  Menos frecuente
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.frequencyChip,
+                  customerSort === 'recent' && styles.frequencyChipActive,
+                ]}
+                onPress={() => setCustomerSort('recent')}
+              >
+                <Text
+                  style={[
+                    styles.frequencyChipText,
+                    customerSort === 'recent' && styles.frequencyChipTextActive,
+                  ]}
+                >
+                  Más reciente
+                </Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.customerSortRow}>
+              <Pressable
+                style={[
+                  styles.frequencyChip,
+                  customerSegment === 'all' && styles.frequencyChipActive,
+                ]}
+                onPress={() => setCustomerSegment('all')}
+              >
+                <Text
+                  style={[
+                    styles.frequencyChipText,
+                    customerSegment === 'all' && styles.frequencyChipTextActive,
+                  ]}
+                >
+                  Todos
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.frequencyChip,
+                  customerSegment === 'new' && styles.frequencyChipActive,
+                ]}
+                onPress={() => setCustomerSegment('new')}
+              >
+                <Text
+                  style={[
+                    styles.frequencyChipText,
+                    customerSegment === 'new' && styles.frequencyChipTextActive,
+                  ]}
+                >
+                  Solo nuevos
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.frequencyChip,
+                  customerSegment === 'recurrent' &&
+                    styles.frequencyChipActive,
+                ]}
+                onPress={() => setCustomerSegment('recurrent')}
+              >
+                <Text
+                  style={[
+                    styles.frequencyChipText,
+                    customerSegment === 'recurrent' &&
+                      styles.frequencyChipTextActive,
+                  ]}
+                >
+                  Solo recurrentes
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.clientInsightRow}>
+            <View style={styles.clientInsightCard}>
+              <Text style={styles.clientInsightLabel}>Orden actual</Text>
+              <Text style={styles.clientInsightValue}>{sortLabel}</Text>
+            </View>
+            <View style={styles.clientInsightCard}>
+              <Text style={styles.clientInsightLabel}>Clientes filtrados</Text>
+              <Text style={styles.clientInsightValue}>{customerRows.length}</Text>
+            </View>
+          </View>
         </View>
 
         <View style={styles.resultsHeader}>
           <View>
-            <Text style={styles.resultsTitle}>Registro del período</Text>
-            <Text style={styles.resultsSubtitle}>
-              {filteredItems.length} servicios encontrados
-            </Text>
-          </View>
+              <Text style={styles.resultsTitle}>Clientes del período</Text>
+              <Text style={styles.resultsSubtitle}>
+              {customerRows.length} clientes encontrados · ordenado por {sortLabel.toLowerCase()}
+              </Text>
+            </View>
           <View style={styles.resultsHeaderActions}>
             <View style={styles.exportButtonsRow}>
               <Pressable
@@ -1089,7 +1264,7 @@ function CustomerHistoryScreen({ navigation }: Props) {
 
         {loading ? (
           <ActivityIndicator color={theme.primary} style={{ marginTop: 42 }} />
-        ) : filteredItems.length ? (
+        ) : customerRows.length ? (
           <View style={styles.tableCard}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View>
@@ -1104,34 +1279,34 @@ function CustomerHistoryScreen({ navigation }: Props) {
                   ))}
                 </View>
 
-                {filteredItems.map((item, index) => (
+                {customerRows.map((item, index) => (
                   <View
-                    key={item._id}
+                    key={item.key}
                     style={[
                       styles.tableRow,
                       index % 2 === 1 && styles.tableRowAlt,
                     ]}
                   >
-                    <TableCell styles={styles} width={140}>
-                      {formatDateTime(item.startTime)}
-                    </TableCell>
-                    <TableCell styles={styles} width={150} emphasis>
+                    <TableCell styles={styles} width={180} emphasis>
                       {item.customerName}
                     </TableCell>
-                    <TableCell styles={styles} width={120}>
-                      {item.barberName}
+                    <TableCell styles={styles} width={90}>
+                      {item.visitsCount}x
                     </TableCell>
-                    <TableCell styles={styles} width={170}>
-                      {item.service}
+                    <TableCell styles={styles} width={150}>
+                      {formatDateTime(item.lastVisitAt)}
                     </TableCell>
-                    <TableCell styles={styles} width={135}>
-                      {item.phone || 'Sin teléfono'}
+                    <TableCell styles={styles} width={150}>
+                      {item.lastBarberName}
                     </TableCell>
-                    <View style={[styles.tableCell, { width: 120 }]}>
+                    <TableCell styles={styles} width={180}>
+                      {item.lastService}
+                    </TableCell>
+                    <View style={[styles.tableCell, { width: 130 }]}>
                       <View
                         style={[
                           styles.paymentBadge,
-                          item.paymentMethod === 'transfer'
+                          item.lastPaymentMethod === 'transfer'
                             ? styles.paymentBadgeTransfer
                             : styles.paymentBadgeCash,
                         ]}
@@ -1139,12 +1314,12 @@ function CustomerHistoryScreen({ navigation }: Props) {
                         <Text
                           style={[
                             styles.paymentBadgeText,
-                            item.paymentMethod === 'transfer'
+                            item.lastPaymentMethod === 'transfer'
                               ? styles.paymentBadgeTextTransfer
                               : styles.paymentBadgeTextCash,
                           ]}
                         >
-                          {item.paymentMethod === 'transfer'
+                          {item.lastPaymentMethod === 'transfer'
                             ? 'Transferencia'
                             : 'Efectivo'}
                         </Text>
@@ -1154,11 +1329,11 @@ function CustomerHistoryScreen({ navigation }: Props) {
                       style={[
                         styles.tableCell,
                         styles.tableCellPrice,
-                        { width: 110 },
+                        { width: 120 },
                       ]}
                     >
                       <Text style={styles.priceText}>
-                        {formatCurrency(item.price)}
+                        {formatCurrency(item.totalRevenue)}
                       </Text>
                     </View>
                   </View>
@@ -1419,6 +1594,77 @@ const makeStyles = (theme: Theme) =>
       fontSize: 11,
       fontWeight: '700',
       marginTop: 4,
+    },
+    customerControlsRow: {
+      gap: 12,
+      marginTop: 14,
+    },
+    visitsFilterBox: {
+      gap: 6,
+    },
+    visitsFilterInput: {
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.input,
+      borderRadius: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      color: theme.textPrimary,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    customerSortRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      paddingBottom: 10,
+    },
+    clientInsightRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 2,
+    },
+    clientInsightCard: {
+      flex: 1,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.surfaceAlt,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    clientInsightLabel: {
+      color: theme.textMuted,
+      fontSize: 10,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 0.7,
+      marginBottom: 5,
+    },
+    clientInsightValue: {
+      color: theme.textPrimary,
+      fontSize: 13,
+      fontWeight: '800',
+    },
+    frequencyChip: {
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.surfaceAlt,
+      borderRadius: 999,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+    },
+    frequencyChipActive: {
+      backgroundColor: theme.primary,
+      borderColor: theme.primary,
+    },
+    frequencyChipText: {
+      color: theme.textPrimary,
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    frequencyChipTextActive: {
+      color: theme.textOnPrimary,
     },
     summaryCard: {
       flex: 1,

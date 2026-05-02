@@ -12,7 +12,6 @@ import {
   Pressable,
   Image,
   ActivityIndicator,
-  Linking,
 } from 'react-native';
 
 import { loginUser, savePushTokenApi } from '../services/api'; // Importado savePushTokenApi
@@ -32,12 +31,9 @@ const AUTH_THEME = {
 } as const;
 const ANDROID_REGISTER_URL =
   'https://barberappbycodex.com/registro';
-const IOS_SUPPORT_WHATSAPP_URL =
-  'https://barberappbycodex.com/soporte';
 
 function Login({ navigation }: any) {
   const { applyUserTheme } = useTheme();
-  const isIOS = Platform.OS === 'ios';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -46,22 +42,6 @@ function Login({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [focusedField, setFocusedField] = useState<string | null>(null);
-
-  const handleOpenIosSupport = async () => {
-    try {
-      await Linking.openURL(IOS_SUPPORT_WHATSAPP_URL);
-    } catch (_error) {
-      setError('No pudimos abrir la página de soporte');
-    }
-  };
-
-  const handleOpenAndroidRegister = async () => {
-    try {
-      await Linking.openURL(ANDROID_REGISTER_URL);
-    } catch (_error) {
-      setError('No pudimos abrir la web de registro');
-    }
-  };
 
   const handleLogin = async () => {
     if (loading) return;
@@ -123,28 +103,8 @@ function Login({ navigation }: any) {
 
           <View style={styles.loginCard}>
             <Text style={styles.instructionText}>
-              {isIOS
-                ? 'Iniciá sesión con tu cuenta existente para continuar'
-                : 'Inicia sesión para continuar'}
+              Iniciá sesión para continuar
             </Text>
-
-            {isIOS ? (
-              <View style={styles.iosInfoCard}>
-                <Text style={styles.iosInfoTitle}>Acceso con cuenta existente</Text>
-                <Text style={styles.iosInfoText}>
-                  Las cuentas se administran fuera de la app. Si necesitás ayuda para
-                  acceder o revisar el estado de tu cuenta, podés hablar con soporte.
-                </Text>
-                <Pressable
-                  style={styles.iosInfoAction}
-                  onPress={handleOpenIosSupport}
-                >
-                  <Text style={styles.iosInfoActionText}>
-                    Abrir soporte
-                  </Text>
-                </Pressable>
-              </View>
-            ) : null}
 
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Email</Text>
@@ -218,17 +178,15 @@ function Login({ navigation }: any) {
               </Text>
             </Pressable>
 
-            {!isIOS ? (
-              <Pressable
-                onPress={handleOpenAndroidRegister}
-                style={styles.registerBtn}
-              >
-                <Text style={styles.registerText}>
-                  ¿No tenés cuenta?{' '}
-                  <Text style={styles.registerTextBold}>Creala por web</Text>
-                </Text>
-              </Pressable>
-            ) : null}
+            <Pressable
+              onPress={() => navigation.navigate('Register')}
+              style={styles.registerBtn}
+            >
+              <Text style={styles.registerText}>
+                ¿No tenés cuenta?{' '}
+                <Text style={styles.registerTextBold}>Creala ahora</Text>
+              </Text>
+            </Pressable>
           </View>
           <Text style={styles.codexText}>BarberApp by CODEX®</Text>
         </ScrollView>

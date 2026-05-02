@@ -120,8 +120,10 @@ function MetricsScreen({ navigation, route }: Props) {
   const barberId = route.params?.barberId;
   const barberName = route.params?.barberName ?? 'Mi Rendimiento';
   const now = useMemo(() => new Date(), []);
+  const currentMonth = now.getMonth() + 1;
 
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
+  const [monthTouched, setMonthTouched] = useState(false);
   const [annual, setAnnual] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -135,12 +137,48 @@ function MetricsScreen({ navigation, route }: Props) {
       try {
         if (!isRefresh) setLoading(true);
         setError('');
-        const response = await fetchAppointmentMetrics({
+        let response = await fetchAppointmentMetrics({
           barberId,
           year: now.getFullYear(),
           month: selectedMonth,
           annual,
         });
+
+        if (
+          !annual &&
+          !monthTouched &&
+          selectedMonth === currentMonth &&
+          (response?.totals?.appointmentsCount ?? 0) === 0
+        ) {
+          const annualResponse = await fetchAppointmentMetrics({
+            barberId,
+            year: now.getFullYear(),
+            annual: true,
+          });
+
+          const latestMonthWithActivity = [...(annualResponse.monthly ?? [])]
+            .reverse()
+            .find(item => Number(item.appointmentsCount || 0) > 0);
+
+          const fallbackMonth = latestMonthWithActivity?.key
+            ? Number(String(latestMonthWithActivity.key).split('-')[1])
+            : null;
+
+          if (
+            fallbackMonth &&
+            Number.isFinite(fallbackMonth) &&
+            fallbackMonth !== selectedMonth
+          ) {
+            response = await fetchAppointmentMetrics({
+              barberId,
+              year: now.getFullYear(),
+              month: fallbackMonth,
+              annual: false,
+            });
+            setSelectedMonth(fallbackMonth);
+          }
+        }
+
         setMetrics(response);
       } catch (err: any) {
         setError(err?.message ?? 'No se pudieron cargar las métricas');
@@ -149,7 +187,7 @@ function MetricsScreen({ navigation, route }: Props) {
         setRefreshing(false);
       }
     },
-    [annual, barberId, now, selectedMonth],
+    [annual, barberId, currentMonth, monthTouched, now, selectedMonth],
   );
 
   useFocusEffect(
@@ -195,7 +233,10 @@ function MetricsScreen({ navigation, route }: Props) {
             </View>
             <Pressable
               style={[styles.annualToggle, annual && styles.annualToggleActive]}
-              onPress={() => setAnnual(prev => !prev)}
+              onPress={() => {
+                setMonthTouched(true);
+                setAnnual(prev => !prev);
+              }}
             >
               <Text
                 style={[
@@ -222,6 +263,7 @@ function MetricsScreen({ navigation, route }: Props) {
                   key={label}
                   style={[styles.monthCard, selected && styles.monthCardActive]}
                   onPress={() => {
+                    setMonthTouched(true);
                     setAnnual(false);
                     setSelectedMonth(monthNumber);
                   }}

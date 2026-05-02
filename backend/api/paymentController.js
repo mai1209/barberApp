@@ -20,6 +20,7 @@ import {
 } from "../services/planPricingService.js";
 import { resolvePlanPricingForSubscription } from "../services/subscriptionPricingService.js";
 import { notifySubscriptionActivated } from "../services/subscriptionLifecycleService.js";
+import { buildAppointmentCancellationWhatsAppUrl } from "../utils/whatsapp.js";
 
 function normalizePaymentStatus(value) {
   if (value === "approved" || value === "authorized") return "approved";
@@ -123,6 +124,12 @@ function buildPaymentApprovedMailHtml({
     timeZone,
   });
   const cancelPhone = String(barberPhone || "").replace(/\s+/g, "");
+  const cancelAppointmentUrl = buildAppointmentCancellationWhatsAppUrl({
+    phone: cancelPhone,
+    customerName,
+    dateLabel,
+    timeLabel,
+  });
 
   return `
     <div style="background-color: #121212; color: #ffffff; padding: 30px; font-family: sans-serif; border-radius: 15px; max-width: 500px; margin: auto; border: 1px solid #B89016;">
@@ -149,8 +156,8 @@ function buildPaymentApprovedMailHtml({
       </p>
 
       <div style="text-align: center; margin-top: 16px;">
-        ${cancelPhone ? `
-        <a href="https://wa.me/${cancelPhone}?text=Hola!%20Soy%20${encodeURIComponent(customerName)},%20te%20escribo%20por%20mi%20turno%20del%20dia%20${encodeURIComponent(dateLabel)}%20a%20las%20${encodeURIComponent(timeLabel)}%20para%20cancelarlo"
+        ${cancelAppointmentUrl ? `
+        <a href="${cancelAppointmentUrl}"
           style="background-color: #FF1493; color: white; padding: 12px 18px; text-decoration: none; border-radius: 8px; font-weight: 700; display: inline-block; font-size: 14px; border: 1px solid #ff4d4d; margin-bottom: 8px;">
           CANCELAR TURNO
         </a>

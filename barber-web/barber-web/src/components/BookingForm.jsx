@@ -6,6 +6,7 @@ import {
   fetchBarbers,
   fetchBarberAppointments,
   createAppointment,
+  createWaitlistEntry,
   fetchShopInfo,
   fetchServices,
   setShopSlug,
@@ -436,6 +437,7 @@ function BookingForm({ shopSlug, onNotFound }) {
   const [loadingBarbers, setLoadingBarbers] = useState(true);
   const [saving, setSaving] = useState(false);
   const [occupiedRanges, setOccupiedRanges] = useState([]);
+  const [barberTimeBlocks, setBarberTimeBlocks] = useState([]);
   const [shopInfo, setShopInfo] = useState(null);
   const [shopLoading, setShopLoading] = useState(true);
   const [services, setServices] = useState([]);
@@ -449,6 +451,8 @@ function BookingForm({ shopSlug, onNotFound }) {
   const [paymentResultMessage, setPaymentResultMessage] = useState("");
   const [shopUnavailable, setShopUnavailable] = useState(false);
   const [closedDayNotice, setClosedDayNotice] = useState("");
+  const [savingWaitlist, setSavingWaitlist] = useState(false);
+  const [waitlistResultMessage, setWaitlistResultMessage] = useState("");
 
   const selectedServiceSummary = useMemo(
     () => buildServiceSummary(selectedServices),
@@ -506,6 +510,7 @@ function BookingForm({ shopSlug, onNotFound }) {
       const start = parse(startStr);
       const end = parse(endStr);
       const slotSet = new Set();
+
       for (let m = start; m <= end; m += step) {
         if (m + step > end) break;
         slotSet.add(minutesToLabel(m));
@@ -722,13 +727,16 @@ function BookingForm({ shopSlug, onNotFound }) {
           const startLabel = formatTimeInShopTZ(app.startTime);
           const [baseHour, baseMinute] = startLabel.split(":").map(Number);
           const startMinutes = baseHour * 60 + baseMinute;
-          const occupiedDuration = app.durationMinutes ?? SLOT_INTERVAL_MINUTES;
+          const occupiedDuration =
+            (app.durationMinutes ?? SLOT_INTERVAL_MINUTES) +
+            (app.bufferAfterMinutesApplied || 0);
           busyRanges.push({
             start: startMinutes,
             end: startMinutes + occupiedDuration,
           });
         });
       }
+      setBarberTimeBlocks(res?.barberTimeBlocks || []);
       if (res?.resolvedSchedule) {
         setSelectedBarberSchedule({
           scheduleRange: res.resolvedSchedule.scheduleRange ?? null,
@@ -755,6 +763,8 @@ function BookingForm({ shopSlug, onNotFound }) {
     if (!selectedBarber) {
       setSelectedBarberSchedule(null);
       setClosedDayNotice("");
+      setBarberTimeBlocks([]);
+      setOccupiedRanges([]);
     }
   }, [selectedBarber]);
 
@@ -801,9 +811,21 @@ function BookingForm({ shopSlug, onNotFound }) {
       );
       if (overlaps) return true;
 
+      const overlapsBlockedTime = barberTimeBlocks.some((block) => {
+        const blockStart = labelToMinutes(block.start);
+        const blockEnd = labelToMinutes(block.end);
+        return blockStart < endMinutes && blockEnd > startMinutes;
+      });
+      if (overlapsBlockedTime) return true;
+
       return false;
     },
-    [currentDuration, occupiedRanges, selectedDate],
+    [barberTimeBlocks, currentDuration, occupiedRanges, selectedDate],
+  );
+
+  const hasAvailableSlots = useMemo(
+    () => allSlots.some((slot) => !isSlotDisabled(slot)),
+    [allSlots, isSlotDisabled],
   );
 
   const handleSubmit = async (e) => {
@@ -903,6 +925,76 @@ function BookingForm({ shopSlug, onNotFound }) {
     }
   };
 
+  const handleJoinWaitlist = useCallback(async () => {
+    const normalizedServices = uniqueServicesById(selectedServices);
+    const serviceName = buildServiceSummary(normalizedServices);
+
+    if (!selectedBarber) {
+      alert("Seleccioná un barbero para sumarte a la lista de espera.");
+      return;
+    }
+
+    if (!customerName.trim()) {
+      alert("Necesitamos tu nombre para anotarte en la lista de espera.");
+      return;
+    }
+
+    if (!normalizedServices.length) {
+      alert("Seleccioná al menos un servicio.");
+      return;
+    }
+
+    if (!emailReview.isValid) {
+      alert(emailReview.message);
+      return;
+    }
+
+    if (emailReview.normalized !== normalizeEmail(emailConfirmation)) {
+      alert("Confirmá el email escribiéndolo igual en los dos campos.");
+      return;
+    }
+
+    try {
+      setSavingWaitlist(true);
+      setWaitlistResultMessage("");
+      const response = await createWaitlistEntry({
+        barberId: selectedBarber,
+        customerName: customerName.trim(),
+        customerEmail: emailReview.normalized,
+        customerPhone: phone.trim(),
+        service: serviceName,
+        serviceItems: normalizedServices.map((item) => ({
+          serviceId: item._id,
+          name: item.name,
+          durationMinutes: Number(item.durationMinutes || 0),
+          price: Number(item.price || 0),
+        })),
+        desiredDate: formatDateParam(selectedDate),
+        durationMinutes: currentDuration,
+        servicePrice: currentServicePrice,
+      });
+
+      setWaitlistResultMessage(
+        response?.message ||
+          "Te sumamos a la lista de espera. Si se libera un lugar, te avisamos por mail.",
+      );
+    } catch (err) {
+      alert("Error: " + (err.details?.error || err.message));
+    } finally {
+      setSavingWaitlist(false);
+    }
+  }, [
+    currentDuration,
+    currentServicePrice,
+    customerName,
+    emailConfirmation,
+    emailReview,
+    phone,
+    selectedBarber,
+    selectedDate,
+    selectedServices,
+  ]);
+
   // 5. LOADING STATE
   if (!slugReady || loadingBarbers) {
     return (
@@ -987,8 +1079,8 @@ function BookingForm({ shopSlug, onNotFound }) {
                   </div>
                   <span className={styles.serviceItemState}>
                     {selectedServices.some((item) => item._id === service._id)
-                      ? "Seleccionado"
-                      : "Sumar"}
+                      ? "✓ Agregado"
+                      : "Agregar"}
                   </span>
                 </button>
               ))}
@@ -1280,34 +1372,59 @@ function BookingForm({ shopSlug, onNotFound }) {
                 </p>
               </div>
             ) : (
-              horarioGroups.map((group, gi) => (
-                <div key={gi}>
-                  {group.label ? (
-                    <p className={styles.shiftGroupLabel}>
-                      {group.label === "mañana" ? "☀️ Mañana" : "🌙 Tarde"}
-                    </p>
-                  ) : null}
-                  <div className={styles.timeGrid}>
-                    {group.slots.map((label) => {
-                      const disabled = isSlotDisabled(label);
-                      return (
-                        <button
-                          type="button"
-                          key={label}
-                          disabled={disabled}
-                          className={`${styles.timeChip} ${selectedSlot === label ? styles.timeChipActive : ""} ${disabled ? styles.timeChipDisabled : ""}`}
-                          onClick={() => setSelectedSlot(label)}
-                        >
-                          <span className={styles.timeChipText}>{label}</span>
-                          <span className={styles.timeChipDuration}>
-                            {currentDuration}min
-                          </span>
-                        </button>
-                      );
-                    })}
+              <>
+                {horarioGroups.map((group, gi) => (
+                  <div key={gi}>
+                    {group.label ? (
+                      <p className={styles.shiftGroupLabel}>
+                        {group.label === "mañana" ? "☀️ Mañana" : "🌙 Tarde"}
+                      </p>
+                    ) : null}
+                    <div className={styles.timeGrid}>
+                      {group.slots.map((label) => {
+                        const disabled = isSlotDisabled(label);
+                        return (
+                          <button
+                            type="button"
+                            key={label}
+                            disabled={disabled}
+                            className={`${styles.timeChip} ${selectedSlot === label ? styles.timeChipActive : ""} ${disabled ? styles.timeChipDisabled : ""}`}
+                            onClick={() => setSelectedSlot(label)}
+                          >
+                            <span className={styles.timeChipText}>{label}</span>
+                            <span className={styles.timeChipDuration}>
+                              {currentDuration}min
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))
+                ))}
+                {!hasAvailableSlots ? (
+                  <div className={styles.waitlistCard}>
+                    <p className={styles.waitlistTitle}>
+                      No quedó ningún horario libre para este día.
+                    </p>
+                    <p className={styles.waitlistText}>
+                      Si querés, te anotamos en lista de espera y te avisamos por mail si se libera un hueco con este barbero.
+                    </p>
+                    <button
+                      type="button"
+                      className={styles.waitlistButton}
+                      disabled={savingWaitlist}
+                      onClick={handleJoinWaitlist}
+                    >
+                      {savingWaitlist ? "Guardando..." : "Anotarme en lista de espera"}
+                    </button>
+                    {waitlistResultMessage ? (
+                      <p className={styles.waitlistSuccess}>
+                        {waitlistResultMessage}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </>
             )}
           </div>
         </div>

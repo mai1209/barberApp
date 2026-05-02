@@ -18,6 +18,7 @@ import {
   registerUser,
   runSubscriptionLifecycle,
   sendTestMail,
+  syncStoreSubscription,
   listSubscriptionUsers,
   updatePaymentSettings,
   updatePassword,
@@ -53,6 +54,7 @@ router.get("/mercadopago/status", requireAuth, getMercadoPagoConnectionStatus);
 router.get("/mercadopago/connect", requireAuth, getMercadoPagoConnectUrl);
 router.delete("/mercadopago/connect", requireAuth, disconnectMercadoPago);
 router.post("/subscription/checkout", requireAuth, createSubscriptionCheckout);
+router.post("/subscription/platform/sync", requireAuth, syncStoreSubscription);
 router.put("/password", requireAuth, updatePassword);
 router.put("/theme", requireAuth, updateThemeConfig);
 router.put("/payment-settings", requireAuth, updatePaymentSettings);

@@ -4,6 +4,7 @@ import {
   publicCreateRecurringSubscriptionCheckout,
   publicCreateSubscriptionCheckout,
   publicCreateAppointment,
+  publicCreateWaitlistEntry,
   publicListBarbers,
   publicGetPlanPricing,
   publicGetShop,
@@ -20,6 +21,7 @@ router.get("/shops/:shopSlug/barbers", publicListBarbers);
 router.get("/shops/:shopSlug/barbers/:barberId/appointments", publicBarberAppointments);
 router.get("/shops/:shopSlug/services", publicListServices);
 router.post("/shops/:shopSlug/appointments", publicCreateAppointment);
+router.post("/shops/:shopSlug/waitlist", publicCreateWaitlistEntry);
 
 export default router;
  

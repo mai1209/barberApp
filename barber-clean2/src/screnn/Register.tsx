@@ -69,7 +69,7 @@ function Register({ navigation }: any) {
         await saveUserProfile(response.user);
         applyUserTheme(response.user);
       }
-      navigation.replace('Plans', { fromRegistration: true, email });
+      navigation.replace('Subscription-Settings');
     } catch (err: any) {
       setError(err.message || 'Error al registrarse');
     } finally {

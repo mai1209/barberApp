@@ -5,11 +5,19 @@ import { ServiceModel } from "../models/Services.js";
 import { UserModel } from "../models/User.js";
 import admin from "../firebase.js";
 import { sendAppMail } from "../services/mailer.js";
-import { getTimeZoneDayRange, getTimeZoneWeekday } from "../utils/timezone.js";
+import {
+  getTimeZoneDayRange,
+  getTimeZoneLabel,
+  getTimeZoneWeekday,
+} from "../utils/timezone.js";
 import {
   resolveBarberClosureForDate,
   serializeBarberClosure,
 } from "../utils/barberClosures.js";
+import {
+  doesTimeBlockOverlapRange,
+  resolveBarberTimeBlocksForDate,
+} from "../utils/barberTimeBlocks.js";
 import {
   resolveShopClosureForDate,
   serializeShopClosure,
@@ -18,6 +26,13 @@ import {
   isReminderRunAuthorized,
   processAppointmentReminders,
 } from "../services/reminderService.js";
+import { buildAppointmentCancellationWhatsAppUrl } from "../utils/whatsapp.js";
+import { getAppointmentOccupiedEnd } from "../utils/appointmentTiming.js";
+import {
+  markWaitlistFulfilled,
+  notifyWaitlistForReleasedAppointment,
+} from "../services/waitlistService.js";
+import { resolveAssignedBarberPushTarget } from "../utils/pushRecipients.js";
 
 // Función auxiliar para calcular rangos de fecha
 function buildDayRange(dateLike) {
@@ -92,6 +107,123 @@ async function resolveServicePrice({ ownerId, serviceName, providedPrice }) {
     .lean();
 
   return Number(serviceDoc?.price || 0);
+}
+
+async function resolveServiceBookingConfig({
+  ownerId,
+  barber,
+  serviceName,
+  providedPrice,
+}) {
+  const parsedPrice = Number(providedPrice);
+  const serviceDoc = await ServiceModel.findOne({
+    owner: ownerId,
+    name: serviceName,
+    isActive: true,
+  })
+    .select({ price: 1, bufferAfterMinutes: 1 })
+    .lean();
+
+  const bufferAfterMinutes = Number.isFinite(
+    Number(serviceDoc?.bufferAfterMinutes),
+  )
+    ? Math.max(0, Number(serviceDoc?.bufferAfterMinutes || 0))
+    : Math.max(0, Number(barber?.bookingBufferMinutes || 0));
+
+  return {
+    price:
+      Number.isFinite(parsedPrice) && parsedPrice >= 0
+        ? parsedPrice
+        : Number(serviceDoc?.price || 0),
+    bufferAfterMinutes,
+  };
+}
+
+async function resolvePrivateAppointmentServices({
+  ownerId,
+  barber,
+  serviceName,
+  durationMinutes,
+  providedPrice,
+  serviceItems,
+}) {
+  const normalizedItems = Array.isArray(serviceItems)
+    ? serviceItems
+        .map((item) => ({
+          serviceId: String(item?.serviceId || item?._id || "").trim(),
+          name: String(item?.name || "").trim(),
+        }))
+        .filter((item) => item.serviceId)
+    : [];
+
+  if (!normalizedItems.length) {
+    const { price, bufferAfterMinutes } = await resolveServiceBookingConfig({
+      ownerId,
+      barber,
+      serviceName,
+      providedPrice,
+    });
+
+    return {
+      serviceLabel: String(serviceName || "Servicio").trim() || "Servicio",
+      totalDurationMinutes: Number(durationMinutes) || 30,
+      totalServicePrice: price,
+      totalBufferAfterMinutes: bufferAfterMinutes,
+    };
+  }
+
+  const serviceIds = [...new Set(normalizedItems.map((item) => item.serviceId))];
+  const serviceDocs = await ServiceModel.find({
+    _id: { $in: serviceIds },
+    owner: ownerId,
+    isActive: true,
+  })
+    .select({ _id: 1, name: 1, durationMinutes: 1, price: 1, bufferAfterMinutes: 1 })
+    .lean();
+
+  if (serviceDocs.length !== serviceIds.length) {
+    return {
+      error: "Uno o más servicios seleccionados ya no están disponibles.",
+      statusCode: 400,
+    };
+  }
+
+  const byId = new Map(serviceDocs.map((doc) => [String(doc._id), doc]));
+  const orderedServices = serviceIds.map((id) => byId.get(id)).filter(Boolean);
+  const totalDurationMinutes = orderedServices.reduce(
+    (sum, item) => sum + Number(item.durationMinutes || 0),
+    0,
+  );
+  const totalServicePrice = orderedServices.reduce(
+    (sum, item) => sum + Number(item.price || 0),
+    0,
+  );
+  const totalBufferAfterMinutes = orderedServices.reduce((max, item) => {
+    const nextValue = Number(item.bufferAfterMinutes);
+    if (!Number.isFinite(nextValue) || nextValue < 0) return max;
+    return Math.max(max, nextValue);
+  }, Math.max(0, Number(barber?.bookingBufferMinutes || 0)));
+
+  if (!orderedServices.length) {
+    return {
+      error: "Necesitamos al menos un servicio válido para reservar.",
+      statusCode: 400,
+    };
+  }
+
+  if (totalDurationMinutes < 15 || totalDurationMinutes > 240) {
+    return {
+      error: "La combinación de servicios debe durar entre 15 minutos y 4 horas.",
+      statusCode: 400,
+    };
+  }
+
+  return {
+    serviceLabel: orderedServices.map((item) => item.name).join(" + "),
+    totalDurationMinutes,
+    totalServicePrice,
+    totalBufferAfterMinutes,
+  };
 }
 
 function monthStartFromOffset(baseDate, offset) {
@@ -203,6 +335,10 @@ function sanitizeService(service) {
     _id: String(service._id),
     name: String(service.name || "").trim(),
     durationMinutes: Number(service.durationMinutes || 30),
+    bufferAfterMinutes:
+      service.bufferAfterMinutes == null
+        ? null
+        : Number(service.bufferAfterMinutes || 0),
     price: Number(service.price || 0),
     isActive: Boolean(service.isActive ?? true),
   };
@@ -242,6 +378,7 @@ export async function createAppointment(req, res, next) {
       email,
       paymentMethod,
       servicePrice,
+      serviceItems,
     } = req.body;
     
     const customerName = String(req.body?.customerName ?? "").trim();
@@ -281,26 +418,69 @@ export async function createAppointment(req, res, next) {
       return res.status(400).json({ error: "El barbero no trabaja este día." });
     }
 
-    const endTime = new Date(startTime.getTime() + durationMinutes * 60000);
     const finalOwnerId = ownerId || barber.owner;
     const normalizedPaymentMethod = normalizePaymentMethod(paymentMethod);
-    const resolvedServicePrice = await resolveServicePrice({
+    const resolvedServices = await resolvePrivateAppointmentServices({
       ownerId: finalOwnerId,
+      barber,
       serviceName: service,
+      durationMinutes,
       providedPrice: servicePrice,
+      serviceItems,
     });
+
+    if (resolvedServices?.error) {
+      return res
+        .status(resolvedServices.statusCode || 400)
+        .json({ error: resolvedServices.error });
+    }
+
+    const {
+      serviceLabel,
+      totalDurationMinutes,
+      totalServicePrice,
+      totalBufferAfterMinutes,
+    } = resolvedServices;
+
+    const endTime = new Date(startTime.getTime() + totalDurationMinutes * 60000);
+    const occupiedEndTime = getAppointmentOccupiedEnd(
+      startTime,
+      totalDurationMinutes,
+      totalBufferAfterMinutes,
+    );
+    const barberTimeBlocks = resolveBarberTimeBlocksForDate(barber, startTime);
+    const startTimeLabel = getTimeZoneLabel(startTime).time;
+    const [startHour, startMinute] = startTimeLabel.split(":").map(Number);
+    const startMinutes = startHour * 60 + startMinute;
+    const occupiedEndMinutes =
+      startMinutes + totalDurationMinutes + totalBufferAfterMinutes;
+
+    const overlappingBlock = barberTimeBlocks.find((block) =>
+      doesTimeBlockOverlapRange(block, startMinutes, occupiedEndMinutes),
+    );
+    if (overlappingBlock) {
+      return res.status(400).json({
+        error: overlappingBlock.message,
+        blockedTime: overlappingBlock,
+      });
+    }
 
     // 2. VALIDACIÓN SOLAPAMIENTO
     const overlappingCandidates = await AppointmentModel.find({
       barber: barberId,
       status: { $ne: "cancelled" },
-      startTime: { $lt: endTime },
-    }).select({ startTime: 1, durationMinutes: 1 }).lean();
+      startTime: { $lt: occupiedEndTime },
+    })
+      .select({ startTime: 1, durationMinutes: 1, bufferAfterMinutesApplied: 1 })
+      .lean();
 
     const isOverlapping = overlappingCandidates.some((existing) => {
       const existingStart = new Date(existing.startTime);
-      const existingDuration = existing.durationMinutes || 30;
-      const existingEnd = new Date(existingStart.getTime() + existingDuration * 60000);
+      const existingEnd = getAppointmentOccupiedEnd(
+        existingStart,
+        existing.durationMinutes || 30,
+        existing.bufferAfterMinutesApplied || 0,
+      );
       return existingEnd > startTime;
     });
 
@@ -313,13 +493,14 @@ export async function createAppointment(req, res, next) {
       owner: finalOwnerId,
       barber: barberId,
       customerName,
-      service,
+      service: serviceLabel,
       startTime,
-      durationMinutes,
-      servicePrice: resolvedServicePrice,
-      amountTotal: resolvedServicePrice,
+      durationMinutes: totalDurationMinutes,
+      bufferAfterMinutesApplied: totalBufferAfterMinutes,
+      servicePrice: totalServicePrice,
+      amountTotal: totalServicePrice,
       amountPaid: 0,
-      amountPending: resolvedServicePrice,
+      amountPending: totalServicePrice,
       notes,
       paymentMethod: normalizedPaymentMethod,
       paymentMethodCollected: null,
@@ -327,11 +508,38 @@ export async function createAppointment(req, res, next) {
       customerEmail: email || undefined,
     });
 
+    if (email) {
+      await markWaitlistFulfilled({
+        ownerId: finalOwnerId,
+        barberId,
+        desiredDate: startTime,
+        customerEmail: email,
+      });
+    }
+
     // --- ENVIAR NOTIFICACIÓN PUSH AL BARBERO ---
     try {
-      const user = await UserModel.findById(finalOwnerId);
-      const token = user?.pushToken || user?.fcmToken;
-      if (token) {
+      const [ownerUser, pushTarget] = await Promise.all([
+        UserModel.findById(finalOwnerId)
+          .select({ pushToken: 1, fcmToken: 1, notificationSettings: 1 })
+          .lean(),
+        resolveAssignedBarberPushTarget({
+          ownerId: finalOwnerId,
+          barberId,
+        }),
+      ]);
+      const ownerToken = String(
+        ownerUser?.pushToken || ownerUser?.fcmToken || '',
+      ).trim();
+      const barberToken =
+        ownerUser?.notificationSettings?.barberInstantBookingEnabled !== false
+          ? String(pushTarget?.token || '').trim()
+          : '';
+      const targetTokens = Array.from(
+        new Set([ownerToken, barberToken].filter(Boolean)),
+      );
+
+      if (targetTokens.length) {
         const timeZone = "America/Argentina/Cordoba";
         const timeLabel = startTime.toLocaleTimeString("es-AR", {
           hour: "2-digit",
@@ -346,7 +554,6 @@ export async function createAppointment(req, res, next) {
           timeZone,
         });
         const payload = {
-          token: token,
           notification: {
             title: "💈Nuevo turno confirmado",
             body: `${customerName} reservó ${service} con ${barber?.fullName || "tu barbero"} el ${dateLabel} a las ${timeLabel}.`,
@@ -355,8 +562,10 @@ export async function createAppointment(req, res, next) {
             priority: "high",
           },
         };
-        const resp = await admin.messaging().send(payload);
-        console.log("Push enviado OK:", resp);
+        const responses = await Promise.all(
+          targetTokens.map(token => admin.messaging().send({ ...payload, token })),
+        );
+        console.log("Push enviado OK:", responses);
       }
     } catch (err) {
       console.log("Push error:", err.message, err);
@@ -383,6 +592,13 @@ export async function createAppointment(req, res, next) {
       });
 
 
+
+      const cancelAppointmentUrl = buildAppointmentCancellationWhatsAppUrl({
+        phone: barber.phone,
+        customerName,
+        dateLabel,
+        timeLabel,
+      });
 
       const mailHtml = `
     <div style="background-color: #121212; color: #ffffff; padding: 30px; font-family: sans-serif; border-radius: 15px; max-width: 500px; margin: auto; border: 1px solid #B89016;">
@@ -413,10 +629,10 @@ export async function createAppointment(req, res, next) {
 
       <div style="text-align: center; margin-top: 16px;">
 
-        ${barber.phone ? `
-        <a href="https://wa.me/${barber.phone.replace(/\s+/g, '')}?text=Hola!%20Soy%20${customerName},%20te%20escribo%20por%20mi%20turno%20del%20dia%20${dateLabel}%20a%20las%20${timeLabel}%20para%20CANCELARLO" 
+        ${cancelAppointmentUrl ? `
+        <a href="${cancelAppointmentUrl}" 
            style="background-color: #FF1493; color: white; padding: 12px 18px; text-decoration: none; border-radius: 8px; font-weight: 700; display: inline-block; font-size: 14px; border: 1px solid #ff4d4d; margin-bottom: 8px;">
-           CONCELAR TURNO
+           CANCELAR TURNO
         </a>
         ` : ''}
       </div>
@@ -844,6 +1060,7 @@ export async function updateAppointmentStatus(req, res, next) {
       return res.status(403).json({ error: "No autorizado para modificar este turno." });
     }
 
+    const previousStatus = appointmentDoc.status;
     appointmentDoc.status = status;
 
     if (status === "completed") {
@@ -880,6 +1097,23 @@ export async function updateAppointmentStatus(req, res, next) {
 
     await appointmentDoc.save();
 
+    if (previousStatus !== "cancelled" && status === "cancelled") {
+      await notifyWaitlistForReleasedAppointment({
+        ownerId,
+        barberId: appointmentDoc.barber,
+        shopSlug: req.user.shopSlug,
+        appointmentStartTime: appointmentDoc.startTime,
+        releasedDurationMinutes:
+          Number(appointmentDoc.durationMinutes || 0) +
+          Number(appointmentDoc.bufferAfterMinutesApplied || 0),
+      }).catch((error) => {
+        console.error(
+          "Error notificando waitlist tras cancelación:",
+          error?.message || error,
+        );
+      });
+    }
+
     const appointment = appointmentDoc.toObject();
 
     return res.json({ appointment });
@@ -909,6 +1143,11 @@ export async function createService(req, res, next) {
     const ownerId = req.user.id;
     const name = String(req.body?.name ?? "").trim();
     const durationMinutes = Number(req.body?.durationMinutes ?? 30);
+    const bufferAfterMinutesRaw = req.body?.bufferAfterMinutes;
+    const bufferAfterMinutes =
+      bufferAfterMinutesRaw == null || String(bufferAfterMinutesRaw).trim() === ""
+        ? null
+        : Number(bufferAfterMinutesRaw);
     const price = Number(req.body?.price ?? 0);
 
     if (!name) {
@@ -921,6 +1160,15 @@ export async function createService(req, res, next) {
 
     if (!Number.isFinite(price) || price < 0) {
       return res.status(400).json({ error: "El precio del servicio no es válido" });
+    }
+
+    if (
+      bufferAfterMinutes != null &&
+      (!Number.isFinite(bufferAfterMinutes) ||
+        bufferAfterMinutes < 0 ||
+        bufferAfterMinutes > 120)
+    ) {
+      return res.status(400).json({ error: "El buffer del servicio no es válido" });
     }
 
     const existing = await ServiceModel.findOne({
@@ -937,6 +1185,7 @@ export async function createService(req, res, next) {
       owner: ownerId,
       name,
       durationMinutes,
+      bufferAfterMinutes,
       price,
       isActive: true,
     });
@@ -953,6 +1202,11 @@ export async function updateService(req, res, next) {
     const { serviceId } = req.params;
     const name = String(req.body?.name ?? "").trim();
     const durationMinutes = Number(req.body?.durationMinutes ?? 30);
+    const bufferAfterMinutesRaw = req.body?.bufferAfterMinutes;
+    const bufferAfterMinutes =
+      bufferAfterMinutesRaw == null || String(bufferAfterMinutesRaw).trim() === ""
+        ? null
+        : Number(bufferAfterMinutesRaw);
     const price = Number(req.body?.price ?? 0);
 
     if (!mongoose.Types.ObjectId.isValid(serviceId)) {
@@ -971,6 +1225,15 @@ export async function updateService(req, res, next) {
       return res.status(400).json({ error: "El precio del servicio no es válido" });
     }
 
+    if (
+      bufferAfterMinutes != null &&
+      (!Number.isFinite(bufferAfterMinutes) ||
+        bufferAfterMinutes < 0 ||
+        bufferAfterMinutes > 120)
+    ) {
+      return res.status(400).json({ error: "El buffer del servicio no es válido" });
+    }
+
     const existing = await ServiceModel.findOne({
       owner: ownerId,
       isActive: true,
@@ -984,7 +1247,7 @@ export async function updateService(req, res, next) {
 
     const service = await ServiceModel.findOneAndUpdate(
       { _id: serviceId, owner: ownerId, isActive: true },
-      { name, durationMinutes, price },
+      { name, durationMinutes, bufferAfterMinutes, price },
       { new: true },
     ).lean();
 
@@ -1027,6 +1290,7 @@ export async function deleteService(req, res, next) {
 export async function deleteAppointment(req, res, next) {
   try {
     const { appointmentId } = req.params;
+    const ownerId = req.user.ownerId || req.user.id;
 
     const appointment = await AppointmentModel.findById(appointmentId);
     if (!appointment) return res.status(404).json({ error: "Turno no encontrado" });
@@ -1047,7 +1311,26 @@ export async function deleteAppointment(req, res, next) {
       return res.status(403).json({ error: "No autorizado para borrar este turno" });
     }
 
+    const releasedDurationMinutes =
+      Number(appointment.durationMinutes || 0) +
+      Number(appointment.bufferAfterMinutesApplied || 0);
+    const appointmentStartTime = appointment.startTime;
+    const barberId = appointment.barber;
+
     await appointment.deleteOne();
+
+    await notifyWaitlistForReleasedAppointment({
+      ownerId,
+      barberId,
+      shopSlug: req.user.shopSlug,
+      appointmentStartTime,
+      releasedDurationMinutes,
+    }).catch((error) => {
+      console.error(
+        "Error notificando waitlist tras borrar turno:",
+        error?.message || error,
+      );
+    });
 
     return res.json({ success: true });
   } catch (err) {

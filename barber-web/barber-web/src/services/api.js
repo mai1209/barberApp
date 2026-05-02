@@ -118,6 +118,13 @@ export async function createAppointment(payload) {
   });
 }
 
+export async function createWaitlistEntry(payload) {
+  return request(buildShopPath('/waitlist'), {
+    method: 'POST',
+    body: payload,
+  });
+}
+
 export async function fetchShopInfo() {
   return request(buildShopPath());
 }

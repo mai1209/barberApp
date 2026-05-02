@@ -23,6 +23,7 @@ import {
   Palette,
   ShieldCheck,
   Scissors,
+  Users,
 } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import {
@@ -261,6 +262,15 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
               label="Promociones por WhatsApp"
               description="Escribí un mensaje y abrí WhatsApp para clientes que ya reservaron."
               onPress={() => navigation.navigate('WhatsApp-Campaigns')}
+              theme={theme}
+              styles={styles}
+            />
+            <View style={styles.separator} />
+            <MenuItem
+              icon={Users}
+              label="Información de clientes"
+              description="Historial, frecuencia y contacto rápido en un panel más completo."
+              onPress={() => navigation.navigate('Customer-History')}
               theme={theme}
               styles={styles}
             />

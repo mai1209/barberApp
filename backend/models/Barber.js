@@ -66,6 +66,23 @@ const barberSchema = new mongoose.Schema(
       ],
       default: [],
     },
+    bookingBufferMinutes: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 120,
+    },
+    barberTimeBlocks: {
+      type: [
+        {
+          date: { type: String, required: true },
+          start: { type: String, required: true },
+          end: { type: String, required: true },
+          message: { type: String, default: null },
+        },
+      ],
+      default: [],
+    },
     barberClosedDays: {
       type: [
         {

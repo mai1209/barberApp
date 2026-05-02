@@ -11,13 +11,23 @@ import {
   calculateSubscriptionExpiry,
   createAppointmentMercadoPagoPreference,
 } from "./paymentController.js";
-import { getTimeZoneDayRange, getTimeZoneWeekday } from "../utils/timezone.js";
+import {
+  getTimeZoneDayRange,
+  getTimeZoneLabel,
+  getTimeZoneWeekday,
+} from "../utils/timezone.js";
 import { resolveBarberScheduleForWeekday } from "../utils/barberSchedule.js";
 import {
   normalizeBarberClosedDays,
   resolveBarberClosureForDate,
   serializeBarberClosure,
 } from "../utils/barberClosures.js";
+import {
+  doesTimeBlockOverlapRange,
+  normalizeBarberTimeBlocks,
+  resolveBarberTimeBlocksForDate,
+  serializeBarberTimeBlocks,
+} from "../utils/barberTimeBlocks.js";
 import {
   normalizeShopClosedDays,
   resolveShopClosureForDate,
@@ -38,6 +48,13 @@ import {
   resolvePlanPricingForSubscription,
 } from "../services/subscriptionPricingService.js";
 import { notifySubscriptionActivated } from "../services/subscriptionLifecycleService.js";
+import { buildAppointmentCancellationWhatsAppUrl } from "../utils/whatsapp.js";
+import { getAppointmentOccupiedEnd } from "../utils/appointmentTiming.js";
+import {
+  createOrRefreshWaitlistEntry,
+  markWaitlistFulfilled,
+} from "../services/waitlistService.js";
+import { resolveAssignedBarberPushTarget } from "../utils/pushRecipients.js";
 
 function buildDayRange(dateParam) {
   return getTimeZoneDayRange(dateParam);
@@ -77,6 +94,8 @@ function sanitizeBarber(barber) {
       scheduleRanges: item?.scheduleRanges || [],
     })),
     barberClosedDays: normalizeBarberClosedDays(barber.barberClosedDays),
+    bookingBufferMinutes: Number(barber.bookingBufferMinutes || 0),
+    barberTimeBlocks: serializeBarberTimeBlocks(barber.barberTimeBlocks),
     workDays: barber.workDays || [],
   };
 }
@@ -86,6 +105,7 @@ function sanitizeAppointment(app) {
     _id: app._id.toString(),
     startTime: app.startTime,
     durationMinutes: app.durationMinutes ?? 30,
+    bufferAfterMinutesApplied: app.bufferAfterMinutesApplied ?? 0,
     status: app.status,
   };
 }
@@ -133,6 +153,10 @@ function sanitizeService(service) {
     _id: service._id.toString(),
     name: service.name,
     durationMinutes: service.durationMinutes ?? 30,
+    bufferAfterMinutes:
+      service.bufferAfterMinutes == null
+        ? null
+        : Number(service.bufferAfterMinutes || 0),
     price: service.price ?? 0,
   };
 }
@@ -304,6 +328,7 @@ async function resolveServicePrice({ ownerId, serviceName, providedPrice }) {
 
 async function resolvePublicAppointmentServices({
   ownerId,
+  barber,
   serviceName,
   durationMinutes,
   providedPrice,
@@ -327,6 +352,10 @@ async function resolvePublicAppointmentServices({
         serviceName,
         providedPrice,
       }),
+      totalBufferAfterMinutes: Math.max(
+        0,
+        Number(barber?.bookingBufferMinutes || 0),
+      ),
     };
   }
 
@@ -336,7 +365,7 @@ async function resolvePublicAppointmentServices({
     owner: ownerId,
     isActive: true,
   })
-    .select({ _id: 1, name: 1, durationMinutes: 1, price: 1 })
+    .select({ _id: 1, name: 1, durationMinutes: 1, price: 1, bufferAfterMinutes: 1 })
     .lean();
 
   if (serviceDocs.length !== serviceIds.length) {
@@ -355,6 +384,11 @@ async function resolvePublicAppointmentServices({
     (sum, item) => sum + Number(item.price || 0),
     0,
   );
+  const totalBufferAfterMinutes = orderedServices.reduce((max, item) => {
+    const nextValue = Number(item.bufferAfterMinutes);
+    if (!Number.isFinite(nextValue) || nextValue < 0) return max;
+    return Math.max(max, nextValue);
+  }, Math.max(0, Number(barber?.bookingBufferMinutes || 0)));
 
   if (!orderedServices.length) {
     const error = new Error("Necesitamos al menos un servicio válido para reservar.");
@@ -374,6 +408,7 @@ async function resolvePublicAppointmentServices({
     serviceLabel: orderedServices.map((item) => item.name).join(" + "),
     totalDurationMinutes,
     totalServicePrice,
+    totalBufferAfterMinutes,
   };
 }
 
@@ -729,6 +764,10 @@ export async function publicBarberAppointments(req, res, next) {
       barber,
       effectiveDate || req.query.date || new Date(),
     );
+    const barberTimeBlocks = resolveBarberTimeBlocksForDate(
+      barber,
+      effectiveDate || req.query.date || new Date(),
+    );
     const appointments = await AppointmentModel.find({
       owner: ownerId,
       barber: barberId,
@@ -753,6 +792,7 @@ export async function publicBarberAppointments(req, res, next) {
         : resolvedSchedule,
       shopClosure: serializeShopClosure(shopClosure),
       barberClosure: serializeBarberClosure(barberClosure),
+      barberTimeBlocks: serializeBarberTimeBlocks(barberTimeBlocks),
       appointments: appointments.map(sanitizeAppointment),
     });
   } catch (err) {
@@ -823,6 +863,7 @@ export async function publicCreateAppointment(req, res, next) {
     try {
       resolvedServices = await resolvePublicAppointmentServices({
         ownerId,
+        barber,
         serviceName: service,
         durationMinutes,
         providedPrice: servicePrice,
@@ -839,20 +880,44 @@ export async function publicCreateAppointment(req, res, next) {
       appointmentDate.getTime() +
         resolvedServices.totalDurationMinutes * 60000,
     );
+    const occupiedEndTime = getAppointmentOccupiedEnd(
+      appointmentDate,
+      resolvedServices.totalDurationMinutes,
+      resolvedServices.totalBufferAfterMinutes || 0,
+    );
+    const barberTimeBlocks = resolveBarberTimeBlocksForDate(barber, appointmentDate);
+    const startTimeLabel = getTimeZoneLabel(appointmentDate).time;
+    const [startHour, startMinute] = startTimeLabel.split(":").map(Number);
+    const startMinutes = startHour * 60 + startMinute;
+    const occupiedEndMinutes =
+      startMinutes +
+      resolvedServices.totalDurationMinutes +
+      (resolvedServices.totalBufferAfterMinutes || 0);
+
+    const overlappingBlock = barberTimeBlocks.find((block) =>
+      doesTimeBlockOverlapRange(block, startMinutes, occupiedEndMinutes),
+    );
+    if (overlappingBlock) {
+      return res.status(400).json({
+        error: overlappingBlock.message,
+        blockedTime: overlappingBlock,
+      });
+    }
     const overlappingCandidates = await AppointmentModel.find({
       owner: ownerId,
       barber: barberId,
       status: { $in: ["pending", "completed"] },
-      startTime: { $lt: endTime },
+      startTime: { $lt: occupiedEndTime },
     })
-      .select({ startTime: 1, durationMinutes: 1 })
+      .select({ startTime: 1, durationMinutes: 1, bufferAfterMinutesApplied: 1 })
       .lean();
 
     const overlaps = overlappingCandidates.some((existing) => {
       const existingStart = new Date(existing.startTime);
-      const existingDuration = existing.durationMinutes || 30;
-      const existingEnd = new Date(
-        existingStart.getTime() + existingDuration * 60000,
+      const existingEnd = getAppointmentOccupiedEnd(
+        existingStart,
+        existing.durationMinutes || 30,
+        existing.bufferAfterMinutesApplied || 0,
       );
       return existingEnd > appointmentDate;
     });
@@ -869,6 +934,7 @@ export async function publicCreateAppointment(req, res, next) {
       service: resolvedServices.serviceLabel,
       startTime: appointmentDate,
       durationMinutes: resolvedServices.totalDurationMinutes,
+      bufferAfterMinutesApplied: resolvedServices.totalBufferAfterMinutes || 0,
       servicePrice: resolvedServices.totalServicePrice,
       amountTotal: resolvedServices.totalServicePrice,
       amountPaid: 0,
@@ -885,11 +951,38 @@ export async function publicCreateAppointment(req, res, next) {
       // Si querés guardar el email en la DB, podés agregarlo al modelo y ponerlo acá
     });
 
+    if (email) {
+      await markWaitlistFulfilled({
+        ownerId,
+        barberId,
+        desiredDate: appointmentDate,
+        customerEmail: email,
+      });
+    }
+
     // --- LÓGICA DE NOTIFICACIÓN PUSH AL BARBERO (YA LA TENÍAS) ---
     try {
-      const user = await UserModel.findById(ownerId);
-      const targetToken = user?.pushToken || user?.fcmToken;
-      if (targetToken) {
+      const [ownerUser, pushTarget] = await Promise.all([
+        UserModel.findById(ownerId)
+          .select({ pushToken: 1, fcmToken: 1, notificationSettings: 1 })
+          .lean(),
+        resolveAssignedBarberPushTarget({
+          ownerId,
+          barberId,
+        }),
+      ]);
+      const ownerToken = String(
+        ownerUser?.pushToken || ownerUser?.fcmToken || '',
+      ).trim();
+      const barberToken =
+        ownerUser?.notificationSettings?.barberInstantBookingEnabled !== false
+          ? String(pushTarget?.token || '').trim()
+          : '';
+      const targetTokens = Array.from(
+        new Set([ownerToken, barberToken].filter(Boolean)),
+      );
+
+      if (targetTokens.length) {
         const timeLabel = appointmentDate.toLocaleTimeString("es-AR", {
           hour: "2-digit",
           minute: "2-digit",
@@ -903,7 +996,6 @@ export async function publicCreateAppointment(req, res, next) {
           timeZone: "America/Argentina/Cordoba",
         });
         const payload = {
-          token: targetToken,
           notification: {
             title:
               normalizedPaymentMethod === "transfer"
@@ -916,8 +1008,10 @@ export async function publicCreateAppointment(req, res, next) {
           },
           android: { priority: "high" },
         };
-        const resp = await admin.messaging().send(payload);
-        console.log("Push público OK:", resp);
+        const responses = await Promise.all(
+          targetTokens.map(token => admin.messaging().send({ ...payload, token })),
+        );
+        console.log("Push público OK:", responses);
       }
     } catch (pushErr) {
       console.error("⚠️ Error enviando push:", pushErr.message);
@@ -955,6 +1049,13 @@ export async function publicCreateAppointment(req, res, next) {
       });
 
 
+      const cancelAppointmentUrl = buildAppointmentCancellationWhatsAppUrl({
+        phone: barber.phone,
+        customerName,
+        dateLabel,
+        timeLabel,
+      });
+
       const mailHtml = `
     <div style="background-color: #121212; color: #ffffff; padding: 30px; font-family: sans-serif; border-radius: 15px; max-width: 500px; margin: auto; border: 1px solid #B89016;">
       
@@ -984,10 +1085,10 @@ export async function publicCreateAppointment(req, res, next) {
 
       <div style="text-align: center; margin-top: 16px;">
 
-        ${barber.phone ? `
-        <a href="https://wa.me/${barber.phone.replace(/\s+/g, '')}?text=Hola!%20Soy%20${customerName},%20te%20escribo%20por%20mi%20turno%20del%20dia%20${dateLabel}%20a%20las%20${timeLabel}%20para%20CANCELARLO" 
+        ${cancelAppointmentUrl ? `
+        <a href="${cancelAppointmentUrl}" 
            style="background-color: #FF1493; color: white; padding: 12px 18px; text-decoration: none; border-radius: 8px; font-weight: 700; display: inline-block; font-size: 14px; border: 1px solid #ff4d4d; margin-bottom: 8px;">
-           CONCELAR TURNO
+           CANCELAR TURNO
         </a>
         ` : ''}
       </div>
@@ -1032,5 +1133,81 @@ export async function publicCreateAppointment(req, res, next) {
   } catch (err) {
     console.error("❌ Error en publicCreateAppointment:", err);
     return res.status(400).json({ error: err.message });
+  }
+}
+
+export async function publicCreateWaitlistEntry(req, res, next) {
+  try {
+    const { shopSlug } = req.params;
+    const shop = await findActiveShop(shopSlug);
+    if (!shop) return res.status(404).json({ error: "Barbería no encontrada" });
+
+    const {
+      barberId,
+      customerName,
+      customerEmail,
+      customerPhone,
+      service,
+      serviceItems,
+      desiredDate,
+      durationMinutes,
+      servicePrice,
+    } = req.body;
+
+    if (!barberId) {
+      return res.status(400).json({ error: "Debes seleccionar un barbero." });
+    }
+
+    const normalizedEmail = String(customerEmail || "").trim().toLowerCase();
+    if (!normalizedEmail) {
+      return res.status(400).json({ error: "Necesitamos un email para avisarte." });
+    }
+
+    const ownerId = toObjectId(shop._id);
+    const barber = await BarberModel.findOne({
+      _id: barberId,
+      owner: ownerId,
+      isActive: true,
+    }).lean();
+    if (!barber) {
+      return res.status(404).json({ error: "Barbero no encontrado" });
+    }
+
+    const targetDate = desiredDate || new Date();
+    let resolvedServices;
+    try {
+      resolvedServices = await resolvePublicAppointmentServices({
+        ownerId,
+        barber,
+        serviceName: service,
+        durationMinutes,
+        providedPrice: servicePrice,
+        serviceItems,
+      });
+    } catch (serviceError) {
+      return res.status(serviceError.statusCode || 400).json({
+        error: serviceError.message,
+      });
+    }
+
+    const entry = await createOrRefreshWaitlistEntry({
+      ownerId,
+      barberId,
+      shopSlug,
+      desiredDate: targetDate,
+      customerName,
+      customerEmail: normalizedEmail,
+      customerPhone,
+      serviceLabel: resolvedServices.serviceLabel,
+      durationMinutes: resolvedServices.totalDurationMinutes,
+    });
+
+    return res.status(201).json({
+      message:
+        "Te sumamos a la lista de espera. Si se libera un lugar, te avisamos por mail.",
+      waitlistEntry: entry,
+    });
+  } catch (err) {
+    return next(err);
   }
 }

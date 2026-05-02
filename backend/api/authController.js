@@ -59,8 +59,111 @@ const SUBSCRIPTION_PLAN_CONFIG = {
   },
 };
 
+const DEFAULT_STORE_SUBSCRIPTION_PRODUCTS = {
+  basic: {
+    apple: "barberapp_basic_monthly",
+    google: "barberapp_basic_monthly",
+  },
+  pro: {
+    apple: "barberapp_pro_monthly",
+    google: "barberapp_pro_monthly",
+  },
+};
+
 function sanitizeEmail(email) {
   return String(email ?? "").trim().toLowerCase();
+}
+
+function getStoreSubscriptionProducts() {
+  return {
+    basic: {
+      apple: String(
+        process.env.APPLE_SUBSCRIPTION_BASIC_PRODUCT_ID ||
+          DEFAULT_STORE_SUBSCRIPTION_PRODUCTS.basic.apple,
+      ).trim(),
+      google: String(
+        process.env.GOOGLE_SUBSCRIPTION_BASIC_PRODUCT_ID ||
+          DEFAULT_STORE_SUBSCRIPTION_PRODUCTS.basic.google,
+      ).trim(),
+    },
+    pro: {
+      apple: String(
+        process.env.APPLE_SUBSCRIPTION_PRO_PRODUCT_ID ||
+          DEFAULT_STORE_SUBSCRIPTION_PRODUCTS.pro.apple,
+      ).trim(),
+      google: String(
+        process.env.GOOGLE_SUBSCRIPTION_PRO_PRODUCT_ID ||
+          DEFAULT_STORE_SUBSCRIPTION_PRODUCTS.pro.google,
+      ).trim(),
+    },
+  };
+}
+
+function resolveStorePlan({ provider, plan, productId, currentPlanId }) {
+  if (plan === "basic" || plan === "pro") {
+    return plan;
+  }
+
+  const catalog = getStoreSubscriptionProducts();
+  const targetIds = [String(productId || "").trim(), String(currentPlanId || "").trim()].filter(Boolean);
+
+  for (const candidatePlan of ["basic", "pro"]) {
+    const candidateProductId = catalog[candidatePlan]?.[provider];
+    if (candidateProductId && targetIds.includes(candidateProductId)) {
+      return candidatePlan;
+    }
+  }
+
+  return null;
+}
+
+function sanitizeStoreSubscriptionSyncInput(input) {
+  const provider = String(input?.provider || "").trim().toLowerCase();
+  if (!["apple", "google"].includes(provider)) {
+    throw new Error("El proveedor de la suscripción debe ser apple o google.");
+  }
+
+  const plan = String(input?.plan || "").trim().toLowerCase();
+  const productId = String(input?.productId || "").trim();
+  if (!productId) {
+    throw new Error("Falta el identificador del producto.");
+  }
+
+  const resolvedPlan = resolveStorePlan({
+    provider,
+    plan: plan || null,
+    productId,
+    currentPlanId: input?.currentPlanId,
+  });
+
+  if (!resolvedPlan) {
+    throw new Error("No pudimos asociar la compra a un plan válido.");
+  }
+
+  const status = String(input?.status || "active").trim().toLowerCase();
+  const normalizedStatus = ["active", "past_due", "cancelled"].includes(status)
+    ? status
+    : "active";
+
+  const expiresAt =
+    input?.expiresAt && !Number.isNaN(new Date(input.expiresAt).getTime())
+      ? new Date(input.expiresAt)
+      : null;
+
+  return {
+    provider,
+    plan: resolvedPlan,
+    productId,
+    currentPlanId: String(input?.currentPlanId || "").trim() || null,
+    purchaseToken: String(input?.purchaseToken || "").trim() || null,
+    transactionId: String(input?.transactionId || "").trim() || null,
+    originalTransactionId:
+      String(input?.originalTransactionId || "").trim() || null,
+    environment: String(input?.environment || "").trim() || null,
+    autoRenewing: Boolean(input?.autoRenewing),
+    status: normalizedStatus,
+    expiresAt,
+  };
 }
 
 function slugify(value) {
@@ -819,6 +922,11 @@ function sanitizeNotificationSettingsInput(input) {
   let hasAnyField = false;
   const allowedReminderMinutes = new Set([15, 30, 60, 120, 180, 1440]);
 
+  if (Object.prototype.hasOwnProperty.call(input, "barberInstantBookingEnabled")) {
+    hasAnyField = true;
+    updates.barberInstantBookingEnabled = Boolean(input.barberInstantBookingEnabled);
+  }
+
   if (Object.prototype.hasOwnProperty.call(input, "barberReminderEnabled")) {
     hasAnyField = true;
     updates.barberReminderEnabled = Boolean(input.barberReminderEnabled);
@@ -1069,6 +1177,77 @@ export async function createSubscriptionCheckout(req, res, next) {
       discountApplied: resolvedPricing.discountApplied,
     });
   } catch (err) {
+    return next(err);
+  }
+}
+
+export async function syncStoreSubscription(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    const userDoc = await UserModel.findById(userId);
+    if (!userDoc || userDoc.isActive === false) {
+      return res.status(404).json({ error: "No encontramos la cuenta." });
+    }
+
+    const {
+      provider,
+      plan,
+      productId,
+      currentPlanId,
+      purchaseToken,
+      transactionId,
+      originalTransactionId,
+      environment,
+      autoRenewing,
+      status,
+      expiresAt,
+    } = sanitizeStoreSubscriptionSyncInput(req.body ?? {});
+
+    const nextStatus = status === "cancelled" ? "cancelled" : status === "past_due" ? "past_due" : "active";
+    const startedAt = userDoc.subscription?.startedAt || new Date();
+
+    userDoc.subscription = {
+      ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
+      plan,
+      status: nextStatus,
+      billingCycle: "monthly",
+      renewalMode: autoRenewing ? "automatic" : "manual",
+      provider,
+      startedAt,
+      expiresAt,
+      nextBillingAt: autoRenewing ? expiresAt : null,
+      pendingPlan: null,
+      mercadoPagoPreferenceId: null,
+      mercadoPagoPreapprovalId: null,
+      mercadoPagoPreapprovalStatus: null,
+      storeProductId: productId,
+      storeCurrentPlanId: currentPlanId,
+      storePurchaseToken: purchaseToken,
+      storeTransactionId: transactionId,
+      storeOriginalTransactionId: originalTransactionId,
+      storeEnvironment: environment,
+      storeLastSyncedAt: new Date(),
+      storeAutoRenewing: autoRenewing,
+      storeStatus: status,
+      lastPaymentAt: nextStatus === "active" ? new Date() : userDoc.subscription?.lastPaymentAt || null,
+      cancelledAt: nextStatus === "cancelled" ? new Date() : null,
+      pastDueAt: nextStatus === "past_due" ? new Date() : null,
+    };
+
+    await userDoc.save();
+
+    return res.json({
+      message: "Suscripción sincronizada correctamente.",
+      user: await buildAuthUserResponse(userDoc),
+    });
+  } catch (err) {
+    if (err instanceof Error) {
+      return res.status(400).json({ error: err.message });
+    }
     return next(err);
   }
 }

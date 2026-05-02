@@ -229,6 +229,7 @@ export type MercadoPagoConnectionInfo = {
 };
 
 export type NotificationSettings = {
+  barberInstantBookingEnabled?: boolean;
   barberReminderEnabled?: boolean;
   barberReminderMinutesBefore?: 15 | 30 | 60 | 120 | 180 | 1440;
   customerSameDayEmailEnabled?: boolean;
@@ -251,9 +252,33 @@ export type ShopClosureInfo = {
 
 export type SubscriptionSettings = {
   renewalMode?: 'manual' | 'automatic';
+  provider?: 'mercadopago' | 'apple' | 'google' | null;
   mercadoPagoPreapprovalId?: string | null;
   mercadoPagoPreapprovalStatus?: string | null;
   nextBillingAt?: string | null;
+  storeProductId?: string | null;
+  storeCurrentPlanId?: string | null;
+  storePurchaseToken?: string | null;
+  storeTransactionId?: string | null;
+  storeOriginalTransactionId?: string | null;
+  storeEnvironment?: string | null;
+  storeLastSyncedAt?: string | null;
+  storeAutoRenewing?: boolean;
+  storeStatus?: string | null;
+};
+
+export type StoreSubscriptionSyncPayload = {
+  provider: 'apple' | 'google';
+  plan?: 'basic' | 'pro';
+  productId: string;
+  currentPlanId?: string | null;
+  purchaseToken?: string | null;
+  transactionId?: string | null;
+  originalTransactionId?: string | null;
+  environment?: string | null;
+  autoRenewing?: boolean;
+  status?: 'active' | 'past_due' | 'cancelled';
+  expiresAt?: string | null;
 };
 
 export type AccountDeletionRequestPayload = {
@@ -332,6 +357,14 @@ export function updateSubscriptionSettings(payload: SubscriptionSettings) {
   });
 }
 
+export function syncStoreSubscription(payload: StoreSubscriptionSyncPayload) {
+  return request<{ message: string; user: any }>("/api/auth/subscription/platform/sync", {
+    method: "POST",
+    body: payload,
+    auth: true,
+  });
+}
+
 export function requestAccountDeletion(payload: AccountDeletionRequestPayload) {
   return request<{ message: string; user: any }>("/api/auth/account-deletion-request", {
     method: "POST",
@@ -404,6 +437,13 @@ export type Barber = {
   photoUrl?: string | null;
   scheduleRange?: string; 
   scheduleRanges?: { label: string; start: string; end: string }[];
+  bookingBufferMinutes?: number;
+  barberTimeBlocks?: {
+    date: string;
+    start: string;
+    end: string;
+    message?: string | null;
+  }[];
   barberClosedDays?: {
     date: string;
     message?: string | null;
@@ -428,6 +468,7 @@ export type ServiceOption = {
   _id: string;
   name: string;
   durationMinutes: number;
+  bufferAfterMinutes?: number | null;
   price?: number;
   isActive?: boolean;
 };
@@ -441,6 +482,7 @@ export type Appointment = {
   service: string;
   startTime: string;
   durationMinutes: number;
+  bufferAfterMinutesApplied?: number;
   servicePrice?: number;
   paymentMethod?: PaymentMethod;
   paymentMethodCollected?: PaymentMethod | null;
@@ -555,6 +597,7 @@ export function fetchServices() {
 export function createService(payload: {
   name: string;
   durationMinutes: number;
+  bufferAfterMinutes?: number | null;
   price: number;
 }) {
   return request<{ service: ServiceOption }>("/api/appointments/services", {
@@ -569,6 +612,7 @@ export function updateService(
   payload: {
     name: string;
     durationMinutes: number;
+    bufferAfterMinutes?: number | null;
     price: number;
   },
 ) {
@@ -593,6 +637,13 @@ export function createBarber(payload: {
   photoUrl?: string;
   scheduleRange?: string;
   scheduleRanges?: { label: string; start: string; end: string }[];
+  bookingBufferMinutes?: number;
+  barberTimeBlocks?: {
+    date: string;
+    start: string;
+    end: string;
+    message?: string | null;
+  }[];
   barberClosedDays?: { date: string; message?: string | null }[];
   dayScheduleOverrides?: {
     day: number;
@@ -619,6 +670,13 @@ export function updateBarber(
     photoUrl?: string;
     scheduleRange?: string;
     scheduleRanges?: { label: string; start: string; end: string }[];
+    bookingBufferMinutes?: number;
+    barberTimeBlocks?: {
+      date: string;
+      start: string;
+      end: string;
+      message?: string | null;
+    }[];
     barberClosedDays?: { date: string; message?: string | null }[];
     dayScheduleOverrides?: {
       day: number;
@@ -693,6 +751,12 @@ export function fetchBarberAppointments(barberId: string, date?: string) {
     };
     shopClosure?: ShopClosureInfo | null;
     barberClosure?: ShopClosureInfo | null;
+    barberTimeBlocks?: {
+      date: string;
+      start: string;
+      end: string;
+      message?: string | null;
+    }[];
     appointments: Appointment[];
   }>(`/api/barbers/${barberId}/appointments${query}`, { auth: true });
 }
@@ -701,6 +765,12 @@ export function createAppointment(payload: {
   barberId: string;
   customerName: string;
   service: string;
+  serviceItems?: {
+    serviceId: string;
+    name: string;
+    durationMinutes: number;
+    price: number;
+  }[];
   startTime: string;
   durationMinutes?: number;
   servicePrice?: number;

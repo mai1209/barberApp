@@ -48,6 +48,7 @@ import {
   Clock,
   Scissors,
   User,
+  MessageCircle,
 } from 'lucide-react-native';
 
 const PRO_PLAN_URL = 'https://barberappbycodex.com/planes?plan=pro';
@@ -129,6 +130,16 @@ function buildCancellationMessage({
   return `Hola ${customerName}, te escribimos de ${shopName}. Tuvimos que cancelar tu turno de ${service} del ${dateLabel} a las ${timeLabel}. Responde este mensaje y te ofrecemos un nuevo horario.`;
 }
 
+function buildWaitingReminderMessage({
+  shopName,
+  customerName,
+}: {
+  shopName: string;
+  customerName: string;
+}) {
+  return `Hola ${customerName}, te escribimos de ${shopName}. No te olvides de tu turno, ya te estamos esperando.`;
+}
+
 function capitalize(text: string) {
   if (!text) return text;
   return text.charAt(0).toUpperCase() + text.slice(1);
@@ -173,7 +184,8 @@ function BarberDashboard({ route, navigation }: Props) {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [authUser, setAuthUser] = useState<any | null>(null);
   const { barberId, barberName, barber: initialBarber } = route.params ?? {};
-  const activeBarberId = barberId ?? initialBarber?._id ?? authUser?.barberId ?? null;
+  const activeBarberId =
+    barberId ?? initialBarber?._id ?? authUser?.barberId ?? null;
   const resolvedBarberName =
     barberName ?? initialBarber?.fullName ?? authUser?.fullName ?? 'Mi Agenda';
   const isBarberUser = resolveUserRole(authUser) === 'barber';
@@ -285,16 +297,17 @@ function BarberDashboard({ route, navigation }: Props) {
 
     try {
       setLoading(true);
-      const appointmentsRes = await fetchBarberAppointments(activeBarberId, dateParam);
+      const appointmentsRes = await fetchBarberAppointments(
+        activeBarberId,
+        dateParam,
+      );
 
       setAppointments(
         appointmentsRes.appointments.filter(
           (item: Appointment) => item.status !== 'cancelled',
         ),
       );
-      setBarberProfile(
-        appointmentsRes.barber ?? initialBarber ?? null,
-      );
+      setBarberProfile(appointmentsRes.barber ?? initialBarber ?? null);
       setError('');
     } catch (err: any) {
       setError(err?.message ?? 'No pudimos cargar los turnos');
@@ -391,11 +404,11 @@ function BarberDashboard({ route, navigation }: Props) {
         {
           text: 'Sí, finalizar',
           onPress: () => {
-            const appointment = appointments.find(item => item._id === appointmentId);
+            const appointment = appointments.find(
+              item => item._id === appointmentId,
+            );
             const totalAmount = Number(
-              appointment?.amountTotal ??
-                appointment?.servicePrice ??
-                0,
+              appointment?.amountTotal ?? appointment?.servicePrice ?? 0,
             );
 
             Alert.alert(
@@ -418,11 +431,16 @@ function BarberDashboard({ route, navigation }: Props) {
                       );
                       setAppointments(prev =>
                         prev.map(app =>
-                          app._id === appointmentId ? response.appointment : app,
+                          app._id === appointmentId
+                            ? response.appointment
+                            : app,
                         ),
                       );
                     } catch (err: any) {
-                      Alert.alert('Error', err?.message ?? 'No se pudo actualizar');
+                      Alert.alert(
+                        'Error',
+                        err?.message ?? 'No se pudo actualizar',
+                      );
                     }
                   },
                 },
@@ -441,11 +459,16 @@ function BarberDashboard({ route, navigation }: Props) {
                       );
                       setAppointments(prev =>
                         prev.map(app =>
-                          app._id === appointmentId ? response.appointment : app,
+                          app._id === appointmentId
+                            ? response.appointment
+                            : app,
                         ),
                       );
                     } catch (err: any) {
-                      Alert.alert('Error', err?.message ?? 'No se pudo actualizar');
+                      Alert.alert(
+                        'Error',
+                        err?.message ?? 'No se pudo actualizar',
+                      );
                     }
                   },
                 },
@@ -463,11 +486,16 @@ function BarberDashboard({ route, navigation }: Props) {
                       );
                       setAppointments(prev =>
                         prev.map(app =>
-                          app._id === appointmentId ? response.appointment : app,
+                          app._id === appointmentId
+                            ? response.appointment
+                            : app,
                         ),
                       );
                     } catch (err: any) {
-                      Alert.alert('Error', err?.message ?? 'No se pudo actualizar');
+                      Alert.alert(
+                        'Error',
+                        err?.message ?? 'No se pudo actualizar',
+                      );
                     }
                   },
                 },
@@ -527,6 +555,25 @@ function BarberDashboard({ route, navigation }: Props) {
     ]);
   };
 
+  const handleWaitingReminder = async (appointment: Appointment) => {
+    try {
+      if (!appointment?.notes) {
+        Alert.alert('Sin contacto', 'No hay WhatsApp registrado.');
+        return;
+      }
+      const phone = sanitizeWhatsappNumber(appointment.notes);
+      const message = buildWaitingReminderMessage({
+        shopName: resolvedBarberName || 'la barbería',
+        customerName: appointment.customerName,
+      });
+      await Linking.openURL(
+        `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+      );
+    } catch (_err) {
+      Alert.alert('Error', 'No pudimos abrir WhatsApp.');
+    }
+  };
+
   const renderAppointmentCard = (appointment: Appointment, index: number) => {
     const isCompleted = appointment.status === 'completed';
     const paymentSnapshot = getPaymentSnapshot(appointment);
@@ -568,7 +615,11 @@ function BarberDashboard({ route, navigation }: Props) {
             {appointment.customerName}
           </Text>
           <View style={styles.serviceRow}>
-            <Scissors size={14} color={hexToRgba(theme.primary, 0.62)} style={{ marginRight: 6 }} />
+            <Scissors
+              size={14}
+              color={hexToRgba(theme.primary, 0.62)}
+              style={{ marginRight: 6 }}
+            />
             <Text style={styles.serviceNameText}>{appointment.service}</Text>
             <Text style={styles.dotSeparator}>•</Text>
             <Text style={styles.durationText}>
@@ -583,7 +634,11 @@ function BarberDashboard({ route, navigation }: Props) {
                 marginTop: 4,
               }}
             >
-              <User size={12} color={hexToRgba(theme.primary, 0.48)} style={{ marginRight: 4 }} />
+              <User
+                size={12}
+                color={hexToRgba(theme.primary, 0.48)}
+                style={{ marginRight: 4 }}
+              />
               <Text style={styles.phoneSubText}>{appointment.notes}</Text>
             </View>
           ) : null}
@@ -593,8 +648,8 @@ function BarberDashboard({ route, navigation }: Props) {
               paymentSnapshot.tone === 'cash'
                 ? styles.paymentInfoBadgeCash
                 : paymentSnapshot.tone === 'transfer'
-                  ? styles.paymentInfoBadgeTransfer
-                  : styles.paymentInfoBadgeNeutral,
+                ? styles.paymentInfoBadgeTransfer
+                : styles.paymentInfoBadgeNeutral,
             ]}
           >
             <Text style={styles.paymentInfoText}>{paymentSnapshot.label}</Text>
@@ -614,6 +669,16 @@ function BarberDashboard({ route, navigation }: Props) {
               onPress={() => handleRelease(appointment._id)}
             >
               <Text style={styles.btnSecText}>Liberar</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.btnAction, styles.btnSec, styles.btnWhatsapp]}
+              onPress={() => handleWaitingReminder(appointment)}
+            >
+              <View style={styles.btnWhatsappRow}>
+                <Image style={styles.btnWhatsappImage} source={require('../assets/wp.png')} />
+
+                <Text style={styles.btnWhatsappHint}>Recordatorio</Text>
+              </View>
             </Pressable>
           </View>
         )}
@@ -664,7 +729,9 @@ function BarberDashboard({ route, navigation }: Props) {
             <Pressable
               onPress={() =>
                 navigation.navigate('Reservas', {
-                  barberId: isBarberUser ? activeBarberId ?? undefined : undefined,
+                  barberId: isBarberUser
+                    ? activeBarberId ?? undefined
+                    : undefined,
                   lockBarber: isBarberUser,
                 })
               }
@@ -683,7 +750,9 @@ function BarberDashboard({ route, navigation }: Props) {
                   onPress={handleEditProfile}
                   style={({ pressed }) => [
                     styles.secondaryActionBtn,
-                    pressed && { backgroundColor: hexToRgba(theme.primary, 0.2) },
+                    pressed && {
+                      backgroundColor: hexToRgba(theme.primary, 0.2),
+                    },
                   ]}
                 >
                   <Pencil size={14} color={theme.primary} />
@@ -691,7 +760,7 @@ function BarberDashboard({ route, navigation }: Props) {
                 </Pressable>
               ) : null}
 
-              {(Platform.OS !== 'ios' || hasProAccess) ? (
+              {Platform.OS !== 'ios' || hasProAccess ? (
                 <Pressable
                   onPress={() =>
                     hasProAccess
@@ -705,7 +774,9 @@ function BarberDashboard({ route, navigation }: Props) {
                   style={({ pressed }) => [
                     styles.secondaryActionBtn,
                     !hasProAccess && styles.secondaryActionBtnLocked,
-                    pressed && { backgroundColor: hexToRgba(theme.primary, 0.2) },
+                    pressed && {
+                      backgroundColor: hexToRgba(theme.primary, 0.2),
+                    },
                   ]}
                 >
                   <BarChart2 size={14} color={theme.primary} />
@@ -803,7 +874,7 @@ function BarberDashboard({ route, navigation }: Props) {
           </View>
         </View>
       </ScrollView>
-      {(Platform.OS !== 'ios' || hasProAccess) ? (
+      {Platform.OS !== 'ios' || hasProAccess ? (
         <ProFeatureModal
           visible={showProModal}
           variant="barber-metrics"
@@ -922,8 +993,16 @@ const makeStyles = (theme: Theme) =>
       fontWeight: '700',
     },
     dateHeroTextWrap: { flex: 1, alignItems: 'center' },
-    dateHeroTitle: { color: theme.textPrimary, fontSize: 18, fontWeight: '800' },
-    dateHeroSubtitle: { color: theme.textMuted, fontSize: 11, fontWeight: '500' },
+    dateHeroTitle: {
+      color: theme.textPrimary,
+      fontSize: 18,
+      fontWeight: '800',
+    },
+    dateHeroSubtitle: {
+      color: theme.textMuted,
+      fontSize: 11,
+      fontWeight: '500',
+    },
     weekStripContent: { paddingHorizontal: 14, paddingTop: 15 },
     weekDayChip: {
       width: 55,
@@ -941,7 +1020,11 @@ const makeStyles = (theme: Theme) =>
     },
     weekDayName: { color: theme.textMuted, fontSize: 10, fontWeight: '700' },
     weekDayNameActive: { color: theme.primary },
-    weekDayNumber: { color: theme.textPrimary, fontSize: 16, fontWeight: '800' },
+    weekDayNumber: {
+      color: theme.textPrimary,
+      fontSize: 16,
+      fontWeight: '800',
+    },
     weekDayNumberActive: { color: theme.primary },
 
     // Appointment Card Redesign
@@ -984,10 +1067,21 @@ const makeStyles = (theme: Theme) =>
       marginBottom: 6,
     },
     serviceRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-    serviceNameText: { color: theme.textSecondary, fontSize: 14, fontWeight: '600' },
-    dotSeparator: { color: hexToRgba(theme.primary, 0.38), marginHorizontal: 8 },
+    serviceNameText: {
+      color: theme.textSecondary,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    dotSeparator: {
+      color: hexToRgba(theme.primary, 0.38),
+      marginHorizontal: 8,
+    },
     durationText: { color: hexToRgba(theme.primary, 0.58), fontSize: 13 },
-    phoneSubText: { color: hexToRgba(theme.primary, 0.5), fontSize: 12, fontWeight: '500' },
+    phoneSubText: {
+      color: hexToRgba(theme.primary, 0.5),
+      fontSize: 12,
+      fontWeight: '500',
+    },
     paymentInfoBadge: {
       marginTop: 10,
       alignSelf: 'flex-start',
@@ -1008,7 +1102,11 @@ const makeStyles = (theme: Theme) =>
       backgroundColor: 'rgba(148, 163, 184, 0.12)',
       borderColor: 'rgba(148, 163, 184, 0.28)',
     },
-    paymentInfoText: { color: theme.textSecondary, fontSize: 11, fontWeight: '700' },
+    paymentInfoText: {
+      color: theme.textSecondary,
+      fontSize: 11,
+      fontWeight: '700',
+    },
     cardActions: {
       flexDirection: 'row',
       gap: 10,
@@ -1018,15 +1116,47 @@ const makeStyles = (theme: Theme) =>
     },
     btnAction: {
       flex: 1,
-      height: 42,
       borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
+      paddingHorizontal: 1,
+      paddingVertical: 8,
     },
-    btnMain: { backgroundColor: theme.primary },
-    btnMainText: { color: '#fff', fontSize: 13, fontWeight: '800' },
-    btnSec: { backgroundColor: theme.surfaceAlt, borderWidth: 1, borderColor: hexToRgba(theme.primary, 0.18) },
+    btnMain: { backgroundColor: theme.primary, flex: 1.18 },
+    btnMainText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '800',
+      textAlign: 'center',
+      lineHeight: 15,
+    },
+    btnSec: {
+      backgroundColor: theme.surfaceAlt,
+      borderWidth: 1,
+      borderColor: hexToRgba(theme.primary, 0.18),
+      flex: 0.92,
+    },
     btnSecText: { color: theme.textPrimary, fontSize: 13, fontWeight: '700' },
+    btnWhatsapp: {
+      borderColor: hexToRgba('#25D366', 0.34),
+      backgroundColor: hexToRgba('#25D366', 0.08),
+      flex: 1.08,
+    },
+    btnWhatsappRow: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    btnWhatsappCopy: {
+      alignItems: 'flex-start',
+    },
+
+    btnWhatsappHint: {
+      color: theme.textMuted,
+      fontSize: 8,
+      fontWeight: '600',
+      marginTop: 1,
+      lineHeight: 11,
+    },
     swipeAction: {
       width: 90,
       borderRadius: 24,
@@ -1045,8 +1175,14 @@ const makeStyles = (theme: Theme) =>
       borderWidth: 1,
       borderColor: hexToRgba(theme.primary, 0.18),
     },
-    emptyTitle: { color: hexToRgba(theme.primary, 0.52), fontSize: 14, fontWeight: '600' },
+    emptyTitle: {
+      color: hexToRgba(theme.primary, 0.52),
+      fontSize: 14,
+      fontWeight: '600',
+    },
     errorText: { color: '#ff7b7b', textAlign: 'center', marginBottom: 10 },
+        btnWhatsappImage: { width: 20, height: 20 },
+
   });
 
 export default BarberDashboard;

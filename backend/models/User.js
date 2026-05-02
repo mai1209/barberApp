@@ -71,6 +71,7 @@ const mercadoPagoAuthSchema = new mongoose.Schema(
 
 const notificationSettingsSchema = new mongoose.Schema(
   {
+    barberInstantBookingEnabled: { type: Boolean, default: true },
     barberReminderEnabled: { type: Boolean, default: true },
     barberReminderMinutesBefore: {
       type: Number,
@@ -157,6 +158,11 @@ const subscriptionSchema = new mongoose.Schema(
       type: String,
       enum: ["manual", "automatic"],
       default: "manual",
+    },
+    provider: {
+      type: String,
+      enum: ["mercadopago", "apple", "google", null],
+      default: null,
     },
     customPriceArs: {
       type: Number,
@@ -285,6 +291,42 @@ const subscriptionSchema = new mongoose.Schema(
     },
     nextBillingAt: {
       type: Date,
+      default: null,
+    },
+    storeProductId: {
+      type: String,
+      default: null,
+    },
+    storeCurrentPlanId: {
+      type: String,
+      default: null,
+    },
+    storePurchaseToken: {
+      type: String,
+      default: null,
+    },
+    storeTransactionId: {
+      type: String,
+      default: null,
+    },
+    storeOriginalTransactionId: {
+      type: String,
+      default: null,
+    },
+    storeEnvironment: {
+      type: String,
+      default: null,
+    },
+    storeLastSyncedAt: {
+      type: Date,
+      default: null,
+    },
+    storeAutoRenewing: {
+      type: Boolean,
+      default: false,
+    },
+    storeStatus: {
+      type: String,
       default: null,
     },
     lastPaymentAt: {

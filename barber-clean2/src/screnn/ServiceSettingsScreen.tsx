@@ -67,12 +67,14 @@ function ServiceSettingsScreen({ navigation }: Props) {
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [durationMinutes, setDurationMinutes] = useState('30');
+  const [bufferAfterMinutes, setBufferAfterMinutes] = useState('');
   const [price, setPrice] = useState('');
 
   const resetForm = () => {
     setEditingServiceId(null);
     setName('');
     setDurationMinutes('30');
+    setBufferAfterMinutes('');
     setPrice('');
   };
 
@@ -99,6 +101,8 @@ function ServiceSettingsScreen({ navigation }: Props) {
   const handleSubmit = async () => {
     const trimmedName = name.trim();
     const parsedDuration = Number(durationMinutes);
+    const parsedBuffer =
+      String(bufferAfterMinutes).trim() === '' ? null : Number(bufferAfterMinutes);
     const parsedPrice = Number(price || '0');
 
     if (!trimmedName) {
@@ -119,18 +123,31 @@ function ServiceSettingsScreen({ navigation }: Props) {
       return;
     }
 
+    if (
+      parsedBuffer != null &&
+      (!Number.isFinite(parsedBuffer) || parsedBuffer < 0 || parsedBuffer > 120)
+    ) {
+      Alert.alert(
+        'Buffer inválido',
+        'El tiempo extra entre turnos tiene que estar entre 0 y 120 minutos.',
+      );
+      return;
+    }
+
     try {
       setSaving(true);
       if (editingServiceId) {
         await updateService(editingServiceId, {
           name: trimmedName,
           durationMinutes: parsedDuration,
+          bufferAfterMinutes: parsedBuffer,
           price: parsedPrice,
         });
       } else {
         await createService({
           name: trimmedName,
           durationMinutes: parsedDuration,
+          bufferAfterMinutes: parsedBuffer,
           price: parsedPrice,
         });
       }
@@ -147,6 +164,11 @@ function ServiceSettingsScreen({ navigation }: Props) {
     setEditingServiceId(service._id);
     setName(service.name ?? '');
     setDurationMinutes(String(service.durationMinutes ?? 30));
+    setBufferAfterMinutes(
+      service.bufferAfterMinutes != null && Number(service.bufferAfterMinutes) > 0
+        ? String(service.bufferAfterMinutes)
+        : '',
+    );
     setPrice(
       service.price != null && Number(service.price) > 0
         ? String(service.price)
@@ -244,6 +266,20 @@ function ServiceSettingsScreen({ navigation }: Props) {
             </View>
 
             <View style={[styles.fieldBlock, styles.fieldHalf]}>
+              <Text style={styles.label}>Buffer extra (min)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="0"
+                placeholderTextColor="#555"
+                keyboardType="numeric"
+                value={bufferAfterMinutes}
+                onChangeText={setBufferAfterMinutes}
+              />
+            </View>
+          </View>
+
+          <View style={styles.twoColumns}>
+            <View style={[styles.fieldBlock, styles.fieldHalf]}>
               <Text style={styles.label}>Precio</Text>
               <TextInput
                 style={styles.input}
@@ -254,6 +290,7 @@ function ServiceSettingsScreen({ navigation }: Props) {
                 onChangeText={setPrice}
               />
             </View>
+            <View style={[styles.fieldBlock, styles.fieldHalf]} />
           </View>
 
           <Pressable
@@ -299,6 +336,12 @@ function ServiceSettingsScreen({ navigation }: Props) {
                       <Clock3 size={12} color="#9DA6B8" />
                       <Text style={styles.metaText}>
                         {service.durationMinutes} min
+                      </Text>
+                    </View>
+                    <View style={styles.metaChip}>
+                      <Clock3 size={12} color="#9DA6B8" />
+                      <Text style={styles.metaText}>
+                        Buffer {service.bufferAfterMinutes ?? 0} min
                       </Text>
                     </View>
                     <View style={styles.metaChip}>
