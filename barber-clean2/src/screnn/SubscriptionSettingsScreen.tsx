@@ -30,6 +30,7 @@ import {
   pickPrimaryActiveSubscription,
   STORE_SUBSCRIPTION_PRODUCTS,
 } from '../services/storeBilling';
+import { isSubscriptionRestricted, resolvePostAuthRoute } from '../services/subscriptionAccess';
 
 const COMMERCIAL_EMAIL = 'barberappbycodex@gmail.com';
 const SUPPORT_URL = 'https://barberappbycodex.com/soporte';
@@ -199,7 +200,18 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
         await saveUserProfile(response.user);
         setSubscription(response.user?.subscription ?? null);
         await finishTransaction({ purchase, isConsumable: false });
-        Alert.alert('Plan activado', 'La suscripción del negocio quedó activa en esta cuenta.');
+        const nextRoute = resolvePostAuthRoute(response.user);
+        Alert.alert('Plan activado', 'La suscripción del negocio quedó activa en esta cuenta.', [
+          {
+            text: 'Continuar',
+            onPress: () => {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: nextRoute }],
+              });
+            },
+          },
+        ]);
       } catch (error: any) {
         Alert.alert(
           'No pudimos activar el plan',
@@ -220,7 +232,8 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
     },
   });
 
-  const syncActiveStoreSubscription = useCallback(async () => {
+  const syncActiveStoreSubscription = useCallback(
+    async (options?: { redirectOnSuccess?: boolean }) => {
     if (!usesStoreBilling || !billingConnected) return false;
 
     try {
@@ -242,6 +255,17 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
       const response = await syncStoreSubscription(payload);
       await saveUserProfile(response.user);
       setSubscription(response.user?.subscription ?? null);
+      if (
+        options?.redirectOnSuccess &&
+        response.user &&
+        !isSubscriptionRestricted(response.user?.subscription?.status)
+      ) {
+        const nextRoute = resolvePostAuthRoute(response.user);
+        navigation.reset({
+          index: 0,
+          routes: [{ name: nextRoute }],
+        });
+      }
       return true;
     } catch (error) {
       console.log('No se pudo sincronizar la suscripción activa del store', error);
@@ -249,7 +273,9 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
     } finally {
       setBillingSyncing(false);
     }
-  }, [billingConnected, getActiveSubscriptions, usesStoreBilling]);
+    },
+    [billingConnected, getActiveSubscriptions, navigation, usesStoreBilling],
+  );
 
   const loadSubscription = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -284,9 +310,28 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
   useEffect(() => {
     if (!usesStoreBilling || !billingConnected) return;
 
-    fetchProducts({ skus: getStoreSubscriptionSkus(), type: 'subs' }).catch(error => {
-      console.log('No se pudieron cargar los planes del store', error);
+    console.log('[StoreBilling] fetchProducts:start', {
+      platform: Platform.OS,
+      billingConnected,
+      skus: getStoreSubscriptionSkus(),
     });
+
+    fetchProducts({ skus: getStoreSubscriptionSkus(), type: 'subs' })
+      .then(result => {
+        console.log(
+          '[StoreBilling] fetchProducts:success',
+          Array.isArray(result)
+            ? result.map(item => ({
+                id: item?.id,
+                displayName: 'displayName' in item ? item.displayName : null,
+                title: 'title' in item ? item.title : null,
+              }))
+            : result,
+        );
+      })
+      .catch(error => {
+        console.log('No se pudieron cargar los planes del store', error);
+      });
   }, [billingConnected, fetchProducts, usesStoreBilling]);
 
   useEffect(() => {
@@ -295,6 +340,17 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
       console.log('No se pudo sincronizar la suscripción activa', error);
     });
   }, [billingConnected, syncActiveStoreSubscription, usesStoreBilling]);
+
+  useEffect(() => {
+    if (!usesStoreBilling) return;
+
+    console.log('[StoreBilling] state', {
+      platform: Platform.OS,
+      billingConnected,
+      subscriptionsCount: storeSubscriptions.length,
+      subscriptionIds: storeSubscriptions.map(item => item.id),
+    });
+  }, [billingConnected, storeSubscriptions, usesStoreBilling]);
 
   const planKey = subscription?.plan ?? 'basic';
   const planInfo = PLAN_COPY[planKey];
@@ -456,6 +512,20 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
     const targetProductId = STORE_SUBSCRIPTION_PRODUCTS[targetPlan];
     const product = storeSubscriptions.find(item => item.id === targetProductId);
 
+    console.log('[StoreBilling] purchase:attempt', {
+      targetPlan,
+      targetProductId,
+      billingConnected,
+      availableProductIds: storeSubscriptions.map(item => item.id),
+      matchedProduct: product
+        ? {
+            id: product.id,
+            displayName: 'displayName' in product ? product.displayName : null,
+            title: 'title' in product ? product.title : null,
+          }
+        : null,
+    });
+
     if (!product) {
       Alert.alert('Plan no disponible', 'Todavía no pudimos cargar este plan desde la tienda.');
       return;
@@ -524,7 +594,7 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
     try {
       setBillingBusy(true);
       await restorePurchases();
-      const synced = await syncActiveStoreSubscription();
+      const synced = await syncActiveStoreSubscription({ redirectOnSuccess: true });
       if (synced) {
         Alert.alert('Compra restaurada', 'La suscripción del negocio volvió a quedar activa.');
       } else {
