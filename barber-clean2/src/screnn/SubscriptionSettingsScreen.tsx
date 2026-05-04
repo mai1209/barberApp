@@ -34,6 +34,8 @@ import { isSubscriptionRestricted, resolvePostAuthRoute } from '../services/subs
 
 const COMMERCIAL_EMAIL = 'barberappbycodex@gmail.com';
 const SUPPORT_URL = 'https://barberappbycodex.com/soporte';
+const PRIVACY_POLICY_URL = 'https://barberappbycodex.com/politica-de-privacidad';
+const TERMS_OF_USE_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 
 type SubscriptionState = {
   plan?: 'basic' | 'pro' | 'custom';
@@ -484,6 +486,14 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
     }
   };
 
+  const openExternalUrl = async (url: string, fallbackLabel: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch (_error) {
+      Alert.alert('No pudimos abrir el enlace', fallbackLabel);
+    }
+  };
+
   const handleSwitchToManualRenewal = async () => {
     try {
       setUpdatingRenewalMode(true);
@@ -718,6 +728,28 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
 
               <View style={styles.includesCard}>
                 <Text style={styles.sectionTitle}>Elegí un plan</Text>
+                <View style={styles.subscriptionLegalCard}>
+                  <Text style={styles.subscriptionLegalTitle}>Suscripciones disponibles</Text>
+                  <View style={styles.subscriptionLegalRow}>
+                    <Text style={styles.subscriptionLegalPlan}>BarberApp Básico</Text>
+                    <Text style={styles.subscriptionLegalMeta}>
+                      Renovación automática mensual
+                      {basicStoreProduct?.displayPrice ? ` · ${basicStoreProduct.displayPrice}` : ''}
+                    </Text>
+                  </View>
+                  <View style={styles.subscriptionLegalRow}>
+                    <Text style={styles.subscriptionLegalPlan}>BarberApp Pro</Text>
+                    <Text style={styles.subscriptionLegalMeta}>
+                      Renovación automática mensual
+                      {proStoreProduct?.displayPrice ? ` · ${proStoreProduct.displayPrice}` : ''}
+                    </Text>
+                  </View>
+                  <Text style={styles.subscriptionLegalFootnote}>
+                    La suscripción se renueva automáticamente hasta que la canceles desde tu cuenta
+                    de Apple. El precio y la duración del plan se muestran antes de confirmar la
+                    compra.
+                  </Text>
+                </View>
                 <Pressable
                   style={[styles.primaryButton, billingBusy && styles.primaryButtonDisabled]}
                   onPress={() => handlePurchasePlan('basic')}
@@ -761,6 +793,22 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
               <Pressable style={styles.ghostButton} onPress={openSupportMail}>
                 <Text style={styles.ghostButtonText}>Hablar con soporte</Text>
               </Pressable>
+
+              <View style={styles.subscriptionLegalLinksCard}>
+                <Text style={styles.subscriptionLegalLinksTitle}>Información legal</Text>
+                <Pressable
+                  style={styles.legalLinkButton}
+                  onPress={() => openExternalUrl(TERMS_OF_USE_URL, TERMS_OF_USE_URL)}
+                >
+                  <Text style={styles.legalLinkButtonText}>Términos de uso (EULA)</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.legalLinkButton}
+                  onPress={() => openExternalUrl(PRIVACY_POLICY_URL, PRIVACY_POLICY_URL)}
+                >
+                  <Text style={styles.legalLinkButtonText}>Política de privacidad</Text>
+                </Pressable>
+              </View>
             </View>
           </>
         )}
@@ -1231,6 +1279,65 @@ const createStyles = (theme: Theme) =>
       color: theme.textSecondary,
       fontSize: 13,
       lineHeight: 19,
+    },
+    subscriptionLegalCard: {
+      backgroundColor: theme.surfaceAlt,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: theme.border,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      gap: 10,
+    },
+    subscriptionLegalTitle: {
+      color: theme.textPrimary,
+      fontSize: 14,
+      fontWeight: '900',
+    },
+    subscriptionLegalRow: {
+      gap: 2,
+    },
+    subscriptionLegalPlan: {
+      color: theme.textPrimary,
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    subscriptionLegalMeta: {
+      color: theme.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    subscriptionLegalFootnote: {
+      color: theme.textMuted,
+      fontSize: 12,
+      lineHeight: 17,
+    },
+    subscriptionLegalLinksCard: {
+      backgroundColor: theme.surfaceAlt,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: theme.border,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      gap: 10,
+    },
+    subscriptionLegalLinksTitle: {
+      color: theme.textPrimary,
+      fontSize: 14,
+      fontWeight: '900',
+    },
+    legalLinkButton: {
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.card,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+    },
+    legalLinkButtonText: {
+      color: theme.primary,
+      fontSize: 14,
+      fontWeight: '800',
     },
     autoRenewMeta: {
       color: theme.textMuted,
