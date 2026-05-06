@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   createSubscriptionCoupon,
+  deleteSubscriptionCoupon,
   fetchPlanPricing,
   fetchSubscriptionCoupons,
   fetchSubscriptions,
@@ -639,10 +640,32 @@ export default function SubscriptionAdmin() {
 
     if (!confirmed) return;
 
-    await handleSaveCoupon(coupon._id, {
-      isActive: false,
-      expiresAt: new Date().toISOString(),
-    });
+    if (!secret.trim()) {
+      setError('Ingresá el secret de administración para borrar cupones.');
+      setSuccess('');
+      return;
+    }
+
+    setSavingCouponId(coupon._id);
+    setError('');
+    setSuccess('');
+
+    try {
+      await deleteSubscriptionCoupon({
+        couponId: coupon._id,
+        secret: secret.trim(),
+      });
+      setCoupons((current) => current.filter((item) => item._id !== coupon._id));
+      setSuccess('Cupón borrado correctamente.');
+      if (editingCouponId === coupon._id) {
+        setEditingCouponId(null);
+        setCouponEditDraft(null);
+      }
+    } catch (err) {
+      setError(err.message || 'No pudimos borrar el cupón.');
+    } finally {
+      setSavingCouponId(null);
+    }
   };
 
   const handleStartEditCoupon = (coupon) => {

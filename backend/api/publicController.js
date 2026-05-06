@@ -8,6 +8,7 @@ import { BarberModel } from "../models/Barber.js";
 import { sendAppMail } from "../services/mailer.js";
 import {
   applyPendingCouponToSubscription,
+  calculateCouponBenefitValidUntil,
   calculateSubscriptionExpiry,
   createAppointmentMercadoPagoPreference,
 } from "./paymentController.js";
@@ -237,10 +238,19 @@ async function activateFreeSubscriptionCoupon({
     pricing,
   });
 
-  const expiresAt = calculateSubscriptionExpiry({
-    billingCycle: "monthly",
-    paidAt: activatedAt,
+  const couponBenefitValidUntil = calculateCouponBenefitValidUntil({
+    benefitDurationType: coupon?.benefitDurationType,
+    benefitDurationValue: Number(coupon?.benefitDurationValue || 0),
+    appliedAt: activatedAt,
   });
+
+  const expiresAt =
+    coupon?.benefitDurationType === "days" || coupon?.benefitDurationType === "months"
+      ? couponBenefitValidUntil
+      : calculateSubscriptionExpiry({
+          billingCycle: "monthly",
+          paidAt: activatedAt,
+        });
 
   userDoc.subscription = {
     ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),

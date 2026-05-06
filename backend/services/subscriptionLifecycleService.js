@@ -1,6 +1,12 @@
 import admin from "../firebase.js";
 import { UserModel } from "../models/User.js";
 import { sendAppMail } from "./mailer.js";
+import {
+  getOrCreatePlanPricing,
+  serializePlanPricing,
+} from "./planPricingService.js";
+import { resolvePlanPricingForSubscription } from "./subscriptionPricingService.js";
+import { updateMercadoPagoSystemPreapproval } from "./mercadoPago.js";
 
 const GRACE_PERIOD_DAYS = 3;
 
@@ -84,6 +90,83 @@ function buildPushPayload({ title, body }) {
     notification: { title, body },
     android: { priority: "high" },
   };
+}
+
+function clearExpiredCouponBenefit(userDoc) {
+  userDoc.subscription = {
+    ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
+    couponCode: null,
+    couponDiscountType: null,
+    couponDiscountPercent: null,
+    couponDiscountAmountUsdReference: null,
+    couponBenefitDurationType: null,
+    couponBenefitDurationValue: null,
+    couponAppliedAt: null,
+    couponValidUntil: null,
+  };
+}
+
+async function reconcileAutomaticCouponBenefit(userDoc, now) {
+  const subscription = userDoc?.subscription ?? {};
+  const plan = String(subscription?.plan || "").trim();
+  const preapprovalId = String(subscription?.mercadoPagoPreapprovalId || "").trim();
+  const renewalMode = String(subscription?.renewalMode || "").trim();
+  const benefitType = String(subscription?.couponBenefitDurationType || "").trim();
+  const couponCode = String(subscription?.couponCode || "").trim();
+  const validUntil = subscription?.couponValidUntil
+    ? new Date(subscription.couponValidUntil)
+    : null;
+
+  if (
+    renewalMode !== "automatic" ||
+    !plan ||
+    !preapprovalId ||
+    !couponCode ||
+    !["days", "months"].includes(benefitType) ||
+    !validUntil ||
+    Number.isNaN(validUntil.getTime()) ||
+    validUntil.getTime() >= now.getTime()
+  ) {
+    return false;
+  }
+
+  const pricingDoc = await getOrCreatePlanPricing();
+  const pricing = serializePlanPricing(pricingDoc);
+  const subscriptionWithoutCoupon = {
+    ...(subscription?.toObject?.() ?? subscription ?? {}),
+    couponCode: null,
+    couponDiscountType: null,
+    couponDiscountPercent: null,
+    couponDiscountAmountUsdReference: null,
+    couponBenefitDurationType: null,
+    couponBenefitDurationValue: null,
+    couponAppliedAt: null,
+    couponValidUntil: null,
+  };
+  const resolvedPricing = resolvePlanPricingForSubscription({
+    plan,
+    pricing,
+    subscription: subscriptionWithoutCoupon,
+  });
+  const expectedAmount = Number(resolvedPricing.effectiveArs || 0);
+
+  if (expectedAmount > 0) {
+    await updateMercadoPagoSystemPreapproval({
+      preapprovalId,
+      payload: {
+        auto_recurring: {
+          frequency: 1,
+          frequency_type: "months",
+          transaction_amount: expectedAmount,
+          currency_id: "ARS",
+        },
+      },
+    });
+  }
+
+  clearExpiredCouponBenefit(userDoc);
+  await userDoc.save();
+  return true;
 }
 
 function buildSubscriptionEventMailHtml({
@@ -334,6 +417,16 @@ export async function processSubscriptionLifecycle({ now = new Date() } = {}) {
 
     const subscription = userDoc.subscription ?? {};
     const status = normalizeStatus(subscription.status);
+
+    try {
+      await reconcileAutomaticCouponBenefit(userDoc, now);
+    } catch (error) {
+      console.error(
+        "Error reconciliando beneficio temporal de cupón en suscripción automática:",
+        error?.message || error,
+      );
+    }
+
     const expiresAt = subscription.expiresAt ? new Date(subscription.expiresAt) : null;
     if (!expiresAt || Number.isNaN(expiresAt.getTime())) continue;
 

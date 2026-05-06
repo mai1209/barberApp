@@ -13,6 +13,7 @@ import {
   getMercadoPagoSystemPreapproval,
   getMercadoPagoSystemPayment,
   refreshMercadoPagoAccessToken,
+  updateMercadoPagoSystemPreapproval,
 } from "../services/mercadoPago.js";
 import {
   getOrCreatePlanPricing,
@@ -257,7 +258,7 @@ export function calculateSubscriptionExpiry({ billingCycle, paidAt }) {
   return base;
 }
 
-function calculateCouponBenefitValidUntil({
+export function calculateCouponBenefitValidUntil({
   benefitDurationType,
   benefitDurationValue,
   appliedAt,
@@ -411,7 +412,7 @@ export async function applyPendingCouponToSubscription({ userDoc, plan, pricing 
   return resolvedPricing;
 }
 
-function clearSubscriptionCouponBenefit(userDoc) {
+export function clearSubscriptionCouponBenefit(userDoc) {
   userDoc.subscription = {
     ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
     couponCode: null,
@@ -423,6 +424,60 @@ function clearSubscriptionCouponBenefit(userDoc) {
     couponAppliedAt: null,
     couponValidUntil: null,
   };
+}
+
+async function syncAutomaticPreapprovalAmount({
+  userDoc,
+  plan,
+  preapproval,
+}) {
+  const preapprovalId = String(
+    preapproval?.id || userDoc?.subscription?.mercadoPagoPreapprovalId || "",
+  ).trim();
+  if (!preapprovalId || !plan) {
+    return false;
+  }
+
+  const pricingDoc = await getOrCreatePlanPricing();
+  const pricing = serializePlanPricing(pricingDoc);
+  const subscriptionForPricing = {
+    ...(userDoc?.subscription?.toObject?.() ?? userDoc?.subscription ?? {}),
+  };
+
+  if (String(subscriptionForPricing.couponBenefitDurationType || "").trim() === "one_time") {
+    subscriptionForPricing.couponValidUntil = new Date(0);
+  }
+
+  const resolvedPricing = resolvePlanPricingForSubscription({
+    plan,
+    pricing,
+    subscription: subscriptionForPricing,
+  });
+
+  const expectedAmount = Number(resolvedPricing.effectiveArs || 0);
+  const currentAmount = Number(preapproval?.auto_recurring?.transaction_amount || 0);
+
+  if (!(expectedAmount > 0)) {
+    return false;
+  }
+
+  if (Math.abs(expectedAmount - currentAmount) < 0.01) {
+    return false;
+  }
+
+  await updateMercadoPagoSystemPreapproval({
+    preapprovalId,
+    payload: {
+      auto_recurring: {
+        frequency: 1,
+        frequency_type: "months",
+        transaction_amount: expectedAmount,
+        currency_id: "ARS",
+      },
+    },
+  });
+
+  return true;
 }
 
 function shouldClearExistingCouponOnApprovedPayment({ userDoc, paidAt }) {
@@ -539,6 +594,19 @@ async function syncAutomaticSubscriptionFromPreapproval(preapproval) {
           error?.message || error,
         );
       }
+    }
+
+    try {
+      await syncAutomaticPreapprovalAmount({
+        userDoc,
+        plan,
+        preapproval,
+      });
+    } catch (error) {
+      console.error(
+        "Error ajustando monto recurrente de Mercado Pago tras activar la suscripción:",
+        error?.message || error,
+      );
     }
 
     return true;

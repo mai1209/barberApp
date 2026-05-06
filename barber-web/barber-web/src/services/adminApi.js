@@ -101,3 +101,10 @@ export function updateSubscriptionCoupon({ couponId, secret, payload }) {
     body: payload,
   });
 }
+
+export function deleteSubscriptionCoupon({ couponId, secret }) {
+  return request(`/admin/subscription-coupons/${couponId}`, {
+    method: 'DELETE',
+    secret,
+  });
+}

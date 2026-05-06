@@ -2052,6 +2052,31 @@ export async function updateSubscriptionCouponAdmin(req, res, next) {
   }
 }
 
+export async function deleteSubscriptionCouponAdmin(req, res, next) {
+  try {
+    const couponId = String(req.params?.couponId || "").trim();
+    if (!couponId) {
+      return res.status(400).json({ error: "Falta el cupón a borrar." });
+    }
+
+    const coupon = await SubscriptionCouponModel.findByIdAndDelete(couponId).lean();
+
+    if (!coupon) {
+      return res.status(404).json({ error: "Cupón no encontrado." });
+    }
+
+    return res.json({
+      message: "Cupón borrado correctamente.",
+      coupon: serializeSubscriptionCoupon(coupon),
+    });
+  } catch (err) {
+    if (err instanceof Error) {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
+}
+
 export async function updatePlanPricingAdmin(req, res, next) {
   try {
     const { updates, hasAnyField } = sanitizePlanPricingInput(req.body ?? {});

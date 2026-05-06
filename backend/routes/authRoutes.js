@@ -3,6 +3,7 @@ import {
   confirmPasswordRecovery,
   createSubscriptionCheckout,
   createSubscriptionCouponAdmin,
+  deleteSubscriptionCouponAdmin,
   disableBarberAccess,
   disconnectMercadoPago,
   getMailDebug,
@@ -73,4 +74,5 @@ router.put("/admin/plan-pricing", requireAdminPanelSecret, updatePlanPricingAdmi
 router.get("/admin/subscription-coupons", requireAdminPanelSecret, listSubscriptionCouponsAdmin);
 router.post("/admin/subscription-coupons", requireAdminPanelSecret, createSubscriptionCouponAdmin);
 router.patch("/admin/subscription-coupons/:couponId", requireAdminPanelSecret, updateSubscriptionCouponAdmin);
+router.delete("/admin/subscription-coupons/:couponId", requireAdminPanelSecret, deleteSubscriptionCouponAdmin);
 export default router;
