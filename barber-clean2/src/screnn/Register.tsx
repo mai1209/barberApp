@@ -22,9 +22,9 @@ import OjoAbierto from '../assets/ojo_abierto.png';
 import OjoCerrado from '../assets/ojo_cerrado.png';
 
 const AUTH_THEME = {
-  primary: '#FF1493',
-  card: '#1C1C1C',
-  background: '#121212',
+  primary: '#111111',
+  card: '#FFFFFF',
+  background: '#F8FAFC',
   logo: require('../assets/logoBarber.png'),
 } as const;
 
@@ -232,14 +232,14 @@ const createStyles = (theme: Theme | typeof AUTH_THEME) =>
     scrollContent: { paddingBottom: 50 },
 
     header: { marginTop: 60, alignItems: 'center', marginBottom: 30 },
-    logo: { width: 70, height: 70, marginBottom: 15, resizeMode: 'contain' },
+    logo: { width: 84, height: 84, resizeMode: 'contain' },
     headerSubtitle: {
       color: theme.primary,
       fontSize: 11,
       fontWeight: '700',
       letterSpacing: 3,
     },
-    headerTitle: { color: '#fff', fontSize: 32, fontWeight: '800' },
+    headerTitle: { color: '#111827', fontSize: 32, fontWeight: '800' },
 
     registerCard: {
       marginHorizontal: 20,
@@ -247,10 +247,10 @@ const createStyles = (theme: Theme | typeof AUTH_THEME) =>
       borderRadius: 30,
       padding: 22,
       borderWidth: 1,
-      borderColor: '#252525',
+      borderColor: '#E2E8F0',
     },
     instructionText: {
-      color: '#888',
+      color: '#64748B',
       textAlign: 'center',
       marginBottom: 20,
       fontSize: 14,
@@ -258,7 +258,7 @@ const createStyles = (theme: Theme | typeof AUTH_THEME) =>
 
     inputContainer: { marginBottom: 12 },
     inputLabel: {
-      color: '#666',
+      color: '#64748B',
       fontSize: 11,
       fontWeight: '700',
       textTransform: 'uppercase',
@@ -266,13 +266,13 @@ const createStyles = (theme: Theme | typeof AUTH_THEME) =>
       marginLeft: 4,
     },
     input: {
-      backgroundColor: '#252525',
+      backgroundColor: '#FFFFFF',
       borderRadius: 14,
       padding: 14,
-      color: '#fff',
+      color: '#111827',
       fontSize: 16,
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: '#CBD5E1',
     },
     inputFocused: { borderColor: theme.primary },
 
@@ -297,8 +297,8 @@ const createStyles = (theme: Theme | typeof AUTH_THEME) =>
     registerBtnText: { color: '#fff', fontSize: 17, fontWeight: '800' },
 
     loginLink: { marginTop: 20, alignItems: 'center' },
-    loginLinkText: { color: '#666', fontSize: 13 },
-    loginLinkBold: { color: '#fff', fontWeight: '700' },
+    loginLinkText: { color: '#64748B', fontSize: 13 },
+    loginLinkBold: { color: '#111827', fontWeight: '700' },
 
     errorText: {
       color: '#ff6b6b',
@@ -307,7 +307,7 @@ const createStyles = (theme: Theme | typeof AUTH_THEME) =>
       fontWeight: '600',
     },
     codexText: {
-      color: '#333',
+      color: '#64748B',
       textAlign: 'center',
       marginTop: 25,
       fontSize: 11,
@@ -318,7 +318,7 @@ const createStyles = (theme: Theme | typeof AUTH_THEME) =>
       width: 22,
       height: 22,
       resizeMode: 'contain',
-      tintColor: '#888',
+      tintColor: '#64748B',
     },
   });
 

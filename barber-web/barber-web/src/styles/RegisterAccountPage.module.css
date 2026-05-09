@@ -1,9 +1,9 @@
 .screen {
   min-height: 100vh;
   background:
-    radial-gradient(circle at top, rgba(255, 20, 147, 0.16), transparent 34%),
-    linear-gradient(180deg, #08080d 0%, #111116 100%);
-  color: #f7f7fb;
+    radial-gradient(circle at top, rgba(148, 163, 184, 0.18), transparent 34%),
+    linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+  color: #0f172a;
   position: relative;
   overflow-x: hidden;
   padding: 0 0 80px;
@@ -16,8 +16,8 @@
   z-index: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(255, 20, 147, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 20, 147, 0.025) 1px, transparent 1px);
+    linear-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px);
   background-size: 64px 64px;
 }
 
@@ -68,10 +68,10 @@
   justify-content: space-between;
   padding: 0 32px;
   height: 60px;
-  background: rgba(10, 10, 15, 0.84);
+  background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.10);
 }
 
 .backBtn {
@@ -80,12 +80,12 @@
   gap: 7px;
   font-size: 0.84rem;
   font-weight: 700;
-  color: #f6b1d6;
+  color: #475569;
   transition: color 0.2s ease, transform 0.2s ease;
 }
 
 .backBtn:hover {
-  color: #fff;
+  color: #0f172a;
   transform: translateX(-1px);
 }
 
@@ -99,12 +99,12 @@
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: linear-gradient(135deg, #ff1493, #ff4db3);
+  background: linear-gradient(135deg, #111827, #334155);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 10px rgba(255, 20, 147, 0.28);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.14);
 }
 
 .topBarName {
@@ -112,17 +112,16 @@
   font-weight: 800;
   font-size: 1rem;
   letter-spacing: -0.4px;
-  color: #fff;
+  color: #0f172a;
 }
 
 .layout {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: 380px 1fr;
-  gap: 0;
-  max-width: 1080px;
-  margin: 0 auto;
+  grid-template-columns: 500px 500px;
+  justify-content: center ;
+  gap: 2rem;
   padding: 48px 24px 0;
   align-items: start;
 }
@@ -140,7 +139,7 @@
 
 .eyebrow {
   margin: 0 0 14px;
-  color: #ff69b4;
+  color: #64748b;
   font-size: 0.74rem;
   font-weight: 800;
   letter-spacing: 2px;
@@ -154,7 +153,7 @@
   font-weight: 800;
   line-height: 0.95;
   letter-spacing: -2.5px;
-  color: #fff;
+  color: #0f172a;
 }
 
 .titleAccent {
@@ -179,99 +178,85 @@
 
 .subtitle {
   font-size: 0.98rem;
-  color: rgba(255, 255, 255, 0.75);
+  color: #475569;
   line-height: 1.72;
   margin-bottom: 36px;
 }
 
 .progressSteps {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  max-width: 420px;
+  gap: 12px;
   margin-bottom: 30px;
 }
 
 .progressItem {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-}
-
-.progressLine {
-  width: 2px;
-  flex: 1;
-  min-height: 28px;
-  background: rgba(255, 255, 255, 0.12);
-  margin: 4px 0 4px 14px;
-  border-radius: 1px;
-}
-
-.progressLineLast {
-  background: transparent;
-}
-
-.stepDot {
-  width: 30px;
-  height: 30px;
-  border-radius: 10px;
-  border: 1.5px solid rgba(255, 255, 255, 0.12);
-  background: rgba(23, 23, 30, 0.95);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.3s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
-}
-
-.stepDot span {
-  font-family: 'Syne', system-ui, sans-serif;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #b8b8c5;
-}
-
-.stepDotActive {
-  border-color: rgba(255, 20, 147, 0.35);
-  background: rgba(255, 20, 147, 0.12);
-  box-shadow: 0 0 0 3px rgba(255, 20, 147, 0.08);
-}
-
-.stepDotActive span {
-  color: #ff69b4;
-}
-
-.stepDotDone {
-  border-color: #ff1493;
-  background: #ff1493;
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(255, 20, 147, 0.28);
+  display: block;
 }
 
 .progressLabel {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 4px 0 24px;
+  width: 200px;
+  gap: 4px;
+  padding: 16px 16px 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.06);
+}
+
+.stepState {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.stepStateActive {
+  background: rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  color: #0f172a;
+}
+
+.stepStateDone {
+  background: rgba(34, 197, 94, 0.10);
+  border: 1px solid rgba(34, 197, 94, 0.16);
+  color: #166534;
+}
+
+.stepStateIdle {
+  background: rgba(148, 163, 184, 0.10);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  color: #64748b;
 }
 
 .progressTitle {
   font-size: 0.9rem;
   font-weight: 700;
-  color: #fff;
+  color: #0f172a;
   font-family: 'Syne', system-ui, sans-serif;
 }
 
 .progressDesc {
   font-size: 0.76rem;
-  color: #b8b8c5;
+  color: #64748b;
 }
 
 .helperCard {
   display: flex;
   gap: 14px;
   align-items: flex-start;
-  background: rgba(23, 23, 30, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 18px;
   padding: 18px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
@@ -281,9 +266,9 @@
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background: rgba(255, 20, 147, 0.12);
-  border: 1px solid rgba(255, 20, 147, 0.24);
-  color: #ff69b4;
+  background: rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  color: #334155;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -295,22 +280,22 @@
   font-family: 'Syne', system-ui, sans-serif;
   font-size: 0.92rem;
   font-weight: 700;
-  color: #fff;
+  color: #0f172a;
 }
 
 .helperText {
   margin: 0;
   font-size: 0.84rem;
-  color: #b8b8c5;
+  color: #64748b;
   line-height: 1.65;
 }
 
 .formCard {
-  background: rgba(15, 15, 21, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 26px;
   padding: 32px;
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.32);
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.12);
   backdrop-filter: blur(10px);
   position: relative;
   overflow: hidden;
@@ -323,7 +308,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #ff1493, transparent);
+  background: linear-gradient(90deg, transparent, #334155, transparent);
 }
 
 .formCardHeader {
@@ -339,16 +324,16 @@
   font-weight: 800;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: #ff69b4;
-  background: rgba(255, 20, 147, 0.12);
-  border: 1px solid rgba(255, 20, 147, 0.24);
+  color: #334155;
+  background: rgba(15, 23, 42, 0.05);
+  border: 1px solid rgba(15, 23, 42, 0.10);
   border-radius: 999px;
   padding: 4px 12px;
 }
 
 .formCardCaption {
   font-size: 0.84rem;
-  color: #b8b8c5;
+  color: #64748b;
   font-weight: 500;
 }
 
@@ -367,7 +352,7 @@
 .fieldLabel {
   font-size: 0.84rem;
   font-weight: 700;
-  color: #fff;
+  color: #0f172a;
 }
 
 .inputWrap {
@@ -379,7 +364,7 @@
 .inputIcon {
   position: absolute;
   left: 14px;
-  color: #b8b8c5;
+  color: #64748b;
   display: flex;
   align-items: center;
   pointer-events: none;
@@ -389,10 +374,10 @@
 
 .inputWrap input {
   width: 100%;
-  border: 1.5px solid rgba(255, 255, 255, 0.09);
+  border: 1.5px solid rgba(15, 23, 42, 0.10);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.04);
-  color: #fff;
+  background: #ffffff;
+  color: #0f172a;
   padding: 16px 44px 16px 40px;
   font-size: 1rem;
   outline: none;
@@ -400,12 +385,12 @@
 }
 
 .inputWrap input::placeholder {
-  color: rgba(255, 255, 255, 0.34);
+  color: #94a3b8;
 }
 
 .inputWrap input:focus {
-  border-color: rgba(255, 20, 147, 0.55);
-  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(15, 23, 42, 0.28);
+  background: #ffffff;
   transform: translateY(-1px);
 }
 
@@ -457,7 +442,7 @@
   font-weight: 700;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: #b8b8c5;
+  color: #94a3b8;
   white-space: nowrap;
 }
 
@@ -466,7 +451,7 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.08);
 }
 
 .passwordGrid {
@@ -484,8 +469,8 @@
   height: 36px;
   border: 0;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  color: #b8b8c5;
+  background: rgba(15, 23, 42, 0.05);
+  color: #64748b;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -494,8 +479,8 @@
 }
 
 .eyeBtn:hover {
-  background: rgba(255, 20, 147, 0.14);
-  color: #ff69b4;
+  background: rgba(15, 23, 42, 0.10);
+  color: #0f172a;
 }
 
 .passwordToggleIcon {
@@ -505,7 +490,7 @@
 
 .strengthBar {
   height: 3px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.08);
   border-radius: 2px;
   overflow: hidden;
   margin-top: 2px;
@@ -570,10 +555,10 @@
   align-items: flex-start;
   gap: 10px;
   margin-top: 14px;
-  background: rgba(62, 19, 28, 0.75);
-  border: 1px solid rgba(255, 90, 95, 0.24);
+  background: rgba(255, 90, 95, 0.08);
+  border: 1px solid rgba(255, 90, 95, 0.16);
   border-radius: 14px;
-  color: #ffd6d7;
+  color: #991b1b;
   font-size: 0.86rem;
   font-weight: 600;
   padding: 13px 16px;

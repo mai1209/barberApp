@@ -194,7 +194,7 @@ const WEB_STYLE_PRESETS = {
 };
 
 const getWebStylePreset = (preset) =>
-  WEB_STYLE_PRESETS[preset] || WEB_STYLE_PRESETS.dark;
+  WEB_STYLE_PRESETS[preset] || WEB_STYLE_PRESETS.light;
 
 function formatTimeInShopTZ(value) {
   const parts = new Intl.DateTimeFormat("es-AR", {

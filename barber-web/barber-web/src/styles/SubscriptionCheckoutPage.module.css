@@ -1,9 +1,9 @@
 .screen {
   min-height: 100vh;
   background:
-    radial-gradient(circle at top right, rgba(255, 20, 147, 0.14), transparent 30%),
-    linear-gradient(180deg, #0a0a0f 0%, #050507 100%);
-  color: #fff;
+    radial-gradient(circle at top right, rgba(15, 23, 42, 0.06), transparent 34%),
+    linear-gradient(180deg, #f7f8fc 0%, #eef2f7 100%);
+  color: #0f172a;
   font-family: 'DM Sans', system-ui, sans-serif;
   position: relative;
   overflow-x: hidden;
@@ -16,8 +16,8 @@
   z-index: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(255, 20, 147, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 20, 147, 0.025) 1px, transparent 1px);
+    linear-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px);
   background-size: 64px 64px;
 }
 
@@ -26,7 +26,7 @@
   width: 640px;
   height: 640px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 20, 147, 0.14) 0%, transparent 68%);
+  background: radial-gradient(circle, rgba(15, 23, 42, 0.08) 0%, transparent 68%);
   top: -240px;
   right: -180px;
   pointer-events: none;
@@ -39,7 +39,7 @@
   width: 500px;
   height: 500px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(33, 192, 99, 0.1) 0%, transparent 68%);
+  background: radial-gradient(circle, rgba(100, 116, 139, 0.08) 0%, transparent 68%);
   bottom: -160px;
   left: -120px;
   pointer-events: none;
@@ -68,10 +68,10 @@
   justify-content: space-between;
   padding: 0 32px;
   height: 60px;
-  background: rgba(10, 10, 15, 0.84);
+  background: rgba(255, 255, 255, 0.86);
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .backBtn {
@@ -80,12 +80,12 @@
   gap: 6px;
   font-size: 0.84rem;
   font-weight: 700;
-  color: #f6b1d6;
+  color: #475569;
   transition: color 0.2s ease, transform 0.2s ease;
 }
 
 .backBtn:hover {
-  color: #fff;
+  color: #0f172a;
   transform: translateX(-1px);
 }
 
@@ -99,12 +99,12 @@
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: linear-gradient(135deg, #ff1493, #ff4db3);
+  background: linear-gradient(135deg, #0f172a, #334155);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  box-shadow: 0 2px 10px rgba(255, 20, 147, 0.28);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
 }
 
 .topBarName {
@@ -112,7 +112,7 @@
   font-weight: 800;
   font-size: 1rem;
   letter-spacing: -0.4px;
-  color: #fff;
+  color: #0f172a;
 }
 
 .layout {
@@ -145,7 +145,7 @@
   font-weight: 800;
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: #ff69b4;
+  color: #64748b;
   margin-bottom: 14px;
 }
 
@@ -155,13 +155,13 @@
   font-weight: 800;
   line-height: 0.93;
   letter-spacing: -3px;
-  color: #fff;
+  color: #0f172a;
   margin-bottom: 16px;
 }
 
 .titleAccent {
   display: block;
-  background: linear-gradient(130deg, #ff1493 0%, #ff6dc4 58%, #ff1493 100%);
+  background: linear-gradient(130deg, #0f172a 0%, #475569 58%, #0f172a 100%);
   background-size: 220% 220%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -181,7 +181,7 @@
 
 .subtitle {
   font-size: 0.98rem;
-  color: #b8b8c5;
+  color: #64748b;
   line-height: 1.7;
   max-width: 540px;
 }
@@ -194,9 +194,9 @@
 
 .planCard {
   border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(23, 23, 30, 0.95);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 22px 50px rgba(15, 23, 42, 0.10);
   padding: 22px 20px;
   text-align: left;
   cursor: pointer;
@@ -231,17 +231,17 @@
 }
 
 .planCard_basic.planCardActive {
-  border-color: rgba(255, 20, 147, 0.35);
+  border-color: rgba(15, 23, 42, 0.18);
   box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.28),
-    0 0 0 2px rgba(255, 20, 147, 0.2);
+    0 24px 60px rgba(15, 23, 42, 0.12),
+    0 0 0 2px rgba(15, 23, 42, 0.08);
 }
 
 .planCard_pro.planCardActive {
-  border-color: rgba(33, 192, 99, 0.35);
+  border-color: rgba(15, 23, 42, 0.18);
   box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.28),
-    0 0 0 2px rgba(33, 192, 99, 0.18);
+    0 24px 60px rgba(15, 23, 42, 0.12),
+    0 0 0 2px rgba(15, 23, 42, 0.08);
 }
 
 .planCard.planCardActive::before {
@@ -307,7 +307,7 @@
   font-family: 'Syne', system-ui, sans-serif;
   font-size: 1.25rem;
   font-weight: 800;
-  color: #fff;
+  color: #0f172a;
 }
 
 .planPricingRow {
@@ -327,16 +327,16 @@
 }
 
 .planPrice_basic {
-  color: #ff1493;
+  color: #0f172a;
 }
 
 .planPrice_pro {
-  color: #21c063;
+  color: #0f172a;
 }
 
 .planNote {
   font-size: 0.7rem;
-  color: #b3b3bf;
+  color: #64748b;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -344,16 +344,16 @@
 
 .planDescription {
   margin: 0;
-  color: #c6c6d0;
+  color: #64748b;
   line-height: 1.55;
   font-size: 0.84rem;
 }
 
 .formCard {
   border-radius: 26px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(23, 23, 30, 0.96);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.12);
   padding: 28px;
   position: relative;
   overflow: hidden;
@@ -369,7 +369,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #ff1493, transparent);
+  background: linear-gradient(90deg, transparent, #334155, transparent);
 }
 
 .formCardHeader {
@@ -384,16 +384,16 @@
   font-weight: 800;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: #ff69b4;
-  background: rgba(255, 20, 147, 0.12);
-  border: 1px solid rgba(255, 20, 147, 0.24);
+  color: #334155;
+  background: rgba(15, 23, 42, 0.05);
+  border: 1px solid rgba(15, 23, 42, 0.10);
   border-radius: 999px;
   padding: 4px 12px;
 }
 
 .formCardCaption {
   font-size: 0.84rem;
-  color: #b8b8c5;
+  color: #64748b;
   font-weight: 500;
 }
 
@@ -406,7 +406,7 @@
 .modeGroupLabel {
   font-size: 0.8rem;
   font-weight: 700;
-  color: #fff;
+  color: #0f172a;
 }
 
 .modeToggle {
@@ -422,9 +422,9 @@
   min-height: 42px;
   padding: 0 14px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(18, 18, 24, 0.92);
-  color: #d7d7e0;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  background: rgba(255, 255, 255, 0.94);
+  color: #475569;
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
@@ -433,23 +433,23 @@
 }
 
 .modeBtn:hover {
-  border-color: rgba(255, 20, 147, 0.3);
-  color: #fff;
+  border-color: rgba(15, 23, 42, 0.18);
+  color: #0f172a;
 }
 
 .modeBtnDot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.24);
+  background: rgba(15, 23, 42, 0.24);
   transition: background 0.2s ease, box-shadow 0.2s ease;
   flex-shrink: 0;
 }
 
 .modeBtnActive {
-  border-color: rgba(255, 20, 147, 0.35);
-  background: rgba(255, 20, 147, 0.14);
-  color: #fff;
+  border-color: rgba(15, 23, 42, 0.18);
+  background: rgba(15, 23, 42, 0.06);
+  color: #0f172a;
 }
 
 .modeBtnActive .modeBtnDot {
@@ -491,7 +491,7 @@
 
 .modeHelper {
   font-size: 0.8rem;
-  color: #a5a5b3;
+  color: #64748b;
   line-height: 1.6;
 }
 
@@ -499,11 +499,11 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  background: rgba(255, 138, 0, 0.08);
-  border: 1px solid rgba(255, 138, 0, 0.28);
+  background: rgba(245, 158, 11, 0.10);
+  border: 1px solid rgba(245, 158, 11, 0.18);
   border-radius: 14px;
   padding: 12px 14px;
-  color: #ffd7a1;
+  color: #92400e;
   font-size: 0.84rem;
   font-weight: 600;
   line-height: 1.55;
@@ -522,7 +522,7 @@
 }
 
 .fieldLabel {
-  color: #bcbccc;
+  color: #334155;
   font-size: 0.78rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -532,9 +532,9 @@
 .field input {
   height: 50px;
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(18, 18, 24, 0.92);
-  color: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  background: #ffffff;
+  color: #0f172a;
   padding: 0 14px;
   font-size: 0.96rem;
   outline: none;
@@ -542,12 +542,12 @@
 }
 
 .field input::placeholder {
-  color: rgba(255, 255, 255, 0.34);
+  color: #94a3b8;
 }
 
 .field input:focus {
-  border-color: rgba(255, 20, 147, 0.55);
-  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(15, 23, 42, 0.22);
+  background: #ffffff;
   transform: translateY(-1px);
 }
 
@@ -585,7 +585,7 @@
 
 .submitWarning {
   margin: -4px 0 0;
-  color: #d8b381;
+  color: #92400e;
   font-size: 0.88rem;
   line-height: 1.45;
   font-weight: 600;
@@ -613,15 +613,15 @@
 }
 
 .messageBox {
-  background: rgba(13, 54, 31, 0.65);
-  border: 1px solid rgba(33, 192, 99, 0.18);
-  color: #d7ffe5;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.16);
+  color: #166534;
 }
 
 .errorBox {
-  background: rgba(62, 19, 28, 0.75);
-  border: 1px solid rgba(255, 90, 95, 0.18);
-  color: #ffd6d8;
+  background: rgba(255, 90, 95, 0.08);
+  border: 1px solid rgba(255, 90, 95, 0.16);
+  color: #991b1b;
 }
 
 .cardDivider {
@@ -635,7 +635,7 @@
   font-weight: 700;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: #a5a5b3;
+  color: #94a3b8;
   white-space: nowrap;
 }
 
@@ -644,7 +644,7 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.08);
 }
 
 .whatsappRow {
@@ -657,7 +657,7 @@
 
 .whatsappHelper {
   font-size: 0.84rem;
-  color: #a5a5b3;
+  color: #64748b;
   line-height: 1.6;
   max-width: 240px;
 }
@@ -692,8 +692,8 @@
   gap: 14px;
   align-items: flex-start;
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(248, 250, 252, 0.96);
   padding: 18px;
 }
 
@@ -719,14 +719,14 @@
 
 .downloadTitle {
   margin: 0;
-  color: #fff;
+  color: #0f172a;
   font-size: 1rem;
   font-weight: 800;
 }
 
 .downloadText {
   margin: 0;
-  color: #b8b8c5;
+  color: #64748b;
   line-height: 1.6;
 }
 
@@ -739,9 +739,9 @@
 
 .storeBtn {
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  background: #ffffff;
+  color: #0f172a;
   font-weight: 800;
   min-height: 42px;
   padding: 0 16px;

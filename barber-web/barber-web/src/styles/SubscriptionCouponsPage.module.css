@@ -2,9 +2,9 @@
   min-height: 100vh;
   padding: 40px 20px 64px;
   background:
-    radial-gradient(circle at top right, rgba(255, 20, 147, 0.16), transparent 28%),
-    linear-gradient(180deg, #09090e 0%, #040406 100%);
-  color: #fff;
+    radial-gradient(circle at top right, rgba(15, 23, 42, 0.06), transparent 28%),
+    linear-gradient(180deg, #f7f8fc 0%, #eef2f7 100%);
+  color: #0f172a;
 }
 
 .hero {
@@ -14,7 +14,7 @@
 
 .eyebrow {
   margin: 0 0 10px;
-  color: #ff8ec9;
+  color: #64748b;
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 2px;
@@ -30,7 +30,7 @@
 .subtitle {
   margin: 0;
   max-width: 680px;
-  color: #c4c4cf;
+  color: #64748b;
   line-height: 1.6;
 }
 
@@ -46,8 +46,8 @@
   align-items: end;
   padding: 18px;
   border-radius: 24px;
-  background: rgba(12, 12, 18, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .field {
@@ -57,7 +57,7 @@
 }
 
 .field span {
-  color: #bcbccc;
+  color: #334155;
   font-size: 0.74rem;
   font-weight: 800;
   letter-spacing: 1px;
@@ -67,9 +67,9 @@
 .field input {
   height: 46px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(18, 18, 24, 0.92);
-  color: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  background: #ffffff;
+  color: #0f172a;
   padding: 0 14px;
   font-size: 0.96rem;
 }
@@ -95,9 +95,9 @@
   margin: 0 auto 18px;
   padding: 14px 16px;
   border-radius: 18px;
-  background: rgba(255, 90, 95, 0.12);
-  border: 1px solid rgba(255, 90, 95, 0.22);
-  color: #ffd7d8;
+  background: rgba(255, 90, 95, 0.08);
+  border: 1px solid rgba(255, 90, 95, 0.16);
+  color: #991b1b;
 }
 
 .summaryGrid {
@@ -111,13 +111,13 @@
 .summaryCard {
   padding: 16px;
   border-radius: 22px;
-  background: rgba(12, 12, 18, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .summaryLabel {
   display: block;
-  color: #a7a7b4;
+  color: #64748b;
   font-size: 0.82rem;
   margin-bottom: 10px;
 }
@@ -138,8 +138,8 @@
 .card {
   padding: 20px;
   border-radius: 24px;
-  background: rgba(12, 12, 18, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .emptyCard h2 {
@@ -148,7 +148,7 @@
 
 .emptyCard p {
   margin: 0;
-  color: #bdbdca;
+  color: #64748b;
   line-height: 1.6;
 }
 
@@ -167,7 +167,7 @@
 
 .cardMeta {
   margin: 0;
-  color: #b0b0bc;
+  color: #64748b;
 }
 
 .couponBadge {
@@ -193,14 +193,14 @@
 .detailItem {
   padding: 14px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(248, 250, 252, 0.96);
+  border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .detailLabel {
   display: block;
   margin-bottom: 8px;
-  color: #9999aa;
+  color: #94a3b8;
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;

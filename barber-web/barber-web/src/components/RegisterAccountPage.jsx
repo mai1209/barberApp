@@ -43,28 +43,16 @@ function buildPlansUrl(email) {
   return target.toString();
 }
 
-function StepDot({ n, active, done }) {
-  return (
-    <div
-      className={`${styles.stepDot} ${active ? styles.stepDotActive : ''} ${
-        done ? styles.stepDotDone : ''
-      }`}
-    >
-      {done ? (
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-          <path
-            d="M2 6l3 3 5-5"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ) : (
-        <span>{n}</span>
-      )}
-    </div>
-  );
+function StepState({ active, done }) {
+  if (done) {
+    return <span className={`${styles.stepState} ${styles.stepStateDone}`}>Listo</span>;
+  }
+
+  if (active) {
+    return <span className={`${styles.stepState} ${styles.stepStateActive}`}>En curso</span>;
+  }
+
+  return <span className={`${styles.stepState} ${styles.stepStateIdle}`}>Siguiente</span>;
 }
 
 export default function RegisterAccountPage() {
@@ -168,25 +156,22 @@ export default function RegisterAccountPage() {
 
             <div className={styles.progressSteps}>
               <div className={styles.progressItem}>
-                <StepDot n="1" active={!step1Done} done={step1Done} />
-                <div className={styles.progressLine} />
                 <div className={styles.progressLabel}>
+                  <StepState active={!step1Done} done={step1Done} />
                   <span className={styles.progressTitle}>Tu barbería</span>
                   <span className={styles.progressDesc}>Nombre del negocio</span>
                 </div>
               </div>
               <div className={styles.progressItem}>
-                <StepDot n="2" active={step1Done && !step2Done} done={step2Done} />
-                <div className={styles.progressLine} />
                 <div className={styles.progressLabel}>
+                  <StepState active={step1Done && !step2Done} done={step2Done} />
                   <span className={styles.progressTitle}>Acceso</span>
                   <span className={styles.progressDesc}>Email de ingreso</span>
                 </div>
               </div>
               <div className={styles.progressItem}>
-                <StepDot n="3" active={step2Done && !step3Done} done={step3Done} />
-                <div className={`${styles.progressLine} ${styles.progressLineLast}`} />
                 <div className={styles.progressLabel}>
+                  <StepState active={step2Done && !step3Done} done={step3Done} />
                   <span className={styles.progressTitle}>Seguridad</span>
                   <span className={styles.progressDesc}>Tu contraseña</span>
                 </div>

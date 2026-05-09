@@ -122,7 +122,26 @@ export function buildThemeFromConfig(
   });
 }
 
-const DEFAULT_THEME: Theme = {
+const LIGHT_DEFAULT_THEME: Theme = {
+  mode: 'light',
+  primary: '#111111',
+  secondary: '#334155',
+  background: 'transparent',
+  card: '#FFFFFF',
+  gradientColors: ['#FFFFFF', '#F8FAFC', '#EEF2F7', '#E2E8F0'],
+  logo: require('../assets/logo.png'),
+  surfaceAlt: '#F3F4F6',
+  input: '#FFFFFF',
+  border: 'rgba(15, 23, 42, 0.12)',
+  textPrimary: '#111827',
+  textSecondary: '#334155',
+  textMuted: '#64748B',
+  textOnPrimary: '#FFFFFF',
+  placeholder: '#94A3B8',
+  overlay: 'rgba(255,255,255,0.30)',
+};
+
+const CODEX_THEME: Theme = {
   mode: 'dark',
   primary: '#FF1493',
   secondary: '#FFFFFF',
@@ -141,30 +160,7 @@ const DEFAULT_THEME: Theme = {
   overlay: 'rgba(10,10,14,0.46)',
 };
 
-const themes: Record<string, Theme> = {
-  codex: DEFAULT_THEME,
-  orion: {
-    ...DEFAULT_THEME,
-  },
-  saiko: {
-    mode: 'dark',
-    primary: '#B07FFF',
-    secondary: '#3F15B1',
-    background: 'transparent',
-    card: '#1E1231',
-    gradientColors: ['#D8A6FF', '#B07FFF', '#6322D1', '#3F15B1'],
-    logo: require('../assets/LogoKevin.png'),
-    surfaceAlt: '#161616',
-    input: '#252525',
-    border: 'rgba(255,255,255,0.08)',
-    textPrimary: '#FFFFFF',
-    textSecondary: '#D1D5DB',
-    textMuted: '#8E8E8E',
-    textOnPrimary: '#FFFFFF',
-    placeholder: '#555555',
-    overlay: 'rgba(10,10,14,0.46)',
-  },
-};
+const DEFAULT_THEME: Theme = LIGHT_DEFAULT_THEME;
 
 type ThemeContextValue = {
   theme: Theme;
@@ -181,20 +177,18 @@ const ThemeContext = createContext<ThemeContextValue>({
 });
 
 function buildThemeFromProfile(profile: ThemeProfile | null) {
-  const normalizedSlug = (profile?.shopSlug ?? '').trim().toLowerCase();
-  const presetTheme = themes[normalizedSlug] ?? DEFAULT_THEME;
   const customTheme = profile?.themeConfig;
 
   if (!customTheme) {
     return {
       resolvedSlug: profile?.shopSlug ?? null,
-      resolvedTheme: presetTheme,
+      resolvedTheme: DEFAULT_THEME,
     };
   }
 
   return {
     resolvedSlug: profile?.shopSlug ?? null,
-    resolvedTheme: buildThemeFromConfig(presetTheme, customTheme),
+    resolvedTheme: buildThemeFromConfig(DEFAULT_THEME, customTheme),
   };
 }
 

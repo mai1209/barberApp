@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ActivityIndicator, Alert, Platform, View } from 'react-native'; 
 import { DarkTheme, NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import messaging from '@react-native-firebase/messaging';
@@ -19,20 +19,61 @@ import {
   resolvePostAuthRoute,
   resolveUserRole,
 } from './src/services/subscriptionAccess';
-import { ThemeProvider } from './src/context/ThemeContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
 export const navigationRef = createNavigationContainerRef();
 
-const appNavigationTheme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    background: '#020203',
-    card: '#020203',
-    border: '#11111A',
-    primary: '#4819AD',
-  },
-};
+function AppShell({
+  currentRouteName,
+  initialRouteName,
+  isSubscriptionLocked,
+  currentUser,
+  setCurrentRouteName,
+}: {
+  currentRouteName?: string;
+  initialRouteName: 'Login' | 'Home' | 'Barber-Home' | 'Subscription-Settings';
+  isSubscriptionLocked: boolean;
+  currentUser: any | null;
+  setCurrentRouteName: (value: string | undefined) => void;
+}) {
+  const { theme } = useTheme();
+  const appNavigationTheme = useMemo(
+    () => ({
+      ...DarkTheme,
+      colors: {
+        ...DarkTheme.colors,
+        background: theme.mode === 'light' ? '#F8FAFC' : '#020203',
+        card: theme.mode === 'light' ? '#FFFFFF' : '#020203',
+        border: theme.mode === 'light' ? 'rgba(15, 23, 42, 0.12)' : '#11111A',
+        primary: theme.primary,
+        text: theme.textPrimary,
+      },
+    }),
+    [theme],
+  );
+
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.mode === 'light' ? '#F8FAFC' : '#020203' }}>
+      <NavigationContainer
+        theme={appNavigationTheme}
+        ref={navigationRef}
+        onReady={() => {
+          setCurrentRouteName(navigationRef.getCurrentRoute()?.name);
+        }}
+        onStateChange={() => {
+          setCurrentRouteName(navigationRef.getCurrentRoute()?.name);
+        }}
+      >
+        <StackNavigator
+          currentRouteName={currentRouteName}
+          initialRouteName={initialRouteName}
+          isSubscriptionLocked={isSubscriptionLocked}
+          currentUserRole={resolveUserRole(currentUser)}
+        />
+      </NavigationContainer>
+    </View>
+  );
+}
 
 export default function App() {
   const [currentRouteName, setCurrentRouteName] = useState<string | undefined>();
@@ -161,16 +202,7 @@ useEffect(() => {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ThemeProvider>
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: '#020203',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <ActivityIndicator size="large" color="#B89016" />
-          </View>
+          <BootLoading />
         </ThemeProvider>
       </GestureHandlerRootView>
     );
@@ -181,26 +213,31 @@ useEffect(() => {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
-        <View style={{ flex: 1, backgroundColor: '#020203' }}>
-          <NavigationContainer
-            theme={appNavigationTheme}
-            ref={navigationRef}
-            onReady={() => {
-              setCurrentRouteName(navigationRef.getCurrentRoute()?.name);
-            }}
-            onStateChange={() => {
-              setCurrentRouteName(navigationRef.getCurrentRoute()?.name);
-            }}
-          >
-            <StackNavigator
-              currentRouteName={currentRouteName}
-              initialRouteName={initialRouteName}
-              isSubscriptionLocked={isSubscriptionLocked}
-              currentUserRole={resolveUserRole(currentUser)}
-            />
-          </NavigationContainer>
-        </View>
+        <AppShell
+          currentRouteName={currentRouteName}
+          initialRouteName={initialRouteName}
+          isSubscriptionLocked={isSubscriptionLocked}
+          currentUser={currentUser}
+          setCurrentRouteName={setCurrentRouteName}
+        />
       </ThemeProvider>
     </GestureHandlerRootView>
+  );
+}
+
+function BootLoading() {
+  const { theme } = useTheme();
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: theme.mode === 'light' ? '#F8FAFC' : '#020203',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <ActivityIndicator size="large" color={theme.primary} />
+    </View>
   );
 }
