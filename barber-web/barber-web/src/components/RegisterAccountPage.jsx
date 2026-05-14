@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { registerPublicAccount } from '../services/api';
 import styles from '../styles/RegisterAccountPage.module.css';
+import { DEFAULT_DOMAIN_BRANDING } from '../config/domainBranding';
 
 function EyeIcon({ visible }) {
   return (
@@ -34,9 +35,9 @@ function EyeIcon({ visible }) {
   );
 }
 
-function buildPlansUrl(email) {
+function buildPlansUrl(email, branding) {
   const trimmedEmail = String(email || '').trim().toLowerCase();
-  const target = new URL('/planes', window.location.origin);
+  const target = new URL(branding?.plansPath || '/planes', window.location.origin);
   if (trimmedEmail) {
     target.searchParams.set('email', trimmedEmail);
   }
@@ -55,7 +56,9 @@ function StepState({ active, done }) {
   return <span className={`${styles.stepState} ${styles.stepStateIdle}`}>Siguiente</span>;
 }
 
-export default function RegisterAccountPage() {
+export default function RegisterAccountPage({
+  branding = DEFAULT_DOMAIN_BRANDING,
+}) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -100,7 +103,7 @@ export default function RegisterAccountPage() {
         email: email.trim().toLowerCase(),
         password,
       });
-      window.location.assign(buildPlansUrl(email));
+      window.location.assign(buildPlansUrl(email, branding));
     } catch (err) {
       setError(err.message || 'No pudimos crear la cuenta.');
     } finally {
@@ -136,22 +139,21 @@ export default function RegisterAccountPage() {
               <rect x="8" y="8" width="5" height="5" rx="1.5" fill="currentColor" fillOpacity="0.9" />
             </svg>
           </div>
-          <span className={styles.topBarName}>BarberApp</span>
+          <span className={styles.topBarName}>{branding.register.topBarName}</span>
         </div>
       </header>
 
       <div className={styles.layout}>
         <aside className={styles.leftPanel}>
           <div className={styles.leftPanelInner}>
-            <p className={styles.eyebrow}>ALTA BARBERAPP</p>
+            <p className={styles.eyebrow}>{branding.register.eyebrow}</p>
             <h1 className={styles.title}>
-              Creá tu cuenta
+              {branding.register.title}
               <br />
-              <span className={styles.titleAccent}>y seguí con el plan.</span>
+              <span className={styles.titleAccent}>{branding.register.accent}</span>
             </h1>
             <p className={styles.subtitle}>
-              Primero registrás tu barbería. Después elegís el plan y completás el pago desde la
-              web.
+              {branding.register.subtitle}
             </p>
 
             <div className={styles.progressSteps}>
@@ -191,10 +193,9 @@ export default function RegisterAccountPage() {
                 </svg>
               </div>
               <div>
-                <p className={styles.helperTitle}>Qué pasa después</p>
+                <p className={styles.helperTitle}>{branding.register.helperTitle}</p>
                 <p className={styles.helperText}>
-                  Al terminar este paso te llevamos a la pantalla de planes con el email ya cargado
-                  para que sigas con la activación.
+                  {branding.register.helperText}
                 </p>
               </div>
             </div>

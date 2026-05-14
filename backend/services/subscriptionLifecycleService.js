@@ -88,7 +88,19 @@ function buildSubscriptionMailHtml({
 function buildPushPayload({ title, body }) {
   return {
     notification: { title, body },
-    android: { priority: "high" },
+    android: {
+      priority: "high",
+      notification: {
+        sound: "default",
+      },
+    },
+    apns: {
+      payload: {
+        aps: {
+          sound: "default",
+        },
+      },
+    },
   };
 }
 

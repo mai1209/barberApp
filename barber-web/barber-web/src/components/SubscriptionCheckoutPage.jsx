@@ -5,10 +5,7 @@ import {
   fetchPlanPricing,
 } from '../services/api';
 import styles from '../styles/SubscriptionCheckoutPage.module.css';
-
-const APP_STORE_URL = 'https://apps.apple.com';
-const PLAY_STORE_URL =
-  'https://play.google.com/store/apps/details?id=com.barberAppByCodex.hub';
+import { DEFAULT_DOMAIN_BRANDING } from '../config/domainBranding';
 
 const PLAN_META = {
   basic: {
@@ -81,7 +78,9 @@ function PlayIcon() {
   );
 }
 
-export default function SubscriptionCheckoutPage() {
+export default function SubscriptionCheckoutPage({
+  branding = DEFAULT_DOMAIN_BRANDING,
+}) {
   const [selectedPlan, setSelectedPlan] = useState(getInitialPlan);
   const [paymentMode, setPaymentMode] = useState(getInitialPaymentMode);
   const [email, setEmail] = useState(getInitialEmail);
@@ -240,22 +239,21 @@ export default function SubscriptionCheckoutPage() {
               />
             </svg>
           </div>
-          <span className={styles.topBarName}>BarberApp</span>
+          <span className={styles.topBarName}>{branding.checkout.topBarName}</span>
         </div>
       </header>
 
       <div className={styles.layout}>
         <section className={styles.leftCol}>
-          <div className={styles.heroBlock}>
-            <p className={styles.eyebrow}>PLANES BARBERAPP</p>
+            <div className={styles.heroBlock}>
+            <p className={styles.eyebrow}>{branding.checkout.eyebrow}</p>
             <h1 className={styles.title}>
-              Alta o renovación
+              {branding.checkout.title}
               <br />
-              <span className={styles.titleAccent}>de plan.</span>
+              <span className={styles.titleAccent}>{branding.checkout.accent}</span>
             </h1>
             <p className={styles.subtitle}>
-              Completá el email de la cuenta y elegí el plan. Si tu cuenta tiene precio especial o
-              descuento, se va a aplicar automáticamente en el checkout.
+              {branding.checkout.subtitle}
             </p>
           </div>
 
@@ -414,7 +412,7 @@ export default function SubscriptionCheckoutPage() {
                 WhatsApp.
               </p>
               <a
-                href="https://wa.me/543425543308?text=Hola%20quiero%20consultar%20por%20mi%20plan%20de%20BarberApp"
+                href={branding.whatsappHref}
                 className={styles.whatsappBtn}
                 target="_blank"
                 rel="noreferrer"
@@ -448,11 +446,11 @@ export default function SubscriptionCheckoutPage() {
                   a usar tu barbería desde el celular.
                 </p>
                 <div className={styles.storeButtons}>
-                  <a href={APP_STORE_URL} target="_blank" rel="noreferrer" className={styles.storeBtn}>
+                  <a href={branding.appStoreUrl} target="_blank" rel="noreferrer" className={styles.storeBtn}>
                     <AppleIcon />
                     App Store
                   </a>
-                  <a href={PLAY_STORE_URL} target="_blank" rel="noreferrer" className={styles.storeBtn}>
+                  <a href={branding.playStoreUrl} target="_blank" rel="noreferrer" className={styles.storeBtn}>
                     <PlayIcon />
                     Google Play
                   </a>

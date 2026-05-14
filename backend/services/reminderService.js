@@ -7,15 +7,20 @@ import { SHOP_TIME_ZONE, getTimeZoneLabel } from "../utils/timezone.js";
 import { buildAppointmentCancellationWhatsAppUrl } from "../utils/whatsapp.js";
 import { resolveAssignedBarberPushTarget } from "../utils/pushRecipients.js";
 
-function getNotificationSettings(userDoc) {
+function getCustomerNotificationSettings(userDoc) {
+  return {
+    customerSameDayEmailEnabled:
+      userDoc?.notificationSettings?.customerSameDayEmailEnabled !== false,
+  };
+}
+
+function getBarberNotificationSettings(userDoc) {
   return {
     barberReminderEnabled:
       userDoc?.notificationSettings?.barberReminderEnabled !== false,
     barberReminderMinutesBefore: Number(
       userDoc?.notificationSettings?.barberReminderMinutesBefore || 60,
     ),
-    customerSameDayEmailEnabled:
-      userDoc?.notificationSettings?.customerSameDayEmailEnabled !== false,
   };
 }
 
@@ -164,7 +169,8 @@ export async function processAppointmentReminders({ now = new Date() } = {}) {
 
     if (!userDoc || userDoc.isActive === false) continue;
 
-    const settings = getNotificationSettings(userDoc);
+    const customerSettings = getCustomerNotificationSettings(userDoc);
+    const barberSettings = getBarberNotificationSettings(pushTarget?.barberUser);
     const appointmentDate = new Date(appointment.startTime);
     const timeLabel = appointmentDate.toLocaleTimeString("es-AR", {
       hour: "2-digit",
@@ -182,7 +188,7 @@ export async function processAppointmentReminders({ now = new Date() } = {}) {
     if (
       canSendBarberReminder({
         appointment,
-        settings,
+        settings: barberSettings,
         pushToken: pushTarget?.token,
         now,
       })
@@ -196,6 +202,16 @@ export async function processAppointmentReminders({ now = new Date() } = {}) {
           },
           android: {
             priority: "high",
+            notification: {
+              sound: "default",
+            },
+          },
+          apns: {
+            payload: {
+              aps: {
+                sound: "default",
+              },
+            },
           },
         });
 
@@ -209,7 +225,7 @@ export async function processAppointmentReminders({ now = new Date() } = {}) {
       }
     }
 
-    if (canSendCustomerReminder({ appointment, settings, now })) {
+    if (canSendCustomerReminder({ appointment, settings: customerSettings, now })) {
       try {
         await sendAppMail({
           to: appointment.customerEmail,

@@ -19,6 +19,7 @@ import {
   KeyRound,
   LogOut,
   Mail,
+  MapPin,
   MessageCircle,
   Palette,
   ShieldCheck,
@@ -210,6 +211,15 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
               label="Cerrar barbería por día"
               description="Bloqueá una fecha puntual para que la web no tome turnos."
               onPress={() => navigation.navigate('Shop-Closure-Settings')}
+              theme={theme}
+              styles={styles}
+            />
+            <View style={styles.separator} />
+            <MenuItem
+              icon={MapPin}
+              label="Perfil público del local"
+              description="Dirección, links de Google Maps, reseñas, Instagram y datos visibles en la web."
+              onPress={() => navigation.navigate('Public-Profile-Settings')}
               theme={theme}
               styles={styles}
             />

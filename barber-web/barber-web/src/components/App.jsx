@@ -11,6 +11,8 @@ import PrivacyPolicyPage from './PrivacyPolicyPage';
 import AccountDeletionPage from './AccountDeletionPage';
 import RegisterAccountPage from './RegisterAccountPage';
 import SupportPage from './SupportPage';
+import { resolveDomainBranding } from '../config/domainBranding';
+import RichBarbershopLanding from './RichBarbershopLanding';
 //import landingStyles from '../styles/LandingPage.module.css';
 
 
@@ -26,7 +28,14 @@ function sanitizeSlug(value) {
   );
 }
 
-function resolveInitialSlug() {
+function sanitizePath(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\/+|\/+$/g, '');
+}
+
+function resolveInitialSlug(branding, internalPage) {
   const fromEnv = sanitizeSlug(process.env.REACT_APP_SHOP_SLUG);
   if (fromEnv) return fromEnv;
 
@@ -36,14 +45,28 @@ function resolveInitialSlug() {
     sanitizeSlug(url.searchParams.get('barberia'));
   if (querySlug) return querySlug;
 
+  const bookingPath = sanitizePath(branding?.bookingPath);
+  if (internalPage === 'booking' && branding?.shopSlug) {
+    return sanitizeSlug(branding.shopSlug);
+  }
+
   const [firstSegment] = url.pathname.replace(/^\/+|\/+$/g, '').split('/');
+  if (sanitizePath(firstSegment) === bookingPath) {
+    return sanitizeSlug(branding?.shopSlug);
+  }
   return sanitizeSlug(firstSegment);
 }
 
-function resolveInternalPage() {
+function resolveInternalPage(branding) {
   const url = new URL(window.location.href);
   const pathname = url.pathname.replace(/^\/+|\/+$/g, '');
   const segments = pathname ? pathname.split('/') : [];
+  const bookingPath = sanitizePath(branding?.bookingPath);
+  const brandOverride = url.searchParams.get('brand');
+
+  if ((branding?.isCustomDomain || brandOverride) && pathname === bookingPath) {
+    return 'booking';
+  }
 
   if (pathname === 'admin' || pathname === 'admin/subscriptions') {
     return 'subscription-admin';
@@ -86,6 +109,7 @@ function resolveInternalPage() {
   }
 
   if (
+    segments[0] === bookingPath ||
     segments[0] === 'admin' ||
     segments[0] === 'planes' ||
     segments[0] === 'suscripcion' ||
@@ -111,10 +135,25 @@ function resolveInternalPage() {
   return null;
 }
 
+function renderLandingByBranding(branding) {
+  if (branding.customLanding === 'rich-barbershop') {
+    return <RichBarbershopLanding branding={branding} />;
+  }
+
+  return <LandingPage branding={branding} />;
+}
+
 
 function App() {
-  const [internalPage] = useState(() => resolveInternalPage());
-  const [shopSlug] = useState(() => resolveInitialSlug());
+  const [branding] = useState(() => {
+    const url = new URL(window.location.href);
+    return resolveDomainBranding(
+      window.location.hostname,
+      url.searchParams.get('brand'),
+    );
+  });
+  const [internalPage] = useState(() => resolveInternalPage(branding));
+  const [shopSlug] = useState(() => resolveInitialSlug(branding, internalPage));
   const [missingShop, setMissingShop] = useState(false);
 
   if (internalPage === 'subscription-admin') {
@@ -126,11 +165,11 @@ function App() {
   }
 
   if (internalPage === 'subscription-checkout') {
-    return <SubscriptionCheckoutPage />;
+    return <SubscriptionCheckoutPage branding={branding} />;
   }
 
   if (internalPage === 'register-account') {
-    return <RegisterAccountPage />;
+    return <RegisterAccountPage branding={branding} />;
   }
 
   if (internalPage === 'privacy-policy') {
@@ -152,13 +191,17 @@ function App() {
   if (shopSlug) registerShopSlug(shopSlug);
 
   if (!shopSlug) {
-    return <LandingPage />;  // ← sin el main wrapper
+    return renderLandingByBranding(branding);  // ← sin el main wrapper
   }
 
   return (
     <main className={styles.app}>
       <div className={styles.glow} aria-hidden="true" />
-      <BookingForm shopSlug={shopSlug} onNotFound={() => setMissingShop(true)} />
+      <BookingForm
+        shopSlug={shopSlug}
+        branding={branding}
+        onNotFound={() => setMissingShop(true)}
+      />
     </main>
   );
 }

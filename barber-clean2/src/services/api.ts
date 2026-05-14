@@ -239,6 +239,19 @@ export type BarberProfileSettings = {
   barberSelfEditEnabled?: boolean;
 };
 
+export type PublicProfileSettings = {
+  subtitle?: string;
+  address?: string;
+  phone?: string;
+  googleMapsUrl?: string;
+  googleReviewsUrl?: string;
+  googlePlaceId?: string;
+  googleRating?: number | null;
+  googleReviewCount?: number | null;
+  instagramUrl?: string;
+  linktreeUrl?: string;
+};
+
 export type ShopClosedDay = {
   date: string;
   message?: string | null;
@@ -335,6 +348,14 @@ export function updateNotificationSettings(payload: NotificationSettings) {
 
 export function updateBarberProfileSettings(payload: BarberProfileSettings) {
   return request<{ message: string; user: any }>("/api/auth/barber-profile-settings", {
+    method: "PUT",
+    body: payload,
+    auth: true,
+  });
+}
+
+export function updatePublicProfileSettings(payload: PublicProfileSettings) {
+  return request<{ message: string; user: any }>("/api/auth/public-profile", {
     method: "PUT",
     body: payload,
     auth: true,

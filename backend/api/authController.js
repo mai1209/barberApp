@@ -166,6 +166,23 @@ function sanitizeStoreSubscriptionSyncInput(input) {
   };
 }
 
+function hasFutureAccessWindow(subscription) {
+  if (!subscription?.expiresAt) return true;
+  const expiresAt = new Date(subscription.expiresAt);
+  if (Number.isNaN(expiresAt.getTime())) return true;
+  return expiresAt.getTime() > Date.now();
+}
+
+function hasWebManagedAccess(subscription) {
+  const provider = String(subscription?.provider || "").trim().toLowerCase();
+  const status = String(subscription?.status || "").trim().toLowerCase();
+
+  if (["apple", "google"].includes(provider)) return false;
+  if (!["active", "trial"].includes(status)) return false;
+
+  return hasFutureAccessWindow(subscription);
+}
+
 function slugify(value) {
   return String(value ?? "")
     .normalize("NFD")
@@ -188,6 +205,21 @@ function normalizeHexColor(value) {
 
   const normalized = raw.startsWith("#") ? raw : `#${raw}`;
   return /^#[0-9a-fA-F]{6}$/.test(normalized) ? normalized.toUpperCase() : null;
+}
+
+function sanitizeOptionalUrl(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+
+  try {
+    const normalized = raw.startsWith("http://") || raw.startsWith("https://")
+      ? raw
+      : `https://${raw}`;
+    const parsed = new URL(normalized);
+    return ["http:", "https:"].includes(parsed.protocol) ? parsed.toString() : "";
+  } catch (_error) {
+    return "";
+  }
 }
 
 function buildPasswordResetCode() {
@@ -982,6 +1014,82 @@ function sanitizeShopClosedDaysInput(input) {
   };
 }
 
+function sanitizePublicProfileInput(input) {
+  if (!input || typeof input !== "object") {
+    return { updates: {}, hasAnyField: false };
+  }
+
+  const fields = [
+    "subtitle",
+    "address",
+    "phone",
+    "googleMapsUrl",
+    "googleReviewsUrl",
+    "googlePlaceId",
+    "googleRating",
+    "googleReviewCount",
+    "instagramUrl",
+    "linktreeUrl",
+  ];
+
+  const hasAnyField = fields.some((field) =>
+    Object.prototype.hasOwnProperty.call(input, field),
+  );
+
+  if (!hasAnyField) {
+    return { updates: {}, hasAnyField: false };
+  }
+
+  const updates = {};
+
+  if (Object.prototype.hasOwnProperty.call(input, "subtitle")) {
+    updates.subtitle = String(input.subtitle ?? "").trim().slice(0, 140);
+  }
+  if (Object.prototype.hasOwnProperty.call(input, "address")) {
+    updates.address = String(input.address ?? "").trim().slice(0, 180);
+  }
+  if (Object.prototype.hasOwnProperty.call(input, "phone")) {
+    updates.phone = String(input.phone ?? "").trim().slice(0, 60);
+  }
+  if (Object.prototype.hasOwnProperty.call(input, "googleMapsUrl")) {
+    updates.googleMapsUrl = sanitizeOptionalUrl(input.googleMapsUrl);
+  }
+  if (Object.prototype.hasOwnProperty.call(input, "googleReviewsUrl")) {
+    updates.googleReviewsUrl = sanitizeOptionalUrl(input.googleReviewsUrl);
+  }
+  if (Object.prototype.hasOwnProperty.call(input, "googlePlaceId")) {
+    updates.googlePlaceId = String(input.googlePlaceId ?? "").trim().slice(0, 120);
+  }
+  if (Object.prototype.hasOwnProperty.call(input, "googleRating")) {
+    const nextValue =
+      input.googleRating === "" || input.googleRating == null
+        ? null
+        : Number(input.googleRating);
+    if (nextValue != null && (!Number.isFinite(nextValue) || nextValue < 0 || nextValue > 5)) {
+      throw new Error("La valoración de Google debe estar entre 0 y 5.");
+    }
+    updates.googleRating = nextValue;
+  }
+  if (Object.prototype.hasOwnProperty.call(input, "googleReviewCount")) {
+    const nextValue =
+      input.googleReviewCount === "" || input.googleReviewCount == null
+        ? null
+        : Number(input.googleReviewCount);
+    if (nextValue != null && (!Number.isFinite(nextValue) || nextValue < 0)) {
+      throw new Error("La cantidad de reseñas de Google debe ser 0 o mayor.");
+    }
+    updates.googleReviewCount = nextValue == null ? null : Math.round(nextValue);
+  }
+  if (Object.prototype.hasOwnProperty.call(input, "instagramUrl")) {
+    updates.instagramUrl = sanitizeOptionalUrl(input.instagramUrl);
+  }
+  if (Object.prototype.hasOwnProperty.call(input, "linktreeUrl")) {
+    updates.linktreeUrl = sanitizeOptionalUrl(input.linktreeUrl);
+  }
+
+  return { updates, hasAnyField: true };
+}
+
 async function buildAvailableSlug(baseValue) {
   const base = baseValue || "barberia";
   let candidate = base;
@@ -1004,7 +1112,7 @@ async function buildAuthUserResponse(userDoc) {
     _id: resolveEffectiveOwnerId(userDoc),
     isActive: true,
   })
-    .select({ shopSlug: 1, subscription: 1, themeConfig: 1, barberProfileSettings: 1 })
+    .select({ shopSlug: 1, subscription: 1, themeConfig: 1, barberProfileSettings: 1, publicProfile: 1 })
     .lean();
 
   if (ownerDoc?.shopSlug) {
@@ -1021,6 +1129,10 @@ async function buildAuthUserResponse(userDoc) {
 
   if (ownerDoc?.barberProfileSettings) {
     userResponse.barberProfileSettings = ownerDoc.barberProfileSettings;
+  }
+
+  if (ownerDoc?.publicProfile) {
+    userResponse.publicProfile = ownerDoc.publicProfile;
   }
 
   return userResponse;
@@ -1209,6 +1321,13 @@ export async function syncStoreSubscription(req, res, next) {
 
     const nextStatus = status === "cancelled" ? "cancelled" : status === "past_due" ? "past_due" : "active";
     const startedAt = userDoc.subscription?.startedAt || new Date();
+
+    if (hasWebManagedAccess(userDoc.subscription) && (nextStatus === "active" || nextStatus === "past_due")) {
+      return res.status(409).json({
+        error:
+          "Esta cuenta ya tiene un plan web activo. No sincronizamos la suscripción del store para evitar pisar o duplicar la suscripción actual.",
+      });
+    }
 
     userDoc.subscription = {
       ...(userDoc.subscription?.toObject?.() ?? userDoc.subscription ?? {}),
@@ -1829,6 +1948,42 @@ export async function updateShopClosedDays(req, res, next) {
 
     return res.json({
       message: "Los cierres del local se guardaron correctamente.",
+      user: userDoc.toJSON(),
+    });
+  } catch (err) {
+    if (err instanceof Error) {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
+}
+
+export async function updatePublicProfile(req, res, next) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    const userDoc = await UserModel.findById(userId);
+    if (!userDoc || userDoc.isActive === false) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
+    }
+
+    const { updates, hasAnyField } = sanitizePublicProfileInput(req.body ?? {});
+    if (!hasAnyField) {
+      return res.status(400).json({ error: "No llegaron cambios del perfil público para guardar." });
+    }
+
+    userDoc.publicProfile = {
+      ...(userDoc.publicProfile?.toObject?.() ?? userDoc.publicProfile ?? {}),
+      ...updates,
+    };
+
+    await userDoc.save();
+
+    return res.json({
+      message: "Perfil público guardado correctamente",
       user: userDoc.toJSON(),
     });
   } catch (err) {

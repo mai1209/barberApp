@@ -115,6 +115,7 @@ function sanitizeShop(shop) {
   if (!shop) return null;
   const paymentSettings = shop.paymentSettings || {};
   const themeConfig = shop.themeConfig || {};
+  const publicProfile = shop.publicProfile || {};
   return {
     _id: shop._id.toString(),
     name: shop.fullName,
@@ -144,6 +145,22 @@ function sanitizeShop(shop) {
       mercadoPagoConnectionStatus:
         paymentSettings.mercadoPagoConnectionStatus || "disconnected",
     },
+    publicProfile: {
+      subtitle: publicProfile.subtitle || "",
+      address: publicProfile.address || "",
+      phone: publicProfile.phone || "",
+      googleMapsUrl: publicProfile.googleMapsUrl || "",
+      googleReviewsUrl: publicProfile.googleReviewsUrl || "",
+      googlePlaceId: publicProfile.googlePlaceId || "",
+      googleRating:
+        publicProfile.googleRating == null ? null : Number(publicProfile.googleRating),
+      googleReviewCount:
+        publicProfile.googleReviewCount == null
+          ? null
+          : Number(publicProfile.googleReviewCount),
+      instagramUrl: publicProfile.instagramUrl || "",
+      linktreeUrl: publicProfile.linktreeUrl || "",
+    },
     shopClosedDays: normalizeShopClosedDays(shop.shopClosedDays),
   };
 }
@@ -169,6 +186,33 @@ function normalizePaymentMethod(value) {
 function normalizePublicPlan(value) {
   const normalized = String(value || "").trim().toLowerCase();
   return ["basic", "pro"].includes(normalized) ? normalized : null;
+}
+
+function hasFutureAccessWindow(subscription) {
+  if (!subscription?.expiresAt) return true;
+  const expiresAt = new Date(subscription.expiresAt);
+  if (Number.isNaN(expiresAt.getTime())) return true;
+  return expiresAt.getTime() > Date.now();
+}
+
+function hasStoreManagedAccess(subscription) {
+  const provider = String(subscription?.provider || "").trim().toLowerCase();
+  const status = String(subscription?.status || "").trim().toLowerCase();
+
+  if (!["apple", "google"].includes(provider)) return false;
+  if (!["active", "past_due", "trial"].includes(status)) return false;
+
+  return hasFutureAccessWindow(subscription);
+}
+
+function hasWebManagedAccess(subscription) {
+  const provider = String(subscription?.provider || "").trim().toLowerCase();
+  const status = String(subscription?.status || "").trim().toLowerCase();
+
+  if (["apple", "google"].includes(provider)) return false;
+  if (!["active", "trial"].includes(status)) return false;
+
+  return hasFutureAccessWindow(subscription);
 }
 
 async function findValidSubscriptionCoupon({ couponCode, plan }) {
@@ -468,6 +512,20 @@ export async function publicCreateSubscriptionCheckout(req, res, next) {
       });
     }
 
+    if (hasStoreManagedAccess(userDoc.subscription)) {
+      return res.status(409).json({
+        error:
+          "Esta cuenta ya tiene una suscripción iniciada desde App Store o Google Play. Terminá de gestionarla desde la tienda para evitar doble cobro.",
+      });
+    }
+
+    if (hasWebManagedAccess(userDoc.subscription)) {
+      return res.status(409).json({
+        error:
+          "Esta cuenta ya tiene un plan web activo. No generamos otro checkout para evitar cobros duplicados.",
+      });
+    }
+
     const pricingDoc = await getOrCreatePlanPricing();
     const pricing = serializePlanPricing(pricingDoc);
     const coupon = couponCode
@@ -600,6 +658,20 @@ export async function publicCreateRecurringSubscriptionCheckout(req, res, next) 
     if (!userDoc) {
       return res.status(404).json({
         error: "No encontramos una cuenta activa con ese email.",
+      });
+    }
+
+    if (hasStoreManagedAccess(userDoc.subscription)) {
+      return res.status(409).json({
+        error:
+          "Esta cuenta ya tiene una suscripción iniciada desde App Store o Google Play. Terminá de gestionarla desde la tienda para evitar doble cobro.",
+      });
+    }
+
+    if (hasWebManagedAccess(userDoc.subscription)) {
+      return res.status(409).json({
+        error:
+          "Esta cuenta ya tiene un plan web activo. No configuramos otra renovación para evitar cobros duplicados.",
       });
     }
 
@@ -1016,7 +1088,19 @@ export async function publicCreateAppointment(req, res, next) {
                 ? `${customerName} inició ${resolvedServices.serviceLabel} con ${barber.fullName} el ${dateLabel} a las ${timeLabel} desde la web. Esperando pago.`
                 : `${customerName} reservó ${resolvedServices.serviceLabel} con ${barber.fullName} el ${dateLabel} a las ${timeLabel} desde la web.`,
           },
-          android: { priority: "high" },
+          android: {
+            priority: "high",
+            notification: {
+              sound: "default",
+            },
+          },
+          apns: {
+            payload: {
+              aps: {
+                sound: "default",
+              },
+            },
+          },
         };
         const responses = await Promise.all(
           targetTokens.map(token => admin.messaging().send({ ...payload, token })),

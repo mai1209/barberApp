@@ -156,8 +156,7 @@ app.use(errorHandler);
 
 export default app;
 
-// En Oracle/VM necesitamos abrir un puerto HTTP real.
-// En Vercel solo exportamos `app` para que lo maneje la plataforma.
+
 if (!process.env.VERCEL) {
   const PORT = Number(process.env.PORT ?? 3002);
   app.listen(PORT, () => {

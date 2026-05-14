@@ -165,6 +165,13 @@ function getCycleCopy(cycle?: SubscriptionState['billingCycle']) {
   }
 }
 
+function hasFutureAccessWindow(value?: string | null) {
+  if (!value) return true;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return true;
+  return date.getTime() > Date.now();
+}
+
 export default function SubscriptionSettingsScreen({ navigation }: { navigation: any }) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -433,6 +440,16 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
   const proStoreProduct = storeSubscriptions.find(product => product.id === STORE_SUBSCRIPTION_PRODUCTS.pro);
   const currentGooglePurchaseToken =
     subscription?.storePurchaseToken || null;
+  const isWebManagedAccount =
+    !currentStoreProductId &&
+    (subscription?.provider === 'mercadopago' ||
+      Boolean(subscription?.mercadoPagoPreapprovalId) ||
+      (subscription?.renewalMode === 'manual' &&
+        Boolean(subscription?.expiresAt || subscription?.startedAt)));
+  const hasActiveWebManagedPlan =
+    isWebManagedAccount &&
+    subscription?.status === 'active' &&
+    hasFutureAccessWindow(subscription?.expiresAt);
 
   const getRenewalHint = () => {
     if (usesStoreBilling) {
@@ -519,6 +536,14 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
       return;
     }
 
+    if (hasActiveWebManagedPlan) {
+      Alert.alert(
+        'Plan ya activo por web',
+        'Esta cuenta ya tiene un plan web activo. No abrimos una compra del store para evitar doble cobro.',
+      );
+      return;
+    }
+
     const targetProductId = STORE_SUBSCRIPTION_PRODUCTS[targetPlan];
     const product = storeSubscriptions.find(item => item.id === targetProductId);
 
@@ -601,6 +626,14 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
   const handleRestorePurchases = async () => {
     if (!usesStoreBilling) return;
 
+    if (hasActiveWebManagedPlan) {
+      Alert.alert(
+        'Plan ya activo por web',
+        'Esta cuenta ya tiene un plan web activo. No restauramos compras del store para evitar mezclar proveedores.',
+      );
+      return;
+    }
+
     try {
       setBillingBusy(true);
       await restorePurchases();
@@ -680,7 +713,9 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
               </View>
 
               <Text style={styles.planSummary}>
-                El plan del negocio se administra con tu suscripción de la App Store.
+                {isWebManagedAccount
+                  ? 'Esta cuenta se administra por fuera de App Store. Acá solo mostramos el estado comercial actual.'
+                  : 'El plan del negocio se administra con tu suscripción de la App Store.'}
               </Text>
 
               <View style={styles.metaGrid}>
@@ -726,69 +761,81 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
                 <Text style={styles.renewalHintText}>{getRenewalHint()}</Text>
               </View>
 
-              <View style={styles.includesCard}>
-                <Text style={styles.sectionTitle}>Elegí un plan</Text>
-                <View style={styles.subscriptionLegalCard}>
-                  <Text style={styles.subscriptionLegalTitle}>Suscripciones disponibles</Text>
-                  <View style={styles.subscriptionLegalRow}>
-                    <Text style={styles.subscriptionLegalPlan}>BarberApp Básico</Text>
-                    <Text style={styles.subscriptionLegalMeta}>
-                      Renovación automática mensual
-                      {basicStoreProduct?.displayPrice ? ` · ${basicStoreProduct.displayPrice}` : ''}
-                    </Text>
-                  </View>
-                  <View style={styles.subscriptionLegalRow}>
-                    <Text style={styles.subscriptionLegalPlan}>BarberApp Pro</Text>
-                    <Text style={styles.subscriptionLegalMeta}>
-                      Renovación automática mensual
-                      {proStoreProduct?.displayPrice ? ` · ${proStoreProduct.displayPrice}` : ''}
-                    </Text>
-                  </View>
-                  <Text style={styles.subscriptionLegalFootnote}>
-                    La suscripción se renueva automáticamente hasta que la canceles desde tu cuenta
-                    de Apple. El precio y la duración del plan se muestran antes de confirmar la
-                    compra.
+              {isWebManagedAccount ? (
+                <View style={styles.iosNoticeCard}>
+                  <Text style={styles.iosNoticeTitle}>Estado del plan</Text>
+                  <Text style={styles.iosNoticeText}>
+                    Esta pantalla muestra el estado actual de la cuenta. Si el plan venció o no
+                    está activo, el acceso queda suspendido.
                   </Text>
                 </View>
-                <Pressable
-                  style={[styles.primaryButton, billingBusy && styles.primaryButtonDisabled]}
-                  onPress={() => handlePurchasePlan('basic')}
-                  disabled={billingBusy || billingSyncing}
-                >
-                  <Text style={styles.primaryButtonText}>
-                    {billingBusy && currentStorePlan !== 'pro' ? 'Abriendo compra...' : `Activar Básico${basicStoreProduct?.displayPrice ? ` · ${basicStoreProduct.displayPrice}` : ''}`}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.primaryButton, billingBusy && styles.primaryButtonDisabled]}
-                  onPress={() => handlePurchasePlan('pro')}
-                  disabled={billingBusy || billingSyncing}
-                >
-                  <Text style={styles.primaryButtonText}>
-                    {billingBusy && currentStorePlan === 'pro' ? 'Abriendo compra...' : `Activar Pro${proStoreProduct?.displayPrice ? ` · ${proStoreProduct.displayPrice}` : ''}`}
-                  </Text>
-                </Pressable>
-              </View>
+              ) : (
+                <>
+                  <View style={styles.includesCard}>
+                    <Text style={styles.sectionTitle}>Elegí un plan</Text>
+                    <View style={styles.subscriptionLegalCard}>
+                      <Text style={styles.subscriptionLegalTitle}>Suscripciones disponibles</Text>
+                      <View style={styles.subscriptionLegalRow}>
+                        <Text style={styles.subscriptionLegalPlan}>BarberApp Básico</Text>
+                        <Text style={styles.subscriptionLegalMeta}>
+                          Renovación automática mensual
+                          {basicStoreProduct?.displayPrice ? ` · ${basicStoreProduct.displayPrice}` : ''}
+                        </Text>
+                      </View>
+                      <View style={styles.subscriptionLegalRow}>
+                        <Text style={styles.subscriptionLegalPlan}>BarberApp Pro</Text>
+                        <Text style={styles.subscriptionLegalMeta}>
+                          Renovación automática mensual
+                          {proStoreProduct?.displayPrice ? ` · ${proStoreProduct.displayPrice}` : ''}
+                        </Text>
+                      </View>
+                      <Text style={styles.subscriptionLegalFootnote}>
+                        La suscripción se renueva automáticamente hasta que la canceles desde tu cuenta
+                        de Apple. El precio y la duración del plan se muestran antes de confirmar la
+                        compra.
+                      </Text>
+                    </View>
+                    <Pressable
+                      style={[styles.primaryButton, billingBusy && styles.primaryButtonDisabled]}
+                      onPress={() => handlePurchasePlan('basic')}
+                      disabled={billingBusy || billingSyncing}
+                    >
+                      <Text style={styles.primaryButtonText}>
+                        {billingBusy && currentStorePlan !== 'pro' ? 'Abriendo compra...' : `Activar Básico${basicStoreProduct?.displayPrice ? ` · ${basicStoreProduct.displayPrice}` : ''}`}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.primaryButton, billingBusy && styles.primaryButtonDisabled]}
+                      onPress={() => handlePurchasePlan('pro')}
+                      disabled={billingBusy || billingSyncing}
+                    >
+                      <Text style={styles.primaryButtonText}>
+                        {billingBusy && currentStorePlan === 'pro' ? 'Abriendo compra...' : `Activar Pro${proStoreProduct?.displayPrice ? ` · ${proStoreProduct.displayPrice}` : ''}`}
+                      </Text>
+                    </Pressable>
+                  </View>
 
-              <View style={styles.iosNoticeCard}>
-                <Text style={styles.iosNoticeTitle}>Restaurar o gestionar</Text>
-                <Text style={styles.iosNoticeText}>
-                  Si ya compraste un plan, podés restaurarlo. Si necesitás cambiar o cancelar, lo
-                  gestionás desde Apple.
-                </Text>
-              </View>
+                  <View style={styles.iosNoticeCard}>
+                    <Text style={styles.iosNoticeTitle}>Restaurar o gestionar</Text>
+                    <Text style={styles.iosNoticeText}>
+                      Si ya compraste un plan, podés restaurarlo. Si necesitás cambiar o cancelar, lo
+                      gestionás desde Apple.
+                    </Text>
+                  </View>
 
-              <Pressable
-                style={[styles.secondaryButton, billingBusy && styles.primaryButtonDisabled]}
-                onPress={handleRestorePurchases}
-                disabled={billingBusy || billingSyncing}
-              >
-                <Text style={styles.secondaryButtonText}>Restaurar compra</Text>
-              </Pressable>
+                  <Pressable
+                    style={[styles.secondaryButton, billingBusy && styles.primaryButtonDisabled]}
+                    onPress={handleRestorePurchases}
+                    disabled={billingBusy || billingSyncing}
+                  >
+                    <Text style={styles.secondaryButtonText}>Restaurar compra</Text>
+                  </Pressable>
 
-              <Pressable style={styles.secondaryButton} onPress={handleManageStoreSubscription}>
-                <Text style={styles.secondaryButtonText}>Gestionar suscripción</Text>
-              </Pressable>
+                  <Pressable style={styles.secondaryButton} onPress={handleManageStoreSubscription}>
+                    <Text style={styles.secondaryButtonText}>Gestionar suscripción</Text>
+                  </Pressable>
+                </>
+              )}
 
               <Pressable style={styles.ghostButton} onPress={openSupportMail}>
                 <Text style={styles.ghostButtonText}>Hablar con soporte</Text>

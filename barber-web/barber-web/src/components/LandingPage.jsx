@@ -2,17 +2,16 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchPlanPricing } from "../services/api";
 import styles from "../styles/LandingPage.module.css";
+import { DEFAULT_DOMAIN_BRANDING } from "../config/domainBranding";
 
-const REGISTER_URL = "/registro";
-const APP_STORE_URL = "https://apps.apple.com";
-const PLAY_STORE_URL =
-  "https://play.google.com/store/apps/details?id=com.barberAppByCodex.hub";
-
-function LandingPage() {
+function LandingPage({ branding = DEFAULT_DOMAIN_BRANDING }) {
   const [pricing, setPricing] = useState({
     basic: { ars: 25000, usdReference: 25 },
     pro: { ars: 35000, usdReference: 35 },
   });
+  const registerUrl = branding.registerPath || "/registro";
+  const appStoreUrl = branding.appStoreUrl;
+  const playStoreUrl = branding.playStoreUrl;
 
   const plans = [
     {
@@ -72,7 +71,7 @@ function LandingPage() {
         "Implementación y presupuesto por fuera del flujo estándar",
       ],
       cta: "Hablar por un plan a medida",
-      href: "https://wa.me/543425543308?text=Hola%20quiero%20consultar%20por%20el%20plan%20personalizable%20de%20BarberApp",
+      href: branding.whatsappHref,
       external: true,
       buttonClassName: `${styles.planButton} ${styles.planButtonGhost}`,
       badgeClassName: `${styles.planBadge} ${styles.planBadgeGold}`,
@@ -196,7 +195,7 @@ function LandingPage() {
   ];
 
   return (
-    <div className={styles.landing}>
+    <div className={styles.landing} style={branding.themeVars}>
       {/* PARTÍCULAS */}
       <div className={styles.particles} aria-hidden="true">
         {Array.from({ length: 20 }).map((_, i) => (
@@ -212,19 +211,19 @@ function LandingPage() {
       {/* NAV */}
       <nav className={styles.nav}>
         <div className={styles.navLogo}>
-        <img className={styles.navLogoImg} src="logoBarber.png" alt="logobarber" />
-        <span className={styles.navLogoText}>BarberAppByCodex</span>
+        <img className={styles.navLogoImg} src={branding.logoSrc} alt={branding.siteName} />
+        <span className={styles.navLogoText}>{branding.navLogoText}</span>
         </div>
         <div className={styles.navActions}>
-          <a href={REGISTER_URL} className={styles.navRegisterButton}>
+          <a href={registerUrl} className={styles.navRegisterButton}>
             Registrate
           </a>
           <a
-            href="https://www.letsbuilditcodex.com/"
+            href={branding.codexBadgeHref}
             target="_blank"
             rel="noreferrer"
           >
-            <span className={styles.navBadge}>by CODEX®</span>
+            <span className={styles.navBadge}>{branding.codexBadgeText}</span>
           </a>
         </div>
       </nav>
@@ -237,32 +236,30 @@ function LandingPage() {
             data-animate
           >
             <span className={styles.eyebrowDot} />
-            Sistema de turnos inteligente
+            {branding.landing.eyebrow}
           </div>
 
           <h1
             className={`${styles.heroTitle} ${styles.animDelay1}`}
             data-animate
           >
-            Tu barbería,
+            {branding.landing.heroTitle}
             <br />
-            <span className={styles.heroTitleAccent}>sin caos.</span>
+            <span className={styles.heroTitleAccent}>{branding.landing.heroAccent}</span>
           </h1>
 
           <p
             className={`${styles.heroSubtitle} ${styles.animDelay2}`}
             data-animate
           >
-            Reservas online 24/7, notificaciones automáticas y gestión de agenda
-            para vos y tu equipo — todo desde el celular.
+            {branding.landing.heroSubtitle}
           </p>
 
           <p
             className={`${styles.heroFlowNote} ${styles.animDelay2}`}
             data-animate
           >
-            Registrate y activá tu plan desde la web. Después descargás la app
-            en iPhone o Android e ingresás con tu cuenta.
+            {branding.landing.flowNote}
           </p>
 
           <div
@@ -270,14 +267,14 @@ function LandingPage() {
             data-animate
           >
             <a
-              href={REGISTER_URL}
+              href={registerUrl}
               className={styles.btnPrimary}
             >
-              Registrate y activá tu barbería
+              {branding.landing.primaryCta}
               <span className={styles.btnShine} />
             </a>
             <a
-              href={APP_STORE_URL}
+              href={appStoreUrl}
               target="_blank"
               rel="noopener noreferrer"
               className={styles.btnSecondary}
@@ -293,7 +290,7 @@ function LandingPage() {
               App Store
             </a>
             <a
-              href={PLAY_STORE_URL}
+              href={playStoreUrl}
               target="_blank"
               rel="noopener noreferrer"
               className={styles.btnSecondary}
@@ -320,7 +317,7 @@ function LandingPage() {
             <div className={styles.phoneFrame}>
               <div className={styles.phoneNotch} />
               <div className={styles.phoneScreen}>
-                <div className={styles.loginLogo}>BARBERAPP</div>
+                <div className={styles.loginLogo}>{branding.siteName.toUpperCase()}</div>
                 <div className={styles.loginSubtitle}>Inicia sesión</div>
                 <div className={styles.loginInput}>correo@ejemplo.com</div>
                 <div className={styles.loginInput}>••••••••</div>
@@ -352,9 +349,9 @@ function LandingPage() {
           className={`${styles.featuresTitle} ${styles.revealUp} ${styles.animDelay1}`}
           data-animate
         >
-          Elegí el nivel que mejor
+          {branding.landing.plansTitle}
           <br />
-          acompaña tu barbería.
+          {branding.landing.plansAccent}
         </h2>
 
         <div className={styles.plansGrid}>
@@ -397,15 +394,15 @@ function LandingPage() {
           className={`${styles.featuresLabel} ${styles.revealUp}`}
           data-animate
         >
-          ¿Por qué BarberApp?
+          ¿Por qué {branding.siteName}?
         </div>
         <h2
           className={`${styles.featuresTitle} ${styles.revealUp} ${styles.animDelay1}`}
           data-animate
         >
-          Todo lo que necesitás,
+          {branding.landing.whyTitle}
           <br />
-          nada de lo que no.
+          {branding.landing.whyAccent}
         </h2>
         <div className={styles.featuresGrid}>
           {features.map((f, i) => (
@@ -450,7 +447,7 @@ function LandingPage() {
           className={`${styles.featuresTitle} ${styles.revealUp} ${styles.animDelay1}`}
           data-animate
         >
-          En 3 pasos, listo.
+          {branding.landing.stepsTitle}
         </h2>
         <div className={styles.steps}>
           {steps.map((s, i) => (
@@ -476,27 +473,27 @@ function LandingPage() {
         <div className={styles.ctaGlow} />
         <div className={styles.ctaOrb} />
         <h2 className={`${styles.ctaTitle} ${styles.revealUp}`} data-animate>
-          ¿Listo para dejar de perder turnos?
+          {branding.landing.finalTitle}
         </h2>
         <p
           className={`${styles.ctaSubtitle} ${styles.revealUp} ${styles.animDelay1}`}
           data-animate
         >
-          Más de 100 barberías ya usan BarberApp. Unite hoy.
+          {branding.landing.finalSubtitle}
         </p>
         <div
           className={`${styles.heroCtagroup} ${styles.revealUp} ${styles.animDelay2}`}
           data-animate
         >
           <a
-            href={REGISTER_URL}
+            href={registerUrl}
             className={styles.btnPrimary}
           >
-            Registrate y activá tu barbería
+            {branding.landing.primaryCta}
             <span className={styles.btnShine} />
           </a>
           <a
-            href={APP_STORE_URL}
+            href={appStoreUrl}
             target="_blank"
             rel="noopener noreferrer"
             className={styles.btnSecondary}
@@ -504,7 +501,7 @@ function LandingPage() {
             App Store
           </a>
           <a
-            href={PLAY_STORE_URL}
+            href={playStoreUrl}
             target="_blank"
             rel="noopener noreferrer"
             className={styles.btnSecondary}
@@ -515,15 +512,15 @@ function LandingPage() {
       </section>
 
       <footer className={styles.footer}>
-        <img className={styles.logo} src="./logo.png" alt="codex" />
+        <img className={styles.logo} src={branding.logoSrc} alt={branding.siteName} />
         <a
-          href="https://www.letsbuilditcodex.com/"
+          href={branding.footerHref}
           target="_blank"
           rel="noreferrer"
         >
           {" "}
           <span>
-            BarberApp by <strong>CODEX®</strong> · {new Date().getFullYear()}
+            {branding.footerTextPrefix} <strong>{branding.footerTextStrong}</strong> · {new Date().getFullYear()}
           </span>
         </a>
       </footer>

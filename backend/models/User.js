@@ -94,6 +94,24 @@ const barberProfileSettingsSchema = new mongoose.Schema(
   },
 );
 
+const publicProfileSchema = new mongoose.Schema(
+  {
+    subtitle: { type: String, trim: true, default: "", maxlength: 140 },
+    address: { type: String, trim: true, default: "", maxlength: 180 },
+    phone: { type: String, trim: true, default: "", maxlength: 60 },
+    googleMapsUrl: { type: String, trim: true, default: "" },
+    googleReviewsUrl: { type: String, trim: true, default: "" },
+    googlePlaceId: { type: String, trim: true, default: "" },
+    googleRating: { type: Number, default: null, min: 0, max: 5 },
+    googleReviewCount: { type: Number, default: null, min: 0 },
+    instagramUrl: { type: String, trim: true, default: "" },
+    linktreeUrl: { type: String, trim: true, default: "" },
+  },
+  {
+    _id: false,
+  },
+);
+
 const shopClosedDaySchema = new mongoose.Schema(
   {
     date: { type: String, required: true, trim: true },
@@ -455,6 +473,10 @@ const userSchema = new mongoose.Schema(
     },
     barberProfileSettings: {
       type: barberProfileSettingsSchema,
+      default: () => ({}),
+    },
+    publicProfile: {
+      type: publicProfileSchema,
       default: () => ({}),
     },
     shopClosedDays: {

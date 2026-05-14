@@ -217,7 +217,7 @@
 
 .shopHeroMedia {
   position: relative;
-  min-height: 270px;
+  min-height: 248px;
   margin: -28px -28px 18px;
   margin-bottom: 18px;
 }
@@ -227,7 +227,7 @@
   inset: 0;
   display: block;
   overflow: hidden;
-  border-radius: 32px 32px 28px 28px;
+  border-radius: 32px 32px 0px 0px;
   border-bottom: 1px solid var(--pink-border);
   background: var(--surface-2);
 }
@@ -238,12 +238,11 @@
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 50% 28%, rgba(0, 0, 0, 0.16) 0%, transparent 38%),
     linear-gradient(
       180deg,
-      rgba(0, 0, 0, 0.68) 0%,
-      rgba(0, 0, 0, 0.38) 46%,
-      rgba(0, 0, 0, 0.42) 100%
+      rgba(0, 0, 0, 0.05) 0%,
+      rgba(0, 0, 0, 0.12) 56%,
+      rgba(0, 0, 0, 0.22) 100%
     );
 }
 
@@ -255,71 +254,53 @@
   display: block;
 }
 
-.shopHeroOverlay {
+.heroMapLink {
   position: absolute;
-  inset: 0;
-  z-index: 1;
-  display: flex;
-  align-items: flex-start;
+  top: 16px;
+  right: 16px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  pointer-events: none;
+  gap: 6px;
+  min-height: 34px;
+  padding: 8px 11px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #94a3b8;
+  text-decoration: none;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
-.shopHeroOverlay .shopHeroText {
-  width: 100%;
-  padding: 14px 16px 16px;
-
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0.194) 100%
-  );
-  border: 1px solid rgba(0, 0, 0, 0.22);
-  box-shadow:
-    0 18px 45px rgba(0, 0, 0, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(4px);
+.heroMapLink:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 32px rgba(0, 0, 0, 0.26);
 }
 
-.shopHeroOverlay .shopHeroEyebrow {
-  background: rgba(255, 255, 255, 0.94);
-  border-color: rgba(255, 255, 255, 0.72);
-  color: #2c1d13;
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.24);
-}
-
-.shopHeroOverlay .shopHeroEyebrow::before {
-  background: var(--pink);
-}
-
-.shopHeroOverlay .shopHeroName {
-  color: #ffffff;
-  text-shadow:
-    0 2px 2px rgba(0, 0, 0, 0.95),
-    0 8px 24px rgba(0, 0, 0, 0.82);
-}
-
-.shopHeroOverlay .shopHeroSubtitle {
-  color: rgba(255, 255, 255, 0.96);
-  font-weight: 700;
-  text-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.9),
-    0 5px 18px rgba(0, 0, 0, 0.72);
+.heroMapIcon {
+  font-size: 0.95rem;
+  line-height: 1;
+  color: #a5b4c8;
 }
 
 .shopHeroAvatar {
   position: absolute;
-  left: 50%;
-  bottom: -34px;
+  left: 22px;
+  bottom: -36px;
   z-index: 2;
-  width: 78px;
-  height: 78px;
-  transform: translateX(-50%);
+  width: 92px;
+  height: 92px;
   border-radius: 999px;
-  padding: 4px;
-  background: var(--card-bg);
-  border: 1px solid var(--pink-border);
-  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
+  padding: 5px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.18);
 }
 
 .shopHeroAvatar img {
@@ -330,6 +311,107 @@
   object-position: center;
   border-radius: inherit;
   background: var(--avatar-bg);
+}
+
+.shopMetaPanel {
+  margin-top: 0;
+  padding: 1rem 4px 0 ;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.shopMetaMain {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.shopMetaIdentity {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.shopMetaName {
+  margin: 0;
+  font-family: "Syne", sans-serif;
+  color: var(--text);
+  font-size: 1.24rem;
+  line-height: 0.98;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.shopRatingBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shopRatingStars {
+  color: #c7a45a;
+  font-size: 1.5rem;
+  letter-spacing: 1px;
+  line-height: 1;
+}
+
+.shopRatingLabel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.shopMetaText {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.shopMetaSubtle {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+.shopMetaActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.shopMetaLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--pink-border);
+  background: var(--surface-3);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.72rem;
+  font-weight: 800;
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s ease,
+    background 0.18s ease;
+}
+
+.shopMetaLink:hover {
+  transform: translateY(-1px);
+  border-color: var(--hover-line);
+  background: var(--hover-surface);
 }
 
 .fieldGroup {
@@ -1067,7 +1149,7 @@
   }
 
   .shopHeroMedia {
-    min-height: 230px;
+    min-height: 216px;
     margin: -20px -16px 20px;
   }
 
@@ -1076,33 +1158,41 @@
   }
 
   .shopHeroAvatar {
-    width: 66px;
-    height: 66px;
-    bottom: -30px;
+    width: 72px;
+    height: 72px;
+    left: 16px;
+    bottom: -28px;
   }
 
-  .shopHeroOverlay {
-    padding: 16px 12px 58px;
+  .heroMapLink {
+    top: 12px;
+    right: 12px;
+    min-height: 34px;
+    padding: 8px 12px;
+    font-size: 0.7rem;
   }
 
-  .shopHeroOverlay .shopHeroText {
-    padding: 12px 12px 14px;
-    border-radius: 20px;
+  .shopMetaPanel {
+    flex-direction: column;
+    gap: 12px;
+    padding-left: 0;
+    padding-top: 48px;
   }
 
-  .shopHeroEyebrow {
-    font-size: 0.62rem;
-    letter-spacing: 1.2px;
+  .shopMetaName {
+    font-size: 1.14rem;
   }
 
-  .shopHeroName {
+  .shopRatingStars {
     font-size: 1.45rem;
   }
 
-  .shopHeroSubtitle {
-    max-width: 300px;
-    font-size: 0.69rem;
-    line-height: 1.45;
+  .shopMetaActions {
+    justify-content: flex-start;
+  }
+
+  .shopMetaLink {
+    flex: 1 1 auto;
   }
 
   .twoColumn,

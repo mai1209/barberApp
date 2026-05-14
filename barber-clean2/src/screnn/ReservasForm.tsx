@@ -74,25 +74,6 @@ function formatDateInShopTZ(value: string | number | Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function getOffsetMinutesInShopTZ(date: Date): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: SHOP_TZ,
-    timeZoneName: 'shortOffset',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).formatToParts(date);
-
-  const offsetText = parts.find(part => part.type === 'timeZoneName')?.value ?? 'GMT';
-  const match = offsetText.match(/^GMT([+-])(\d{1,2})(?::?(\d{2}))?$/);
-
-  if (!match) return 0;
-
-  const sign = match[1] === '-' ? -1 : 1;
-  const hours = Number(match[2] ?? 0);
-  const minutes = Number(match[3] ?? 0);
-  return sign * (hours * 60 + minutes);
-}
-
 function getWeekdayInShopTZ(value: string | number | Date): number {
   const weekday = new Intl.DateTimeFormat('en-US', {
     timeZone: SHOP_TZ,
@@ -113,11 +94,14 @@ function getWeekdayInShopTZ(value: string | number | Date): number {
 }
 
 function buildIsoFromShopDateAndTime(dateValue: Date, slotLabel: string): string {
-  const [year, month, day] = formatDateInShopTZ(dateValue).split('-').map(Number);
+  const year = dateValue.getFullYear();
+  const month = dateValue.getMonth();
+  const day = dateValue.getDate();
   const [hour, minute] = slotLabel.split(':').map(Number);
-  const startUtcGuess = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
-  const offsetMinutes = getOffsetMinutesInShopTZ(new Date(startUtcGuess));
-  return new Date(startUtcGuess - offsetMinutes * 60_000).toISOString();
+
+  // Igualamos el payload de mobile al de la web para evitar corrimientos por
+  // conversiones manuales de timezone en React Native.
+  return new Date(year, month, day, hour, minute, 0, 0).toISOString();
 }
 
 function labelToMinutes(label: string): number {

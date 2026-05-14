@@ -11,6 +11,7 @@ import {
   fetchServices,
   setShopSlug,
 } from "../services/api";
+import { DEFAULT_DOMAIN_BRANDING } from "../config/domainBranding";
 
 const formatDateParam = (date) => {
   const year = date.getFullYear();
@@ -317,6 +318,19 @@ const reviewEmail = (value) => {
   };
 };
 
+const clampRating = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.min(5, Math.max(0, numeric));
+};
+
+const renderStars = (rating) => {
+  const safeRating = clampRating(rating);
+  if (safeRating == null) return "☆☆☆☆☆";
+  const fullStars = Math.round(safeRating);
+  return `${"★".repeat(fullStars)}${"☆".repeat(5 - fullStars)}`;
+};
+
 const labelToMinutes = (label) => {
   const [hours, minutes] = label.split(":").map(Number);
   return hours * 60 + minutes;
@@ -419,7 +433,11 @@ const buildServiceSummary = (list) => {
   return list.map((item) => item.name).join(" + ");
 };
 
-function BookingForm({ shopSlug, onNotFound }) {
+function BookingForm({
+  shopSlug,
+  onNotFound,
+  branding = DEFAULT_DOMAIN_BRANDING,
+}) {
   // 1. TODOS LOS USESTATE PRIMERO
   const [slugReady] = useState(() => {
     if (shopSlug) {
@@ -585,17 +603,40 @@ function BookingForm({ shopSlug, onNotFound }) {
     [selectedDate],
   );
 
+  const fallbackBannerSrc =
+    branding.booking?.bannerSrc || branding.logoSrc || DEFAULT_BOOKING_BANNER;
+  const fallbackLogoSrc =
+    branding.booking?.logoSrc || branding.logoSrc || DEFAULT_BOOKING_LOGO;
   const desktopBannerSrc =
-    shopInfo?.themeConfig?.bannerDataUrl || DEFAULT_BOOKING_BANNER;
+    shopInfo?.themeConfig?.bannerDataUrl || fallbackBannerSrc;
   const mobileBannerSrc =
     shopInfo?.themeConfig?.mobileBannerDataUrl ||
     shopInfo?.themeConfig?.bannerDataUrl ||
-    DEFAULT_BOOKING_BANNER;
+    fallbackBannerSrc;
   const shopProfileSrc =
-    shopInfo?.themeConfig?.logoDataUrl || DEFAULT_BOOKING_LOGO;
+    shopInfo?.themeConfig?.logoDataUrl || fallbackLogoSrc;
+  const publicProfile = shopInfo?.publicProfile || {};
+  const brandingMapsUrl = branding.mapsHref || "";
+  const brandingAddress = branding.addressText || "";
+  const brandingPhone = branding.phoneText || "";
+  const brandingReviewsUrl = branding.googleReviewsUrl || "";
+  const shopSubtitle =
+    publicProfile.subtitle || "Elegí servicio, horario y forma de pago para confirmar tu visita.";
+  const mapsUrl = publicProfile.googleMapsUrl || brandingMapsUrl;
+  const reviewsUrl = publicProfile.googleReviewsUrl || brandingReviewsUrl;
+  const ratingValue = clampRating(publicProfile.googleRating);
+  const ratingCount =
+    publicProfile.googleReviewCount == null
+      ? null
+      : Number(publicProfile.googleReviewCount);
+  const locationLabel = publicProfile.address || brandingAddress;
+  const contactPhone = publicProfile.phone || brandingPhone;
   const webStyleVars = useMemo(
-    () => getWebStylePreset(shopInfo?.themeConfig?.webPreset),
-    [shopInfo?.themeConfig?.webPreset],
+    () => ({
+      ...getWebStylePreset(shopInfo?.themeConfig?.webPreset),
+      ...(branding.themeVars || {}),
+    }),
+    [branding.themeVars, shopInfo?.themeConfig?.webPreset],
   );
   const emailReview = useMemo(() => reviewEmail(email), [email]);
   const emailConfirmationMatches =
@@ -1106,17 +1147,21 @@ function BookingForm({ shopSlug, onNotFound }) {
       {/* NAV */}
       <nav className={style.nav}>
         <div className={style.navLogo}>
-          <span className={style.navLogoScissors}>
-            <img src="" alt="" />
-          </span>
-          <span className={style.navLogoText}>BarberAppByCodex</span>
+          {branding.logoSrc ? (
+            <img
+              className={style.navLogoImg}
+              src={branding.logoSrc}
+              alt={branding.siteName}
+            />
+          ) : null}
+          <span className={style.navLogoText}>{branding.booking.navLogoText}</span>
         </div>
         <a
-          href="https://www.letsbuilditcodex.com/"
+          href={branding.booking.navBadgeHref}
           target="_blank"
           rel="noreferrer"
         >
-          <span className={style.navBadge}>by CODEX®</span>
+          <span className={style.navBadge}>{branding.booking.navBadgeText}</span>
         </a>
       </nav>
 
@@ -1132,24 +1177,81 @@ function BookingForm({ shopSlug, onNotFound }) {
                 aria-hidden="true"
               />
             </picture>
-            <div className={styles.shopHeroOverlay}>
-              <div className={styles.shopHeroText}>
-                <p className={styles.shopHeroEyebrow}>Reservá tu turno en</p>
-                <h2 className={styles.shopHeroName}>
-                  {shopLoading
-                    ? "Cargando barbería..."
-                    : shopInfo?.name || "Barbería"}
-                </h2>
-                <p className={styles.shopHeroSubtitle}>
-                  Elegí servicio, horario y forma de pago para confirmar tu visita.
-                </p>
-              </div>
-            </div>
+            {mapsUrl ? (
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={styles.heroMapLink}
+              >
+                <span>Ver en el mapa</span>
+                <span className={styles.heroMapIcon} aria-hidden="true">
+                  ⌖
+                </span>
+              </a>
+            ) : null}
             <div className={styles.shopHeroAvatar}>
               <img
                 src={shopProfileSrc}
                 alt={shopInfo?.name ? `Logo de ${shopInfo.name}` : "Logo de la barbería"}
               />
+            </div>
+          </div>
+
+          <div className={styles.shopMetaPanel}>
+            <div className={styles.shopMetaMain}>
+              <div className={styles.shopMetaIdentity}>
+                <h2 className={styles.shopMetaName}>
+                  {shopLoading
+                    ? "Cargando barbería..."
+                    : shopInfo?.name || "Barbería"}
+                </h2>
+                <p className={styles.shopMetaSubtle}>{shopSubtitle}</p>
+              </div>
+
+              <div className={styles.shopRatingBlock}>
+                <div className={styles.shopRatingStars} aria-hidden="true">
+                  {renderStars(ratingValue)}
+                </div>
+                <div className={styles.shopRatingLabel}>
+                  {ratingValue != null ? (
+                    <span>{ratingValue.toFixed(1)} valoración</span>
+                  ) : (
+                    <span>Sin valoraciones todavía</span>
+                  )}
+                  {ratingCount != null ? <span>· {ratingCount} reseñas</span> : null}
+                </div>
+              </div>
+
+              {locationLabel ? (
+                <p className={styles.shopMetaText}>{locationLabel}</p>
+              ) : null}
+              {contactPhone ? (
+                <p className={styles.shopMetaSubtle}>Tel. {contactPhone}</p>
+              ) : null}
+            </div>
+
+            <div className={styles.shopMetaActions}>
+              {reviewsUrl ? (
+                <a
+                  href={reviewsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={styles.shopMetaLink}
+                >
+                  Ver reseñas
+                </a>
+              ) : null}
+              {mapsUrl ? (
+                <a
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={styles.shopMetaLink}
+                >
+                  Cómo llegar
+                </a>
+              ) : null}
             </div>
           </div>
         </div>

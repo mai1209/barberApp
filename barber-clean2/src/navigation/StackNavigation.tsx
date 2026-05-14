@@ -19,6 +19,7 @@ import AppearanceSettingsScreen from '../screnn/AppearanceSettingsScreen';
 import ServiceSettingsScreen from '../screnn/ServiceSettingsScreen';
 import PaymentSettingsScreen from '../screnn/PaymentSettingsScreen';
 import NotificationSettingsScreen from '../screnn/NotificationSettingsScreen';
+import PublicProfileSettingsScreen from '../screnn/PublicProfileSettingsScreen';
 import BarberProfileSettingsScreen from '../screnn/BarberProfileSettingsScreen';
 import ShopClosureSettingsScreen from '../screnn/ShopClosureSettingsScreen';
 import WhatsAppCampaignScreen from '../screnn/WhatsAppCampaignScreen';
@@ -71,6 +72,7 @@ export type RootStackParamList = {
   'Service-Settings': undefined;
   'Payment-Settings': undefined;
   'Notification-Settings': undefined;
+  'Public-Profile-Settings': undefined;
   'Barber-Profile-Settings': undefined;
   'Shop-Closure-Settings': undefined;
   'WhatsApp-Campaigns': undefined;
@@ -147,6 +149,7 @@ export default function StackNavigator({
               <Stack.Screen name="Service-Settings" component={ServiceSettingsScreen} />
               <Stack.Screen name="Payment-Settings" component={PaymentSettingsScreen} />
               <Stack.Screen name="Notification-Settings" component={NotificationSettingsScreen} />
+              <Stack.Screen name="Public-Profile-Settings" component={PublicProfileSettingsScreen} />
               <Stack.Screen name="Barber-Profile-Settings" component={BarberProfileSettingsScreen} />
               <Stack.Screen name="Shop-Closure-Settings" component={ShopClosureSettingsScreen} />
               <Stack.Screen name="WhatsApp-Campaigns" component={WhatsAppCampaignScreen} />

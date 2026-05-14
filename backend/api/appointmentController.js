@@ -560,6 +560,16 @@ export async function createAppointment(req, res, next) {
           },
           android: {
             priority: "high",
+            notification: {
+              sound: "default",
+            },
+          },
+          apns: {
+            payload: {
+              aps: {
+                sound: "default",
+              },
+            },
           },
         };
         const responses = await Promise.all(
