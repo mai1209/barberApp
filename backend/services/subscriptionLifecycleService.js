@@ -444,6 +444,7 @@ export async function processSubscriptionLifecycle({ now = new Date() } = {}) {
 
     if (status === "active") {
       const remainingDays = daysUntil(expiresAt, now);
+      const renewalMode = String(subscription.renewalMode || "").trim();
 
       if (remainingDays <= 0) {
         userDoc.subscription = {
@@ -479,6 +480,10 @@ export async function processSubscriptionLifecycle({ now = new Date() } = {}) {
 
         movedToPastDue += 1;
         await userDoc.save();
+        continue;
+      }
+
+      if (renewalMode === "automatic") {
         continue;
       }
 
