@@ -1,3 +1,5 @@
+"use client";
+
 import styles from "../styles/RichBarbershopLanding.module.css";
 import { DEFAULT_DOMAIN_BRANDING } from "../config/domainBranding";
 
@@ -5,6 +7,10 @@ export default function RichBarbershopLanding({
   branding = DEFAULT_DOMAIN_BRANDING,
 }) {
   const bookingUrl = (() => {
+    if (typeof window === "undefined") {
+      return branding.bookingPath || "/turnos";
+    }
+
     const target = new URL(
       branding.bookingPath || "/turnos",
       window.location.origin,
@@ -21,9 +27,11 @@ export default function RichBarbershopLanding({
 
   const instagramHref =
     branding.instagramHref || "https://www.instagram.com/richbarbershop";
+
   const linktreeHref = branding.linktreeHref || branding.contactHref || "#";
   const contactHref = branding.contactHref || branding.whatsappHref || "#";
   const contactLabel = branding.contactLabel || "Contacto";
+  const appStoreUrl = branding.appStoreUrl || "";
 
   const phoneText = branding.phoneText || "+54 342 555-0000";
 
@@ -41,6 +49,7 @@ export default function RichBarbershopLanding({
       <div className={styles.orbTop} aria-hidden="true" />
       <div className={styles.orbBottom} aria-hidden="true" />
       <div className={styles.grid} aria-hidden="true" />
+      <div className={styles.noise} aria-hidden="true" />
 
       <section className={styles.heroShell}>
         <nav className={styles.nav}>
@@ -69,18 +78,22 @@ export default function RichBarbershopLanding({
         </nav>
 
         <section className={styles.hero}>
+          <div className={styles.heroGlow} aria-hidden="true" />
+
           <img
             className={`${styles.lamp} ${styles.lampLeft}`}
             src="/lampara.png"
             alt=""
             aria-hidden="true"
           />
+
           <img
             className={`${styles.lamp} ${styles.lampRight}`}
             src="/lampara2.png"
             alt=""
             aria-hidden="true"
           />
+
           <div className={styles.copy}>
             <p className={styles.sectionEyebrow}>
               {branding.landing?.eyebrow || branding.siteName}
@@ -90,6 +103,7 @@ export default function RichBarbershopLanding({
               <span className={styles.titleLine}>
                 {branding.landing?.heroTitle || branding.siteName}
               </span>
+
               <span className={styles.titleAccent}>
                 {branding.landing?.heroAccent || "Reservá online"}
               </span>
@@ -116,7 +130,7 @@ export default function RichBarbershopLanding({
       </section>
 
       <section className={styles.section}>
-        <div className={styles.sectionHead}>
+        <div className={styles.sectionHead} data-reveal>
           <p className={styles.sectionEyebrow}>Experiencia Rich</p>
 
           <h2 className={styles.sectionTitle}>
@@ -131,27 +145,25 @@ export default function RichBarbershopLanding({
         </div>
 
         <div className={styles.visual}>
-          <div className={styles.photoTall}>
+          <div className={styles.photoTall} data-reveal="left">
             <span>Fades y cortes con precisión</span>
           </div>
 
-          <div className={styles.photoCard}>
+          <div className={styles.photoCard} data-reveal="up">
             <span>Perfilados y atención al detalle</span>
           </div>
 
-          <div className={styles.photoWide}>
+          <div className={styles.photoWide} data-reveal="right">
             <span>Afeitado premium con toallas calientes y navaja</span>
           </div>
         </div>
       </section>
 
       <section className={styles.locationSection}>
-        <div className={styles.locationCopy}>
+        <div className={styles.locationCopy} data-reveal="left">
           <p className={styles.sectionEyebrow}>Ubicación</p>
 
-          <h2 className={styles.locationTitle}>
-            San Luis 2557, Rosario.
-          </h2>
+          <h2 className={styles.locationTitle}>San Luis 2557, Rosario.</h2>
 
           <p className={styles.locationText}>
             Reservá online, escribinos por nuestras redes o encontranos directo
@@ -199,10 +211,20 @@ export default function RichBarbershopLanding({
             >
               Ver Instagram
             </a>
+            {appStoreUrl ? (
+              <a
+                href={appStoreUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={styles.secondaryButton}
+              >
+                App Store
+              </a>
+            ) : null}
           </div>
         </div>
 
-        <div className={styles.mapCard}>
+        <div className={styles.mapCard} data-reveal="right">
           <iframe
             title={`Mapa de ${branding.siteName}`}
             src={mapsSrc}
@@ -214,7 +236,7 @@ export default function RichBarbershopLanding({
         </div>
       </section>
 
-      <footer className={styles.footer}>
+      <footer className={styles.footer} data-reveal>
         <div className={styles.footerBrand}>
           <img
             className={styles.footerLogo}
@@ -243,6 +265,12 @@ export default function RichBarbershopLanding({
           <a href={instagramHref} target="_blank" rel="noreferrer">
             Instagram
           </a>
+
+          {appStoreUrl ? (
+            <a href={appStoreUrl} target="_blank" rel="noreferrer">
+              App Store
+            </a>
+          ) : null}
         </div>
       </footer>
     </main>

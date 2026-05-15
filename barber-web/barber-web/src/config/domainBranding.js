@@ -1,6 +1,6 @@
-const DEFAULT_APP_STORE_URL = "https://apps.apple.com";
-const DEFAULT_PLAY_STORE_URL =
-  "https://play.google.com/store/apps/details?id=com.barberAppByCodex.hub";
+const DEFAULT_APP_STORE_URL =
+  "https://apps.apple.com/ar/app/barber-app/id6762878422";
+const DEFAULT_PLAY_STORE_URL = "";
 const DEFAULT_CODEX_URL = "https://www.letsbuilditcodex.com/";
 const DEFAULT_WHATSAPP_URL =
   "https://wa.me/543425543308?text=Hola%20quiero%20consultar%20por%20BarberApp";

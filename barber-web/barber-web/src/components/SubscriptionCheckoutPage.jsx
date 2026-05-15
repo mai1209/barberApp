@@ -446,14 +446,18 @@ export default function SubscriptionCheckoutPage({
                   a usar tu barbería desde el celular.
                 </p>
                 <div className={styles.storeButtons}>
-                  <a href={branding.appStoreUrl} target="_blank" rel="noreferrer" className={styles.storeBtn}>
-                    <AppleIcon />
-                    App Store
-                  </a>
-                  <a href={branding.playStoreUrl} target="_blank" rel="noreferrer" className={styles.storeBtn}>
-                    <PlayIcon />
-                    Google Play
-                  </a>
+                  {branding.appStoreUrl ? (
+                    <a href={branding.appStoreUrl} target="_blank" rel="noreferrer" className={styles.storeBtn}>
+                      <AppleIcon />
+                      App Store
+                    </a>
+                  ) : null}
+                  {branding.playStoreUrl ? (
+                    <a href={branding.playStoreUrl} target="_blank" rel="noreferrer" className={styles.storeBtn}>
+                      <PlayIcon />
+                      Google Play
+                    </a>
+                  ) : null}
                 </div>
               </div>
             </div>

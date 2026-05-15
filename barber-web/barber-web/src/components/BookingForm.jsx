@@ -620,10 +620,14 @@ function BookingForm({
   const brandingAddress = branding.addressText || "";
   const brandingPhone = branding.phoneText || "";
   const brandingReviewsUrl = branding.googleReviewsUrl || "";
+  const brandingInstagramUrl = branding.instagramHref || "";
+  const brandingLinktreeUrl = branding.linktreeHref || branding.contactHref || "";
   const shopSubtitle =
     publicProfile.subtitle || "Elegí servicio, horario y forma de pago para confirmar tu visita.";
   const mapsUrl = publicProfile.googleMapsUrl || brandingMapsUrl;
   const reviewsUrl = publicProfile.googleReviewsUrl || brandingReviewsUrl;
+  const instagramUrl = publicProfile.instagramUrl || brandingInstagramUrl;
+  const linktreeUrl = publicProfile.linktreeUrl || brandingLinktreeUrl;
   const ratingValue = clampRating(publicProfile.googleRating);
   const ratingCount =
     publicProfile.googleReviewCount == null
@@ -1145,23 +1149,22 @@ function BookingForm({
       )}
 
       {/* NAV */}
-      <nav className={style.nav}>
-        <div className={style.navLogo}>
+      <nav className={`${style.nav} ${styles.bookingNav}`}>
+        <div className={`${style.navLogo} ${styles.bookingNavLogo}`}>
           {branding.logoSrc ? (
             <img
-              className={style.navLogoImg}
+              className={`${style.navLogoImg} ${styles.bookingNavLogoImg}`}
               src={branding.logoSrc}
               alt={branding.siteName}
             />
           ) : null}
-          <span className={style.navLogoText}>{branding.booking.navLogoText}</span>
         </div>
         <a
           href={branding.booking.navBadgeHref}
           target="_blank"
           rel="noreferrer"
         >
-          <span className={style.navBadge}>{branding.booking.navBadgeText}</span>
+          <span className={`${style.navBadge} ${styles.bookingNavBadge}`}>{branding.booking.navBadgeText}</span>
         </a>
       </nav>
 
@@ -1209,19 +1212,17 @@ function BookingForm({
                 <p className={styles.shopMetaSubtle}>{shopSubtitle}</p>
               </div>
 
-              <div className={styles.shopRatingBlock}>
-                <div className={styles.shopRatingStars} aria-hidden="true">
-                  {renderStars(ratingValue)}
-                </div>
-                <div className={styles.shopRatingLabel}>
-                  {ratingValue != null ? (
+              {ratingValue != null ? (
+                <div className={styles.shopRatingBlock}>
+                  <div className={styles.shopRatingStars} aria-hidden="true">
+                    {renderStars(ratingValue)}
+                  </div>
+                  <div className={styles.shopRatingLabel}>
                     <span>{ratingValue.toFixed(1)} valoración</span>
-                  ) : (
-                    <span>Sin valoraciones todavía</span>
-                  )}
-                  {ratingCount != null ? <span>· {ratingCount} reseñas</span> : null}
+                    {ratingCount != null ? <span>· {ratingCount} reseñas</span> : null}
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               {locationLabel ? (
                 <p className={styles.shopMetaText}>{locationLabel}</p>
@@ -1250,6 +1251,26 @@ function BookingForm({
                   className={styles.shopMetaLink}
                 >
                   Cómo llegar
+                </a>
+              ) : null}
+              {instagramUrl ? (
+                <a
+                  href={instagramUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={styles.shopMetaLink}
+                >
+                  Instagram
+                </a>
+              ) : null}
+              {linktreeUrl ? (
+                <a
+                  href={linktreeUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={styles.shopMetaLink}
+                >
+                  Linktree
                 </a>
               ) : null}
             </div>
@@ -1293,7 +1314,7 @@ function BookingForm({
             <label className={styles.label}>WhatsApp</label>
             <input
               className={styles.input}
-              placeholder="Ej: +54 9 342 000-0000"
+              placeholder="Ej: 342 000-0000"
               type="tel"
               value={phone}
               onChange={(e) =>
