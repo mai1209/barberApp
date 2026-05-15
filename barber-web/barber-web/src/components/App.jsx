@@ -1,4 +1,4 @@
-import {  useState } from 'react';
+import { useEffect, useState } from 'react';
 import BookingForm from './BookingForm';
 import styles from '../styles/App.module.css';
 import { setShopSlug as registerShopSlug } from '../services/api';
@@ -155,6 +155,21 @@ function App() {
   const [internalPage] = useState(() => resolveInternalPage(branding));
   const [shopSlug] = useState(() => resolveInitialSlug(branding, internalPage));
   const [missingShop, setMissingShop] = useState(false);
+
+  useEffect(() => {
+    const pageTitle = branding?.siteName || 'BarberAppByCodex';
+    document.title = pageTitle;
+
+    const favicon = document.querySelector('link[rel="icon"]');
+    if (favicon && branding?.logoSrc) {
+      favicon.setAttribute('href', branding.logoSrc);
+    }
+
+    const appleTouchIcon = document.querySelector('link[rel="apple-touch-icon"]');
+    if (appleTouchIcon && branding?.logoSrc) {
+      appleTouchIcon.setAttribute('href', branding.logoSrc);
+    }
+  }, [branding]);
 
   if (internalPage === 'subscription-admin') {
     return <SubscriptionAdmin />;

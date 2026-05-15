@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap");
+
 .page {
   --brand: var(--pink, #0f172a);
   --brand-soft: var(--pink-light, #8b5e34);
@@ -5,13 +7,15 @@
   --brand-border: var(--pink-border, rgba(139, 94, 52, 0.24));
   --text-main: var(--text, #0f172a);
   --text-muted: var(--text-muted, #5b3f2b);
+  --font-body: var(--font-body, "Poppins", system-ui, sans-serif);
+  --font-display: var(--font-display, "Poppins", system-ui, sans-serif);
 
   min-height: 100vh;
   background:
     radial-gradient(circle at top left, rgba(199, 164, 90, 0.16), transparent 32%),
     linear-gradient(180deg, #f8fafc 0%, #f2ece4 100%);
   color: var(--text-main);
-  font-family: "DM Sans", system-ui, sans-serif;
+  font-family: var(--font-body);
   position: relative;
   overflow-x: hidden;
 }
@@ -49,12 +53,12 @@
 @keyframes navDrop {
   from {
     opacity: 0;
-    transform: translateY(-18px);
+    transform: translate(-50%, -18px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(-50%, 0);
   }
 }
 
@@ -292,6 +296,29 @@
   }
 }
 
+@keyframes cardDrift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes labelLift {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* =========================
    DECORACIÓN GLOBAL
 ========================= */
@@ -362,15 +389,15 @@
 
 .heroShell {
   background-image: url("../../public/imgportada.jpeg");
-  background-size: 106%;
-  background-position: center;
+  background-size: cover;
+  background-position: center 42%;
   background-repeat: no-repeat;
-  overflow: hidden;
-  padding: 0 0 3rem;
-  min-height: 88vh;
+  overflow: clip;
+  padding: 0 0 9rem;
+  min-height: 100vh;
   position: relative;
   isolation: isolate;
-  margin-bottom: 3rem;
+  margin-bottom: -4rem;
   animation:
     pageFade 0.5s ease-out both,
     heroPan 20s ease-in-out infinite;
@@ -420,15 +447,15 @@
     ),
     linear-gradient(
       180deg,
-      rgba(0, 0, 0, 0.2) 0%,
-      transparent 42%,
-      rgba(0, 0, 0, 0.34) 100%
+      rgba(0, 0, 0, 0.18) 0%,
+      transparent 34%,
+      rgba(9, 22, 17, 0.24) 70%,
+      #f2ece4 100%
     );
   z-index: 0;
 }
 
 .nav,
-.heroShell,
 .hero,
 .section,
 .locationSection,
@@ -438,13 +465,34 @@
 }
 
 .nav {
-  max-width: 1180px;
+  width: 100vw;
   margin: 0 auto;
-  padding: 24px 28px 8px;
+  padding: 1rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   animation: navDrop 0.72s cubic-bezier(0.22, 1, 0.36, 1) both;
+  position: fixed;
+  z-index: 999;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  transition:
+    background 0.24s ease,
+    backdrop-filter 0.24s ease,
+    box-shadow 0.24s ease,
+    border-color 0.24s ease,
+    padding 0.24s ease,
+    transform 0.24s ease;
+}
+
+.navScrolled {
+  padding: 14px 28px 12px;
+  background: rgba(12, 34, 21, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 18px 40px rgba(3, 10, 8, 0.22);
+  border-bottom: 1px solid rgba(199, 164, 90, 0.14);
 }
 
 .brand {
@@ -454,8 +502,7 @@
 }
 
 .brandLogo {
-  width: 122px;
-  height: 94px;
+  width: 10rem;
   object-fit: contain;
   transition:
     transform 0.35s ease,
@@ -480,7 +527,8 @@
   position: relative;
   border-radius: 999px;
   text-decoration: none;
-  font-weight: 800;
+  font-weight: 500;
+  font-size: 0.8rem;
   overflow: hidden;
   will-change: transform;
   transition:
@@ -558,7 +606,7 @@
   max-width: 1180px;
   min-height: calc(88vh - 132px);
   margin: 0 auto;
-  padding: 24px 28px 88px;
+  padding: 11.6rem 28px 88px;
   display: grid;
   grid-template-columns: minmax(0, 0.92fr);
   gap: 40px;
@@ -590,19 +638,9 @@
   max-width: 720px;
   position: relative;
   z-index: 4;
-  padding: 32px 34px 34px;
-  border-radius: 28px;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(6, 19, 13, 0.68) 0%,
-      rgba(7, 18, 13, 0.54) 100%
-    );
-  border: 1px solid rgba(218, 176, 82, 0.24);
-  box-shadow:
-    0 34px 80px rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(14px);
+  padding: 38px 38px 36px;
+  border-radius: 32px;
+
   animation: heroReveal 1.08s cubic-bezier(0.22, 1, 0.36, 1) 0.16s both;
 }
 
@@ -644,32 +682,39 @@
    LÁMPARAS BIEN UBICADAS
 ========================= */
 
-.lamp {
+.sideDecor {
+  position: relative;
+  max-width: 1180px;
+  height: 0;
+  margin: 0 auto;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.sideLampLeft,
+.sideLampRight {
   position: absolute;
   height: auto;
   object-fit: contain;
-  pointer-events: none;
   transform-origin: center top;
-  z-index: 3;
+  pointer-events: none;
 }
 
-/* Esta queda como lámpara colgada sobre la card, no arriba perdida */
-.lampLeft {
-  width: clamp(100px, 9vw, 138px);
-  left: clamp(42px, 6vw, 96px);
-  top: clamp(82px, 12vh, 138px);
-  opacity: 0.72;
+.sideLampLeft {
+  width: clamp(88px, 8vw, 122px);
+  left: clamp(6px, 1.4vw, 18px);
+  top: -22px;
+  opacity: 0.44;
   animation:
     lampLeftFloat 7.4s ease-in-out infinite,
     lampGlow 4.8s ease-in-out infinite;
 }
 
-/* Esta queda más afuera del hero para no invadir el título */
-.lampRight {
-  width: clamp(82px, 7.6vw, 116px);
-  right: clamp(24px, 4vw, 68px);
-  top: clamp(116px, 16vh, 170px);
-  opacity: 0.5;
+.sideLampRight {
+  width: clamp(78px, 7vw, 108px);
+  right: clamp(8px, 1.8vw, 26px);
+  top: 540px;
+  opacity: 0.36;
   animation:
     lampRightFloat 8.2s ease-in-out infinite,
     lampGlow 5.4s ease-in-out infinite;
@@ -691,12 +736,11 @@
 
 .title {
   margin: 16px 0 20px;
-  font-family: "Syne", system-ui, sans-serif;
-  font-size: clamp(3rem, 7vw, 5.4rem);
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 7vw, 5rem);
   line-height: 0.92;
   letter-spacing: -0.065em;
   color: #f8f5ee;
-  text-shadow: 0 12px 34px rgba(0, 0, 0, 0.38);
 }
 
 .titleLine,
@@ -745,6 +789,28 @@
   animation: heroReveal 0.92s cubic-bezier(0.22, 1, 0.36, 1) 0.72s both;
 }
 
+.heroHighlights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+  animation: heroReveal 0.92s cubic-bezier(0.22, 1, 0.36, 1) 0.82s both;
+}
+
+.heroHighlights span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(247, 221, 160, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(248, 245, 238, 0.92);
+  font-size: 0.8rem;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
+}
+
 /* =========================
    SECCIÓN EXPERIENCIA
 ========================= */
@@ -753,16 +819,18 @@
   max-width: 1180px;
   margin: 0 auto;
   padding: 0 28px 88px;
+  position: relative;
+  z-index: 2;
 }
 
 .sectionHead {
   max-width: 760px;
-  margin-bottom: 28px;
+  margin: 10rem 0;
 }
 
 .sectionTitle,
 .locationTitle {
-  font-family: "Syne", system-ui, sans-serif;
+  font-family: var(--font-display);
   letter-spacing: -0.04em;
 }
 
@@ -796,6 +864,15 @@
     border-color 0.38s ease,
     filter 0.38s ease;
   will-change: transform;
+  animation: cardDrift 9s ease-in-out infinite;
+}
+
+.photoCard {
+  animation-duration: 10.6s;
+}
+
+.photoWide {
+  animation-duration: 11.8s;
 }
 
 .photoTall:hover,
@@ -805,6 +882,20 @@
   box-shadow: 0 36px 80px rgba(15, 23, 42, 0.16);
   border-color: rgba(199, 164, 90, 0.38);
   filter: saturate(1.05) contrast(1.02);
+}
+
+.photoTall span,
+.photoWide span,
+.photoCard span {
+  animation: labelLift 0.84s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.photoCard span {
+  animation-delay: 0.18s;
+}
+
+.photoWide span {
+  animation-delay: 0.32s;
 }
 
 .photoTall::before,
@@ -951,11 +1042,28 @@
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.62);
   border: 1px solid rgba(15, 23, 42, 0.07);
+  animation: cardRise 0.82s cubic-bezier(0.22, 1, 0.36, 1) both;
   transition:
     transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
     border-color 0.24s ease,
     background 0.24s ease,
     box-shadow 0.24s ease;
+}
+
+.infoItem:nth-child(1) {
+  animation-delay: 0.16s;
+}
+
+.infoItem:nth-child(2) {
+  animation-delay: 0.24s;
+}
+
+.infoItem:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+.infoItem:nth-child(4) {
+  animation-delay: 0.4s;
 }
 
 .infoItem:hover {
@@ -1026,7 +1134,7 @@
   display: grid;
   grid-template-columns: 1.1fr 0.9fr auto;
   align-items: center;
-  gap: 28px;
+  gap: 0.9rem;
 }
 
 .footerLogo {
@@ -1055,19 +1163,21 @@
   display: grid;
   gap: 6px;
   font-size: 0.94rem;
+  text-align: center;
 }
 
 .footerLinks {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
   justify-content: flex-end;
 }
 
 .footerLinks a {
   color: var(--text-main);
   text-decoration: none;
-  font-weight: 800;
+  font-weight: 500;
+  font-size: 0.8rem;
   padding: 10px 14px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.68);
@@ -1077,6 +1187,19 @@
     background 0.24s ease,
     border-color 0.24s ease,
     box-shadow 0.24s ease;
+  animation: heroReveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.footerLinks a:nth-child(1) {
+  animation-delay: 0.12s;
+}
+
+.footerLinks a:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.footerLinks a:nth-child(3) {
+  animation-delay: 0.28s;
 }
 
 .footerLinks a:hover {
@@ -1149,19 +1272,18 @@
     grid-template-columns: 1fr;
   }
 
-  .lampLeft {
-    left: 18px;
-    right: auto;
-    top: 96px;
-    width: 92px;
-    opacity: 0.46;
+  .sideLampLeft {
+    left: 12px;
+    top: 42px;
+    width: 76px;
+    opacity: 0.3;
   }
 
-  .lampRight {
-    right: 18px;
-    top: 128px;
-    width: 74px;
-    opacity: 0.34;
+  .sideLampRight {
+    right: 12px;
+    top: 500px;
+    width: 64px;
+    opacity: 0.26;
   }
 
   .footer {
@@ -1183,6 +1305,7 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 0;
+    width: calc(100% - 20px);
     padding: 18px 18px 4px;
   }
 
@@ -1209,7 +1332,8 @@
   .heroShell {
     background-size: cover;
     background-position: center;
-    margin-bottom: 2.4rem;
+    margin-bottom: -2rem;
+    padding-bottom: 6rem;
   }
 
   .heroShell::after {
@@ -1241,19 +1365,26 @@
     font-size: 1rem;
   }
 
-  .lampLeft {
-    width: 68px;
-    left: 8px;
-    right: auto;
-    top: 84px;
-    opacity: 0.28;
+  .heroHighlights {
+    gap: 8px;
   }
 
-  .lampRight {
-    width: 58px;
-    right: 8px;
-    top: 96px;
+  .heroHighlights span {
+    font-size: 0.74rem;
+  }
+
+  .sideLampLeft {
+    width: 62px;
+    left: 8px;
+    top: 48px;
     opacity: 0.22;
+  }
+
+  .sideLampRight {
+    width: 54px;
+    right: 10px;
+    top: 520px;
+    opacity: 0.18;
   }
 
   .section {
@@ -1298,6 +1429,10 @@
   .footerLinks a {
     text-align: center;
   }
+
+  .nav{
+    display: none;
+  }
 }
 
 /* =========================
@@ -1312,8 +1447,8 @@
   .copy::after,
   .actions,
   .section,
-  .lampLeft,
-  .lampRight,
+  .sideLampLeft,
+  .sideLampRight,
   .sectionHead,
   .visual,
   .locationCopy,
@@ -1329,6 +1464,8 @@
   .photoTall,
   .photoWide,
   .photoCard,
+  .infoItem,
+  .footerLinks a,
   [data-reveal] {
     animation: none !important;
   }

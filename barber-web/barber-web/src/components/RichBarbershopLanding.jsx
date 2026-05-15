@@ -1,11 +1,25 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import styles from "../styles/RichBarbershopLanding.module.css";
 import { DEFAULT_DOMAIN_BRANDING } from "../config/domainBranding";
 
 export default function RichBarbershopLanding({
   branding = DEFAULT_DOMAIN_BRANDING,
 }) {
+  const [isNavScrolled, setIsNavScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsNavScrolled(window.scrollY > 18);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   const bookingUrl = (() => {
     if (typeof window === "undefined") {
       return branding.bookingPath || "/turnos";
@@ -51,48 +65,36 @@ export default function RichBarbershopLanding({
       <div className={styles.grid} aria-hidden="true" />
       <div className={styles.noise} aria-hidden="true" />
 
+      <nav
+        className={`${styles.nav} ${isNavScrolled ? styles.navScrolled : ""}`}
+      >
+        <div className={styles.brand}>
+          <img
+            className={styles.brandLogo}
+            src={branding.logoSrc}
+            alt={branding.siteName}
+          />
+        </div>
+
+        <div className={styles.navActions}>
+          <a href={bookingUrl} className={styles.navLink}>
+            Turnos
+          </a>
+
+          <a
+            href={contactHref}
+            target="_blank"
+            rel="noreferrer"
+            className={styles.navCta}
+          >
+            {contactLabel}
+          </a>
+        </div>
+      </nav>
+
       <section className={styles.heroShell}>
-        <nav className={styles.nav}>
-          <div className={styles.brand}>
-            <img
-              className={styles.brandLogo}
-              src={branding.logoSrc}
-              alt={branding.siteName}
-            />
-          </div>
-
-          <div className={styles.navActions}>
-            <a href={bookingUrl} className={styles.navLink}>
-              Turnos
-            </a>
-
-            <a
-              href={contactHref}
-              target="_blank"
-              rel="noreferrer"
-              className={styles.navCta}
-            >
-              {contactLabel}
-            </a>
-          </div>
-        </nav>
-
         <section className={styles.hero}>
           <div className={styles.heroGlow} aria-hidden="true" />
-
-          <img
-            className={`${styles.lamp} ${styles.lampLeft}`}
-            src="/lampara.png"
-            alt=""
-            aria-hidden="true"
-          />
-
-          <img
-            className={`${styles.lamp} ${styles.lampRight}`}
-            src="/lampara2.png"
-            alt=""
-            aria-hidden="true"
-          />
 
           <div className={styles.copy}>
             <p className={styles.sectionEyebrow}>
@@ -125,9 +127,20 @@ export default function RichBarbershopLanding({
                 Ver contacto
               </a>
             </div>
+
+            <div className={styles.heroHighlights}>
+              <span>Reservas online</span>
+              <span>Toallas calientes</span>
+              <span>Rosario centro</span>
+            </div>
           </div>
         </section>
       </section>
+
+      <div className={styles.sideDecor} aria-hidden="true">
+        <img className={styles.sideLampLeft} src="/lampara.png" alt="" />
+        <img className={styles.sideLampRight} src="/lampara2.png" alt="" />
+      </div>
 
       <section className={styles.section}>
         <div className={styles.sectionHead} data-reveal>

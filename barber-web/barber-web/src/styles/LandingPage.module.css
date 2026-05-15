@@ -329,9 +329,10 @@
 }
 
 .navLogoImg{
-  width: 32px;
-  height: 32px;
+  width: 100px;
+  height: 100px;
   object-fit: contain;
+  margin-left: 2rem;
 }
 
 /* ========================
@@ -1443,6 +1444,9 @@ a {
   }
   .hero {
     padding: 100px 20px 60px;
+  }
+  .navLogoImg {
+    display: none;
   }
 }
 

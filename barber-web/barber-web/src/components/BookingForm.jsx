@@ -605,6 +605,11 @@ function BookingForm({
 
   const fallbackBannerSrc =
     branding.booking?.bannerSrc || branding.logoSrc || DEFAULT_BOOKING_BANNER;
+  const fallbackMobileBannerSrc =
+    branding.booking?.mobileBannerSrc ||
+    branding.booking?.bannerSrc ||
+    branding.logoSrc ||
+    DEFAULT_BOOKING_BANNER;
   const fallbackLogoSrc =
     branding.booking?.logoSrc || branding.logoSrc || DEFAULT_BOOKING_LOGO;
   const desktopBannerSrc =
@@ -612,7 +617,7 @@ function BookingForm({
   const mobileBannerSrc =
     shopInfo?.themeConfig?.mobileBannerDataUrl ||
     shopInfo?.themeConfig?.bannerDataUrl ||
-    fallbackBannerSrc;
+    fallbackMobileBannerSrc;
   const shopProfileSrc =
     shopInfo?.themeConfig?.logoDataUrl || fallbackLogoSrc;
   const publicProfile = shopInfo?.publicProfile || {};
@@ -637,10 +642,12 @@ function BookingForm({
   const contactPhone = publicProfile.phone || brandingPhone;
   const webStyleVars = useMemo(
     () => ({
-      ...getWebStylePreset(shopInfo?.themeConfig?.webPreset),
+      ...getWebStylePreset(
+        shopInfo?.themeConfig?.webPreset || branding.booking?.webPreset,
+      ),
       ...(branding.themeVars || {}),
     }),
-    [branding.themeVars, shopInfo?.themeConfig?.webPreset],
+    [branding.booking?.webPreset, branding.themeVars, shopInfo?.themeConfig?.webPreset],
   );
   const emailReview = useMemo(() => reviewEmail(email), [email]);
   const emailConfirmationMatches =
@@ -1159,13 +1166,7 @@ function BookingForm({
             />
           ) : null}
         </div>
-        <a
-          href={branding.booking.navBadgeHref}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <span className={`${style.navBadge} ${styles.bookingNavBadge}`}>{branding.booking.navBadgeText}</span>
-        </a>
+     
       </nav>
 
       <form className={styles.card} onSubmit={handleSubmit}>

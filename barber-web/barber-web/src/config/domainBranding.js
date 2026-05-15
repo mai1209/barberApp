@@ -117,6 +117,10 @@ export const DOMAIN_BRANDING = {
       navLogoText: "Rich Barbershop",
       navBadgeText: "Reservas",
       navBadgeHref: "/turnos",
+      webPreset: "vintage",
+      bannerSrc: "/imgportada.jpeg",
+      mobileBannerSrc: "/img2.jpeg",
+      logoSrc: "/logoRich.png",
     },
     themeVars: {
       "--pink": "#0C2215",
@@ -127,6 +131,8 @@ export const DOMAIN_BRANDING = {
       "--text": "#0C2215",
       "--text-muted": "#3C4D41",
       "--text-dim": "#7B715C",
+      "--font-body": "\"Poppins\", sans-serif",
+      "--font-display": "\"Poppins\", sans-serif",
     },
   },
 };
