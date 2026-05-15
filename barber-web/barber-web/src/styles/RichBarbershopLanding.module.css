@@ -507,6 +507,8 @@
   transition:
     transform 0.35s ease,
     filter 0.35s ease;
+    margin-left: 2rem;
+    margin-top: 1rem;
 }
 
 .brandLogo:hover {
@@ -605,14 +607,14 @@
 .hero {
   max-width: 1180px;
   min-height: calc(88vh - 132px);
-  margin: 0 auto;
-  padding: 11.6rem 28px 88px;
   display: grid;
   grid-template-columns: minmax(0, 0.92fr);
   gap: 40px;
   align-items: center;
   position: relative;
   isolation: isolate;
+  padding-top: 10rem;
+  margin-left: 10rem;
 }
 
 .heroGlow {
@@ -638,7 +640,6 @@
   max-width: 720px;
   position: relative;
   z-index: 4;
-  padding: 38px 38px 36px;
   border-radius: 32px;
 
   animation: heroReveal 1.08s cubic-bezier(0.22, 1, 0.36, 1) 0.16s both;
@@ -648,15 +649,6 @@
   content: "";
   position: absolute;
   inset: -1px;
-  border-radius: inherit;
-  background:
-    linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.16),
-      transparent 30%,
-      rgba(218, 176, 82, 0.16)
-    );
-  opacity: 0.72;
   pointer-events: none;
   z-index: -1;
 }
@@ -727,7 +719,7 @@
 .sectionEyebrow {
   text-transform: uppercase;
   letter-spacing: 0.22em;
-  font-size: 0.74rem;
+  font-size: 1rem;
   font-weight: 900;
   color: #d7b36b;
   margin: 0;
@@ -816,28 +808,20 @@
 ========================= */
 
 .section {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 0 28px 88px;
-  position: relative;
-  z-index: 2;
+ margin: 8rem 5rem;
+ text-align: center;
+
 }
 
-.sectionHead {
-  max-width: 760px;
-  margin: 10rem 0;
+
+.sectionHead{
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 800px;
+  margin: 4rem auto;
 }
 
-.sectionTitle,
-.locationTitle {
-  font-family: var(--font-display);
-  letter-spacing: -0.04em;
-}
-
-.sectionTitle {
-  font-size: clamp(2rem, 4vw, 3.1rem);
-  margin: 10px 0 12px;
-}
 
 .visual {
   display: grid;
