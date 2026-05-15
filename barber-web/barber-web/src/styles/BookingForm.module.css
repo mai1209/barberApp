@@ -283,7 +283,7 @@
   backdrop-filter: none !important;
   border-bottom: 0 !important;
   box-shadow: none !important;
-  padding: 20px 24px;
+  padding: 16px 24px 8px;
 }
 
 .bookingNavLogo {
@@ -417,9 +417,9 @@
 }
 
 .bookingNavLogoImg {
-  width: 56px;
-  height: 56px;
-  filter: drop-shadow(0 14px 28px rgba(15, 23, 42, 0.18));
+  width: 112px;
+  height: 112px;
+  filter: drop-shadow(0 20px 38px rgba(15, 23, 42, 0.24));
 }
 
 .shopMetaLink {
