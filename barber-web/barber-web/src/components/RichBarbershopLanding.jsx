@@ -249,16 +249,7 @@ export default function RichBarbershopLanding({
             >
               Ver Instagram
             </a>
-            {appStoreUrl ? (
-              <a
-                href={appStoreUrl}
-                target="_blank"
-                rel="noreferrer"
-                className={styles.secondaryButton}
-              >
-                App Store
-              </a>
-            ) : null}
+       
           </div>
         </div>
 
