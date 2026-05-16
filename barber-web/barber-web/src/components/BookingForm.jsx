@@ -627,6 +627,13 @@ function BookingForm({
   const brandingReviewsUrl = branding.googleReviewsUrl || "";
   const brandingInstagramUrl = branding.instagramHref || "";
   const brandingLinktreeUrl = branding.linktreeHref || branding.contactHref || "";
+  const landingUrl = (() => {
+    if (typeof window === "undefined") return "/";
+    const target = new URL("/", window.location.origin);
+    const activeBrand = new URL(window.location.href).searchParams.get("brand");
+    if (activeBrand) target.searchParams.set("brand", activeBrand);
+    return `${target.pathname}${target.search}`;
+  })();
   const shopSubtitle =
     publicProfile.subtitle || "Elegí servicio, horario y forma de pago para confirmar tu visita.";
   const mapsUrl = publicProfile.googleMapsUrl || brandingMapsUrl;
@@ -1157,7 +1164,11 @@ function BookingForm({
 
       {/* NAV */}
       <nav className={`${style.nav} ${styles.bookingNav}`}>
-        <div className={`${style.navLogo} ${styles.bookingNavLogo}`}>
+        <a
+          href={landingUrl}
+          className={`${style.navLogo} ${styles.bookingNavLogo}`}
+          aria-label={`Volver a ${branding.siteName}`}
+        >
           {branding.logoSrc ? (
             <img
               className={`${style.navLogoImg} ${styles.bookingNavLogoImg}`}
@@ -1165,7 +1176,7 @@ function BookingForm({
               alt={branding.siteName}
             />
           ) : null}
-        </div>
+        </a>
      
       </nav>
 

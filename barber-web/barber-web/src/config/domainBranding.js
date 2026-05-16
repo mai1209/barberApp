@@ -131,8 +131,8 @@ export const DOMAIN_BRANDING = {
       "--text": "#0C2215",
       "--text-muted": "#3C4D41",
       "--text-dim": "#7B715C",
-      "--font-body": "\"Poppins\", sans-serif",
-      "--font-display": "\"Poppins\", sans-serif",
+      "--font-body": "\"Playfair Display\", serif",
+      "--font-display": "\"Playfair Display\", serif",
     },
   },
 };

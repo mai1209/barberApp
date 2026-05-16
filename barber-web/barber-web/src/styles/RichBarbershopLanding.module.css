@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&display=swap");
 
 .page {
   --brand: var(--pink, #0f172a);
@@ -7,8 +7,8 @@
   --brand-border: var(--pink-border, rgba(139, 94, 52, 0.24));
   --text-main: var(--text, #0f172a);
   --text-muted: var(--text-muted, #5b3f2b);
-  --font-body: var(--font-body, "Poppins", system-ui, sans-serif);
-  --font-display: var(--font-display, "Poppins", system-ui, sans-serif);
+  --font-body: var(--font-body, "Playfair Display", Georgia, serif);
+  --font-display: var(--font-display, "Playfair Display", Georgia, serif);
 
   min-height: 100vh;
   background:
@@ -465,8 +465,8 @@
 }
 
 .nav {
-  width: 100vw;
   margin: 0 auto;
+  width: 100vw;
   padding: 1rem;
   display: flex;
   align-items: center;
@@ -507,8 +507,8 @@
   transition:
     transform 0.35s ease,
     filter 0.35s ease;
-    margin-left: 2rem;
-    margin-top: 1rem;
+  margin-left: 0;
+  margin-top: 0;
 }
 
 .brandLogo:hover {
@@ -613,8 +613,8 @@
   align-items: center;
   position: relative;
   isolation: isolate;
-  padding-top: 10rem;
-  margin-left: 10rem;
+  margin: 0 auto;
+  padding: 11.6rem 28px 88px;
 }
 
 .heroGlow {
@@ -654,20 +654,7 @@
 }
 
 .copy::after {
-  content: "";
-  position: absolute;
-  top: -40%;
-  left: -32%;
-  width: 40%;
-  height: 180%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.13),
-    transparent
-  );
-  animation: subtleShine 7.5s ease-in-out infinite;
-  pointer-events: none;
+  display: none;
 }
 
 /* =========================
@@ -1157,22 +1144,16 @@
   justify-content: flex-end;
 }
 
-.footerLinks a {
-  color: var(--text-main);
-  text-decoration: none;
-  font-weight: 500;
-  font-size: 0.8rem;
-  padding: 10px 14px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.68);
-  border: 1px solid rgba(15, 23, 42, 0.08);
+.footerLinks img{
+  width: 28px;
+  height: 28px;
+  filter: grayscale(0.8) brightness(1.2);
   transition:
-    transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-    background 0.24s ease,
-    border-color 0.24s ease,
-    box-shadow 0.24s ease;
-  animation: heroReveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+    transform 0.32s ease,
+    filter 0.32s ease;
 }
+
+
 
 .footerLinks a:nth-child(1) {
   animation-delay: 0.12s;
@@ -1191,6 +1172,63 @@
   background: rgba(255, 255, 255, 0.94);
   border-color: rgba(199, 164, 90, 0.34);
   box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+}
+
+.scrollCue {
+  position: absolute;
+  left: 50%;
+  bottom: -40px;
+  transform: translateX(-0%);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: rgba(248, 245, 238, 0.88);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  animation: heroReveal 0.9s cubic-bezier(0.22, 1, 0.36, 1) 1s both;
+}
+
+.scrollCueArrow {
+  font-size: 1.6rem;
+  line-height: 1;
+  animation: mapFloat 2.2s ease-in-out infinite;
+}
+
+.backToTop {
+  position: fixed;
+  right: 18px;
+  bottom: 22px;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(12, 34, 21, 0.86);
+  color: #f8f5ee;
+  box-shadow: 0 18px 34px rgba(3, 10, 8, 0.24);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  cursor: pointer;
+  font: inherit;
+  font-size: 1.3rem;
+  font-weight: 700;
+  z-index: 1001;
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.backToTop:hover {
+  transform: translateY(-3px);
+  background: rgba(12, 34, 21, 0.94);
+  box-shadow: 0 22px 40px rgba(3, 10, 8, 0.28);
 }
 
 /* =========================
@@ -1329,6 +1367,18 @@
         rgba(8, 20, 14, 0.58) 42%,
         rgba(8, 20, 14, 0.88) 100%
       );
+  }
+
+  .scrollCue {
+    bottom: -30px;
+    font-size: 0.72rem;
+  }
+
+  .backToTop {
+    right: 14px;
+    bottom: 16px;
+    width: 44px;
+    height: 44px;
   }
 
   .hero {

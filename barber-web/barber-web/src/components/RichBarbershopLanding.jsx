@@ -8,10 +8,12 @@ export default function RichBarbershopLanding({
   branding = DEFAULT_DOMAIN_BRANDING,
 }) {
   const [isNavScrolled, setIsNavScrolled] = useState(false);
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
       setIsNavScrolled(window.scrollY > 18);
+      setShowBackToTop(window.scrollY > 540);
     };
 
     handleScroll();
@@ -19,6 +21,17 @@ export default function RichBarbershopLanding({
 
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  const scrollToExperience = () => {
+    const target = document.getElementById("rich-experience");
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const bookingUrl = (() => {
     if (typeof window === "undefined") {
@@ -134,6 +147,18 @@ export default function RichBarbershopLanding({
               <span>Rosario centro</span>
             </div>
           </div>
+
+          <button
+            type="button"
+            className={styles.scrollCue}
+            onClick={scrollToExperience}
+            aria-label="Deslizá hacia abajo"
+          >
+            <span className={styles.scrollCueArrow} aria-hidden="true">
+              ↓
+            </span>
+            <span>Deslizá</span>
+          </button>
         </section>
       </section>
 
@@ -142,7 +167,7 @@ export default function RichBarbershopLanding({
         <img className={styles.sideLampRight} src="/lampara2.png" alt="" />
       </div>
 
-      <section className={styles.section}>
+      <section className={styles.section} id="rich-experience">
         <div className={styles.sectionHead} data-reveal>
           <p className={styles.sectionEyebrow}>Experiencia Rich</p>
 
@@ -269,23 +294,54 @@ export default function RichBarbershopLanding({
         </div>
 
         <div className={styles.footerLinks}>
-          <a href={bookingUrl}>Reservar turno</a>
-
-          <a href={linktreeHref} target="_blank" rel="noreferrer">
-            Linktree
+          <a href={bookingUrl} aria-label="Reservar turno" title="Reservar turno">
+            <img src="/turno.png" alt="turno" />
           </a>
 
-          <a href={instagramHref} target="_blank" rel="noreferrer">
-            Instagram
+          <a
+            href={linktreeHref}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Linktree"
+            title="Linktree"
+          >
+            <img src="/linktree.png" alt="Linktree" />
+          </a>
+
+          <a
+            href={instagramHref}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Instagram"
+            title="Instagram"
+          >
+            <img src="/instagram.png" alt="Instagram" />
           </a>
 
           {appStoreUrl ? (
-            <a href={appStoreUrl} target="_blank" rel="noreferrer">
-              App Store
+            <a
+              href={appStoreUrl}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="App Store"
+              title="App Store"
+            >
+            <img src="/apple.png" alt="App Store" />
             </a>
           ) : null}
         </div>
       </footer>
+
+      {showBackToTop ? (
+        <button
+          type="button"
+          className={styles.backToTop}
+          onClick={scrollToTop}
+          aria-label="Volver arriba"
+        >
+          ↑
+        </button>
+      ) : null}
     </main>
   );
 }
