@@ -378,7 +378,7 @@ function createStyles(theme: any) {
       backgroundColor: theme.background,
     },
     scrollContent: {
-      paddingTop: Platform.OS === 'ios' ? 72 : 28,
+      paddingTop: Platform.OS === 'ios' ? 92 : 28,
       paddingHorizontal: 20,
       paddingBottom: 130,
     },
