@@ -229,6 +229,7 @@ export type MercadoPagoConnectionInfo = {
 };
 
 export type NotificationSettings = {
+  adminInstantBookingEnabled?: boolean;
   barberInstantBookingEnabled?: boolean;
   barberReminderEnabled?: boolean;
   barberReminderMinutesBefore?: 15 | 30 | 60 | 120 | 180 | 1440;

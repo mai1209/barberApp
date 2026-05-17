@@ -1053,9 +1053,10 @@ export async function publicCreateAppointment(req, res, next) {
           barberId,
         }),
       ]);
-      const ownerToken = String(
-        ownerUser?.pushToken || ownerUser?.fcmToken || '',
-      ).trim();
+      const ownerToken =
+        ownerUser?.notificationSettings?.adminInstantBookingEnabled !== false
+          ? String(ownerUser?.pushToken || ownerUser?.fcmToken || '').trim()
+          : '';
       const barberToken =
         ownerUser?.notificationSettings?.barberInstantBookingEnabled !== false
           ? String(pushTarget?.token || '').trim()

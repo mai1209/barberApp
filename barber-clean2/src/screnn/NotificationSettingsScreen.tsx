@@ -46,6 +46,7 @@ export default function NotificationSettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<NotificationSettings>({
+    adminInstantBookingEnabled: true,
     barberInstantBookingEnabled: true,
     barberReminderEnabled: true,
     barberReminderMinutesBefore: 60,
@@ -61,6 +62,8 @@ export default function NotificationSettingsScreen() {
         if (!active) return;
         const settings = res?.user?.notificationSettings ?? {};
         setForm({
+          adminInstantBookingEnabled:
+            settings.adminInstantBookingEnabled !== false,
           barberInstantBookingEnabled:
             settings.barberInstantBookingEnabled !== false,
           barberReminderEnabled: settings.barberReminderEnabled !== false,
@@ -123,9 +126,64 @@ export default function NotificationSettingsScreen() {
       </View>
 
       <View style={styles.card}>
+        <Text style={styles.sectionLabel}>Nuevo turno al admin</Text>
+        <Text style={styles.sectionHint}>
+          Cuando entra una reserva nueva, este teléfono también puede recibir el aviso aunque el turno sea para otro barbero.
+        </Text>
+
+        <View style={styles.toggleRow}>
+          <Pressable
+            style={[
+              styles.toggleChip,
+              form.adminInstantBookingEnabled && styles.toggleChipActive,
+            ]}
+            onPress={() =>
+              setForm(current => ({
+                ...current,
+                adminInstantBookingEnabled: true,
+              }))
+            }
+          >
+            <Text
+              style={[
+                styles.toggleChipText,
+                form.adminInstantBookingEnabled && styles.toggleChipTextActive,
+              ]}
+            >
+              Activado
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={[
+              styles.toggleChip,
+              form.adminInstantBookingEnabled === false &&
+                styles.toggleChipActive,
+            ]}
+            onPress={() =>
+              setForm(current => ({
+                ...current,
+                adminInstantBookingEnabled: false,
+              }))
+            }
+          >
+            <Text
+              style={[
+                styles.toggleChipText,
+                form.adminInstantBookingEnabled === false &&
+                  styles.toggleChipTextActive,
+              ]}
+            >
+              Desactivado
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={styles.card}>
         <Text style={styles.sectionLabel}>Nuevo turno al barbero</Text>
         <Text style={styles.sectionHint}>
-          Cuando entra una reserva nueva, el admin la recibe siempre y al barbero se la mandamos si esto está activado.
+          Si el turno queda asignado a un barbero, también podés decidir si le mandamos el push a esa persona.
         </Text>
 
         <View style={styles.toggleRow}>
