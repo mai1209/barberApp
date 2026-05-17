@@ -311,12 +311,12 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
         />
       </View>
 
-      <Text style={styles.sectionLabel}>Soporte</Text>
+      <Text style={styles.sectionLabel}>Centro de soporte</Text>
       <View style={styles.groupCard}>
         <MenuItem
           icon={BookOpen}
-          label="Manual de uso"
-          description="Guía simple para arrancar, configurar y compartir tu sistema."
+          label="Centro de soporte"
+          description="Guía rápida para arrancar, configurar la app y resolver dudas comunes."
           onPress={() => navigation.navigate('Usage-Guide')}
           theme={theme}
           styles={styles}
@@ -346,8 +346,8 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
         <View style={styles.separator} />
         <MenuItem
           icon={Mail}
-          label="Comunicate con soporte"
-          description="Abrí la página de soporte con mail, WhatsApp y contacto."
+          label="Hablar con soporte"
+          description="Abrí la página de soporte con mail, WhatsApp y vías de contacto."
           onPress={handleSupportMail}
           theme={theme}
           styles={styles}

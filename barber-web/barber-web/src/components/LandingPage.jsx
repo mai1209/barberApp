@@ -10,6 +10,7 @@ function LandingPage({ branding = DEFAULT_DOMAIN_BRANDING }) {
     pro: { ars: 35000, usdReference: 35 },
   });
   const registerUrl = branding.registerPath || "/registro";
+  const plansUrl = branding.plansPath || "/planes";
   const appStoreUrl = branding.appStoreUrl;
   const playStoreUrl = branding.playStoreUrl;
   const hasAppStore = Boolean(appStoreUrl);
@@ -218,9 +219,11 @@ function LandingPage({ branding = DEFAULT_DOMAIN_BRANDING }) {
       <nav className={styles.nav}>
         <div className={styles.navLogo}>
         <img className={styles.navLogoImg} src={branding.logoSrc} alt={branding.siteName} />
-        <span className={styles.navLogoText}>{branding.navLogoText}</span>
         </div>
         <div className={styles.navActions}>
+          <a href={plansUrl} className={styles.navPlansButton}>
+            Ver planes
+          </a>
           <a href={registerUrl} className={styles.navRegisterButton}>
             Registrate
           </a>
@@ -278,6 +281,9 @@ function LandingPage({ branding = DEFAULT_DOMAIN_BRANDING }) {
             >
               {branding.landing.primaryCta}
               <span className={styles.btnShine} />
+            </a>
+            <a href={plansUrl} className={styles.btnSecondary}>
+              Ver planes
             </a>
             {hasAppStore ? (
               <a

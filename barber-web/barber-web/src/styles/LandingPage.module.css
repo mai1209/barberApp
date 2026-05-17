@@ -1,5 +1,5 @@
 /* LandingPage.module.css */
-@import url("https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap");
 
 :root {
   --pink: #1f2937;
@@ -27,7 +27,7 @@
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
-  font-family: "DM Sans", sans-serif;
+  font-family: "Poppins", sans-serif;
   position: relative;
   overflow-x: hidden;
 }
@@ -237,9 +237,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 30px;
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(24px);
+  padding: 0px 10px;
+  backdrop-filter: blur(2px);
   border-bottom: 1px solid var(--border);
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
   animation: navSlideDown 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -287,7 +286,7 @@
 }
 
 .navLogoText {
-  font-family: "Syne", sans-serif;
+  font-family: "Poppins", sans-serif;
   font-weight: 800;
   font-size: 1.2rem;
   letter-spacing: -0.5px;
@@ -321,6 +320,28 @@
   font-weight: 800;
   box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
   transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+}
+
+.navPlansButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.84rem;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+  transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+}
+
+.navPlansButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px rgba(15, 23, 42, 0.12);
 }
 
 .navRegisterButton:hover {
@@ -401,7 +422,7 @@
 }
 
 .heroTitle {
-  font-family: "Syne", sans-serif;
+  font-family: "Poppins", sans-serif;
   font-size: clamp(3.2rem, 9vw, 7rem);
   font-weight: 800;
   line-height: 0.95;
@@ -541,7 +562,7 @@
 }
 
 .planTitle {
-  font-family: "Syne", sans-serif;
+  font-family: "Poppins", sans-serif;
   font-size: 1.65rem;
   line-height: 1.1;
   letter-spacing: -1px;
@@ -561,7 +582,7 @@
 }
 
 .planPrice {
-  font-family: "Syne", sans-serif;
+  font-family: "Poppins", sans-serif;
   font-size: 2rem;
   line-height: 1;
   letter-spacing: -1px;
@@ -797,7 +818,7 @@
 }
 
 .loginLogo {
-  font-family: "Syne", sans-serif;
+  font-family: "Poppins", sans-serif;
   font-weight: 800;
   letter-spacing: 2px;
   text-align: center;
@@ -1057,7 +1078,7 @@
 }
 
 .featuresTitle {
-  font-family: "Syne", sans-serif;
+  font-family: "Poppins", sans-serif;
   font-size: clamp(2rem, 4vw, 3.2rem);
   font-weight: 800;
   letter-spacing: -1.5px;
@@ -1147,7 +1168,7 @@
 }
 
 .featureTitle {
-  font-family: "Syne", sans-serif;
+  font-family: "Poppins", sans-serif;
   font-size: 1rem;
   font-weight: 700;
   margin-bottom: 8px;
@@ -1222,7 +1243,7 @@
 }
 
 .statNum {
-  font-family: "Syne", sans-serif;
+  font-family: "Poppins", sans-serif;
   font-size: 2.4rem;
   font-weight: 800;
   background: linear-gradient(135deg, #0f172a, #475569);
@@ -1290,7 +1311,7 @@
 }
 
 .stepNumber {
-  font-family: "Syne", sans-serif;
+  font-family: "Poppins", sans-serif;
   font-size: 2.8rem;
   font-weight: 800;
   color: rgba(15, 23, 42, 0.12);
@@ -1306,7 +1327,7 @@
 }
 
 .stepTitle {
-  font-family: "Syne", sans-serif;
+  font-family: "Poppins", sans-serif;
   font-size: 1.2rem;
   font-weight: 700;
   margin-bottom: 8px;
@@ -1372,7 +1393,7 @@
 }
 
 .ctaTitle {
-  font-family: "Syne", sans-serif;
+  font-family: "Poppins", sans-serif;
   font-size: clamp(2rem, 4.5vw, 3.8rem);
   font-weight: 800;
   letter-spacing: -2px;
