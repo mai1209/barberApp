@@ -129,7 +129,15 @@ type ActivePicker =
   | 'blockEnd'
   | null;
 
-const TIME_PICKER_MINUTES = [0, 5, 10, 15, 30, 45] as const;
+const TIME_PICKER_MINUTES = [0, 15, 30, 45] as const;
+
+function snapPickerMinute(minute: number) {
+  return TIME_PICKER_MINUTES.reduce((closest, current) => {
+    return Math.abs(current - minute) < Math.abs(closest - minute)
+      ? current
+      : closest;
+  }, TIME_PICKER_MINUTES[0]);
+}
 
 function getNextSelectableMinutes(totalMinutes: number) {
   const currentHour = Math.floor(totalMinutes / 60);
@@ -2732,7 +2740,7 @@ function minutesToPickerParts(totalMinutes: number): {
   minute: number;
 } {
   const hours24 = Math.floor(totalMinutes / 60) % 24;
-  const minutes = totalMinutes % 60;
+  const minutes = snapPickerMinute(totalMinutes % 60);
   return {
     period: hours24 >= 12 ? 'PM' : 'AM',
     hour: hours24 % 12 || 12,
