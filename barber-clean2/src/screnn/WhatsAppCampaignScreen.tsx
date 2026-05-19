@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,8 +15,14 @@ import {
 import Clipboard from '@react-native-clipboard/clipboard';
 import { MessageCircle, Search, Send } from 'lucide-react-native';
 import { CustomerContact, fetchCustomerContacts } from '../services/api';
+import { getUserProfile } from '../services/authStorage';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
+import { hasProPlanAccess } from '../services/planAccess';
+
+type Props = {
+  navigation: any;
+};
 
 const DEFAULT_MESSAGE =
   'Hola {nombre}! Tenemos una promoción especial en la barbería. Escribinos para reservar tu turno.';
@@ -48,7 +55,7 @@ const buildMessage = (template: string, contact: CustomerContact) =>
     .replace(/\{nombre\}/gi, contact.customerName || 'Cliente')
     .replace(/\{servicio\}/gi, contact.lastService || 'tu servicio');
 
-export default function WhatsAppCampaignScreen() {
+export default function WhatsAppCampaignScreen({ navigation }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [contacts, setContacts] = useState<CustomerContact[]>([]);
@@ -60,6 +67,18 @@ export default function WhatsAppCampaignScreen() {
   >('most_frequent');
   const [minVisitsInput, setMinVisitsInput] = useState('');
   const [maxVisitsInput, setMaxVisitsInput] = useState('');
+
+  const openUpgradeScreen = (email?: string) => {
+    if (Platform.OS === 'ios') {
+      navigation.replace('Subscription-Settings');
+      return;
+    }
+
+    navigation.replace('Plans', {
+      fromRegistration: false,
+      email,
+    });
+  };
 
   const loadContacts = useCallback(async () => {
     try {
@@ -85,7 +104,27 @@ export default function WhatsAppCampaignScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadContacts();
+      let cancelled = false;
+
+      (async () => {
+        const storedUser = await getUserProfile();
+        if (cancelled) return;
+
+        if (!hasProPlanAccess(storedUser)) {
+          Alert.alert(
+            'Disponible con plan Pro',
+            'Promociones por WhatsApp se desbloquea con el plan Pro.',
+            [{ text: 'Continuar', onPress: () => openUpgradeScreen(storedUser?.email) }],
+          );
+          return;
+        }
+
+        loadContacts();
+      })();
+
+      return () => {
+        cancelled = true;
+      };
     }, [loadContacts]),
   );
 

@@ -17,6 +17,7 @@ import {
   CreditCard,
   Crown,
   KeyRound,
+  Lock,
   LogOut,
   Mail,
   MapPin,
@@ -34,6 +35,7 @@ import {
   subscribeToUserProfile,
 } from '../services/authStorage';
 import { resolveUserRole } from '../services/subscriptionAccess';
+import { hasActiveFreePlan, hasProPlanAccess } from '../services/planAccess';
 
 const SUPPORT_EMAIL = 'barberappbycodex@gmail.com';
 const SUPPORT_URL = 'https://barberappbycodex.com/soporte';
@@ -47,6 +49,8 @@ type MenuItemProps = {
   theme: any;
   onPress: () => void;
   danger?: boolean;
+  locked?: boolean;
+  lockText?: string;
   styles: any; // Pasamos los estilos para que MenuItem los reconozca
 };
 
@@ -57,6 +61,8 @@ function MenuItem({
   onPress,
   theme,
   danger = false,
+  locked = false,
+  lockText = 'Extendé tu plan para desbloquear esta función.',
   styles,
 }: MenuItemProps) {
   return (
@@ -64,20 +70,28 @@ function MenuItem({
       onPress={onPress}
       style={({ pressed }) => [
         styles.menuItem,
+        locked && styles.menuItemLocked,
         pressed && styles.menuItemPressed,
       ]}
     >
-      <View style={[styles.iconWrap, danger && styles.iconWrapDanger]}>
+      <View style={[styles.iconWrap, danger && styles.iconWrapDanger, locked && styles.iconWrapLocked]}>
         <Icon
           size={18}
-          color={danger ? '#ff1414' : theme?.primary || '#FFFFFF'}
+          color={danger ? '#ff1414' : locked ? theme?.textMuted || '#6E7585' : theme?.primary || '#FFFFFF'}
         />
       </View>
       <View style={styles.itemBody}>
-        <Text style={[styles.itemLabel, danger && styles.itemLabelDanger]}>
-          {label}
-        </Text>
-        <Text style={styles.itemDescription}>{description}</Text>
+        <View style={styles.itemTitleRow}>
+          <Text style={[styles.itemLabel, danger && styles.itemLabelDanger, locked && styles.itemLabelLocked]}>
+            {label}
+          </Text>
+          {locked ? (
+            <View style={styles.lockBadge}>
+              <Lock size={11} color={theme?.textMuted || '#6E7585'} />
+            </View>
+          ) : null}
+        </View>
+        <Text style={styles.itemDescription}>{locked ? lockText : description}</Text>
       </View>
       <ChevronRight size={18} color={theme?.textMuted || '#6E7585'} />
     </Pressable>
@@ -111,6 +125,20 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
   }, []);
 
   const isBarberUser = resolveUserRole(currentUser) === 'barber';
+  const isFreePlan = hasActiveFreePlan(currentUser);
+  const hasProAccess = hasProPlanAccess(currentUser);
+
+  const openUpgradeScreen = () => {
+    if (Platform.OS === 'ios') {
+      navigation.navigate('Subscription-Settings');
+      return;
+    }
+
+    navigation.navigate('Plans', {
+      fromRegistration: false,
+      email: currentUser?.email,
+    });
+  };
 
   const handleLogout = async () => {
     Alert.alert(
@@ -160,13 +188,10 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.title}>Ajustes</Text>
-          <Text style={styles.subtitle}>
-            Todo lo importante, explicado en simple.
-          </Text>
+         
         </View>
       </View>
 
-      <Text style={styles.sectionLabel}>Preferencias</Text>
       <View style={styles.groupCard}>
         <MenuItem
           icon={BellRing}
@@ -201,8 +226,10 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
               icon={KeyRound}
               label="Habilitar editar perfil barbero"
               description="Activá o desactivá si el barbero puede cambiar su propio perfil."
-              onPress={() => navigation.navigate('Barber-Profile-Settings')}
+              onPress={isFreePlan ? openUpgradeScreen : () => navigation.navigate('Barber-Profile-Settings')}
               theme={theme}
+              locked={isFreePlan}
+              lockText="Extendé tu plan para permitir que cada barbero edite su propio perfil."
               styles={styles}
             />
             <View style={styles.separator} />
@@ -219,8 +246,10 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
               icon={MapPin}
               label="Perfil público del local"
               description="Dirección, links de Google Maps, reseñas, Instagram y datos visibles en la web."
-              onPress={() => navigation.navigate('Public-Profile-Settings')}
+              onPress={isFreePlan ? openUpgradeScreen : () => navigation.navigate('Public-Profile-Settings')}
               theme={theme}
+              locked={isFreePlan}
+              lockText="Extendé tu plan para mostrar dirección, links y perfil público del local."
               styles={styles}
             />
           </>
@@ -271,8 +300,10 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
               icon={MessageCircle}
               label="Promociones por WhatsApp"
               description="Escribí un mensaje y abrí WhatsApp para clientes que ya reservaron."
-              onPress={() => navigation.navigate('WhatsApp-Campaigns')}
+              onPress={hasProAccess ? () => navigation.navigate('WhatsApp-Campaigns') : openUpgradeScreen}
               theme={theme}
+              locked={!hasProAccess}
+              lockText="Esta función requiere un plan Pro activo para contactar clientes por WhatsApp."
               styles={styles}
             />
             <View style={styles.separator} />
@@ -280,8 +311,10 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
               icon={Users}
               label="Información de clientes"
               description="Historial, frecuencia y contacto rápido en un panel más completo."
-              onPress={() => navigation.navigate('Customer-History')}
+              onPress={hasProAccess ? () => navigation.navigate('Customer-History') : openUpgradeScreen}
               theme={theme}
+              locked={!hasProAccess}
+              lockText="Esta función requiere un plan Pro activo para ver historial y panel de clientes."
               styles={styles}
             />
           </View>
@@ -393,11 +426,7 @@ function createStyles(theme: any) {
       fontSize: 34,
       fontWeight: '800',
     },
-    subtitle: {
-      color: theme.textSecondary,
-      fontSize: 14,
-      marginTop: 6,
-    },
+  
     sectionLabel: {
       color: theme.textMuted,
       fontSize: 12,
@@ -420,6 +449,9 @@ function createStyles(theme: any) {
       paddingVertical: 16,
       paddingHorizontal: 16,
     },
+    menuItemLocked: {
+      opacity: 0.92,
+    },
     menuItemPressed: {
       opacity: 0.82,
       backgroundColor: theme.surfaceAlt,
@@ -436,9 +468,19 @@ function createStyles(theme: any) {
     iconWrapDanger: {
       backgroundColor: 'rgba(255, 138, 138, 0.12)',
     },
+    iconWrapLocked: {
+      backgroundColor: theme.background,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
     itemBody: {
       flex: 1,
       paddingRight: 12,
+    },
+    itemTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
     },
     itemLabel: {
       color: theme.textPrimary,
@@ -448,11 +490,32 @@ function createStyles(theme: any) {
     itemLabelDanger: {
       color: '#FFD0D0',
     },
+    itemLabelLocked: {
+      color: theme.textSecondary,
+    },
     itemDescription: {
       color: theme.textSecondary,
       fontSize: 12,
       marginTop: 4,
       lineHeight: 17,
+    },
+    lockBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.background,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    lockBadgeText: {
+      color: theme.textMuted,
+      fontSize: 10,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
     },
     separator: {
       height: 1,

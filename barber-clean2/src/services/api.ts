@@ -15,10 +15,10 @@ type ApiError = Error & {
   isNetworkError?: boolean;
 };
 
-const LAN_IP = "192.168.100.57"; 
+const LAN_IP = "192.168.100.51"; 
 const ANDROID_EMULATOR_HOST = "10.0.2.2";
 const REQUEST_TIMEOUT_MS = 15000;
-const FORCE_PROD_IN_DEBUG = true; // Útil para probar el comportamiento en producción sin necesidad de un backend local
+const FORCE_PROD_IN_DEBUG = false; 
 
 const isAndroid = Platform.OS === "android";
 const isAndroidEmulator = Boolean(
@@ -184,7 +184,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 export function registerUser(payload: { email: string; fullName: string; password: string; }) {
   return request<{ token?: string; user?: any; message?: string }>("/api/auth/register", {
     method: "POST",
-    body: payload,
+    body: {
+      ...payload,
+      registrationSource: "mobile",
+    },
   });
 }
 

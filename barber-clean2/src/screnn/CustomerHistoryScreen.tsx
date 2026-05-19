@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Modal,
   Platform,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -30,6 +31,7 @@ import {
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
+import { getUserProfile } from '../services/authStorage';
 import {
   CustomerHistoryResponse,
   ServiceOption,
@@ -37,6 +39,7 @@ import {
   fetchCustomerHistory,
   fetchServices,
 } from '../services/api';
+import { hasProPlanAccess } from '../services/planAccess';
 
 type Props = {
   navigation: any;
@@ -206,6 +209,18 @@ function CustomerHistoryScreen({ navigation }: Props) {
   );
   const [activePicker, setActivePicker] = useState<PickerType>(null);
 
+  const openUpgradeScreen = (email?: string) => {
+    if (Platform.OS === 'ios') {
+      navigation.replace('Subscription-Settings');
+      return;
+    }
+
+    navigation.replace('Plans', {
+      fromRegistration: false,
+      email,
+    });
+  };
+
   const monthOptions = useMemo<PickerOption[]>(
     () =>
       MONTH_LABELS.map((label, index) => ({
@@ -274,7 +289,27 @@ function CustomerHistoryScreen({ navigation }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      loadData(false);
+      let cancelled = false;
+
+      (async () => {
+        const storedUser = await getUserProfile();
+        if (cancelled) return;
+
+        if (!hasProPlanAccess(storedUser)) {
+          Alert.alert(
+            'Disponible con plan Pro',
+            'La información de clientes se desbloquea con el plan Pro.',
+            [{ text: 'Continuar', onPress: () => openUpgradeScreen(storedUser?.email) }],
+          );
+          return;
+        }
+
+        loadData(false);
+      })();
+
+      return () => {
+        cancelled = true;
+      };
     }, [loadData]),
   );
 

@@ -160,18 +160,18 @@ const subscriptionSchema = new mongoose.Schema(
   {
     plan: {
       type: String,
-      enum: ["basic", "pro", "custom"],
-      default: "basic",
+      enum: ["free", "basic", "pro", "custom"],
+      default: "free",
     },
     status: {
       type: String,
       enum: ["trial", "active", "past_due", "cancelled"],
-      default: "trial",
+      default: "active",
     },
     billingCycle: {
       type: String,
       enum: ["monthly", "yearly", "custom", null],
-      default: "monthly",
+      default: null,
     },
     renewalMode: {
       type: String,
@@ -417,6 +417,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       minlength: 10,
+    },
+    registrationSource: {
+      type: String,
+      enum: ["mobile", "web"],
+      default: "mobile",
     },
     role: {
       type: String,

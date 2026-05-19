@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,9 +14,14 @@ import {
   getCurrentUser,
   updateBarberProfileSettings,
 } from '../services/api';
-import { saveUserProfile } from '../services/authStorage';
+import { getUserProfile, saveUserProfile } from '../services/authStorage';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
+import { hasActiveFreePlan } from '../services/planAccess';
+
+type Props = {
+  navigation: any;
+};
 
 const hexToRgba = (hex: string, alpha: number) => {
   const sanitized = hex.replace('#', '');
@@ -29,7 +35,7 @@ const hexToRgba = (hex: string, alpha: number) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
-export default function BarberProfileSettingsScreen() {
+export default function BarberProfileSettingsScreen({ navigation }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [loading, setLoading] = useState(true);
@@ -38,13 +44,46 @@ export default function BarberProfileSettingsScreen() {
     barberSelfEditEnabled: true,
   });
 
+  const openUpgradeScreen = (email?: string) => {
+    if (Platform.OS === 'ios') {
+      navigation.replace('Subscription-Settings');
+      return;
+    }
+
+    navigation.replace('Plans', {
+      fromRegistration: false,
+      email,
+    });
+  };
+
   useEffect(() => {
     let active = true;
 
     (async () => {
       try {
+        const storedUser = await getUserProfile();
+        if (hasActiveFreePlan(storedUser)) {
+          if (!active) return;
+          Alert.alert(
+            'Disponible con plan pago',
+            'La edición del perfil del barbero se desbloquea al extender tu plan.',
+            [{ text: 'Continuar', onPress: () => openUpgradeScreen(storedUser?.email) }],
+          );
+          return;
+        }
+
         const res = await getCurrentUser();
         if (!active) return;
+
+        if (hasActiveFreePlan(res?.user)) {
+          Alert.alert(
+            'Disponible con plan pago',
+            'La edición del perfil del barbero se desbloquea al extender tu plan.',
+            [{ text: 'Continuar', onPress: () => openUpgradeScreen(res?.user?.email) }],
+          );
+          return;
+        }
+
         const settings = res?.user?.barberProfileSettings ?? {};
         setForm({
           barberSelfEditEnabled: settings.barberSelfEditEnabled !== false,

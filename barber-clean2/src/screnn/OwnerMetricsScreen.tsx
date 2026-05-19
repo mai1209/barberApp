@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Platform,
   Pressable,
   RefreshControl,
@@ -17,8 +18,10 @@ import {
   MonthOverviewBarber,
   fetchOwnerMetricsOverview,
 } from '../services/api';
+import { getUserProfile } from '../services/authStorage';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
+import { hasProPlanAccess } from '../services/planAccess';
 import {
   LayoutDashboard,
   ArrowLeft,
@@ -83,6 +86,18 @@ function OwnerMetricsScreen({ navigation }: Props) {
   const [error, setError] = useState('');
   const [data, setData] = useState<CurrentMonthOverviewResponse | null>(null);
 
+  const openUpgradeScreen = (email?: string) => {
+    if (Platform.OS === 'ios') {
+      navigation.replace('Subscription-Settings');
+      return;
+    }
+
+    navigation.replace('Plans', {
+      fromRegistration: false,
+      email,
+    });
+  };
+
   const loadData = useCallback(
     async (isRefresh = false) => {
       try {
@@ -106,7 +121,27 @@ function OwnerMetricsScreen({ navigation }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      loadData(false);
+      let cancelled = false;
+
+      (async () => {
+        const storedUser = await getUserProfile();
+        if (cancelled) return;
+
+        if (!hasProPlanAccess(storedUser)) {
+          Alert.alert(
+            'Disponible con plan Pro',
+            'Las métricas globales del local se desbloquean con el plan Pro.',
+            [{ text: 'Continuar', onPress: () => openUpgradeScreen(storedUser?.email) }],
+          );
+          return;
+        }
+
+        loadData(false);
+      })();
+
+      return () => {
+        cancelled = true;
+      };
     }, [loadData]),
   );
 

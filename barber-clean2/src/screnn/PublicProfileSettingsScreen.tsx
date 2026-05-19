@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,8 +15,14 @@ import {
   PublicProfileSettings,
   updatePublicProfileSettings,
 } from '../services/api';
+import { getUserProfile } from '../services/authStorage';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
+import { hasActiveFreePlan } from '../services/planAccess';
+
+type Props = {
+  navigation: any;
+};
 
 type FormState = Required<
   Omit<PublicProfileSettings, 'googleRating' | 'googleReviewCount'>
@@ -115,20 +122,53 @@ function toPayload(form: FormState): PublicProfileSettings {
   };
 }
 
-export default function PublicProfileSettingsScreen() {
+export default function PublicProfileSettingsScreen({ navigation }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
+  const openUpgradeScreen = (email?: string) => {
+    if (Platform.OS === 'ios') {
+      navigation.replace('Subscription-Settings');
+      return;
+    }
+
+    navigation.replace('Plans', {
+      fromRegistration: false,
+      email,
+    });
+  };
+
   useEffect(() => {
     let active = true;
 
     (async () => {
       try {
+        const storedUser = await getUserProfile();
+        if (hasActiveFreePlan(storedUser)) {
+          if (!active) return;
+          Alert.alert(
+            'Disponible con plan pago',
+            'El perfil público del local se desbloquea al extender tu plan.',
+            [{ text: 'Continuar', onPress: () => openUpgradeScreen(storedUser?.email) }],
+          );
+          return;
+        }
+
         const res = await getCurrentUser();
         if (!active) return;
+
+        if (hasActiveFreePlan(res?.user)) {
+          Alert.alert(
+            'Disponible con plan pago',
+            'El perfil público del local se desbloquea al extender tu plan.',
+            [{ text: 'Continuar', onPress: () => openUpgradeScreen(res?.user?.email) }],
+          );
+          return;
+        }
+
         setForm(toFormState(res?.user?.publicProfile));
       } catch (err: any) {
         if (active) {

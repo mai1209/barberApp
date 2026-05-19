@@ -456,7 +456,9 @@ export default function BarberAccessScreen({ navigation, route }: Props) {
             ]}
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.backButtonText}>Volver</Text>
+            <Text style={styles.backButtonText}>
+              {route.params?.returnLabel || 'Volver'}
+            </Text>
           </Pressable>
         </View>
       </ScrollView>

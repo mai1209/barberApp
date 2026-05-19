@@ -23,6 +23,7 @@ import {
   resolveShopClosureForDate,
   serializeShopClosure,
 } from "../utils/shopClosures.js";
+import { normalizeEffectiveSubscription } from "../utils/subscriptionState.js";
 
 function normalizeShift(value) {
   if (value == null) return undefined;
@@ -138,6 +139,25 @@ export async function createBarber(req, res, next) {
       return res
         .status(400)
         .json({ error: "El nombre del barbero es obligatorio" });
+    }
+
+    const ownerUser = await UserModel.findById(ownerId).select({ subscription: 1 }).lean();
+    const ownerSubscription = normalizeEffectiveSubscription(ownerUser?.subscription);
+    const ownerPlan = String(ownerSubscription?.plan || "").trim();
+    const ownerStatus = String(ownerSubscription?.status || "").trim();
+
+    if (ownerPlan === "free" && ownerStatus === "active") {
+      const activeBarberCount = await BarberModel.countDocuments({
+        owner: ownerId,
+        isActive: true,
+      });
+
+      if (activeBarberCount >= 1) {
+        return res.status(403).json({
+          error: "El plan Free permite cargar solo 1 barbero. Extendé tu plan para sumar más.",
+          code: "PLAN_LIMIT_REACHED",
+        });
+      }
     }
 
     // 3. PASAMOS workDays AL MODELO

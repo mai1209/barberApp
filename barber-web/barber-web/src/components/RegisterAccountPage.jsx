@@ -38,6 +38,7 @@ function EyeIcon({ visible }) {
 function buildPlansUrl(email, branding) {
   const trimmedEmail = String(email || '').trim().toLowerCase();
   const target = new URL(branding?.plansPath || '/planes', window.location.origin);
+  target.searchParams.set('registered', '1');
   if (trimmedEmail) {
     target.searchParams.set('email', trimmedEmail);
   }

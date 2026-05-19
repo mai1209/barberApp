@@ -18,6 +18,7 @@ import { registerUser } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
 import { saveToken, saveUserProfile } from '../services/authStorage';
+import { resolvePostAuthRoute } from '../services/subscriptionAccess';
 import OjoAbierto from '../assets/ojo_abierto.png';
 import OjoCerrado from '../assets/ojo_cerrado.png';
 
@@ -69,7 +70,15 @@ function Register({ navigation }: any) {
         await saveUserProfile(response.user);
         applyUserTheme(response.user);
       }
-      navigation.replace('Subscription-Settings');
+      if (__DEV__) {
+        console.log('REGISTER RESPONSE USER', response?.user);
+        console.log('REGISTER SUBSCRIPTION', response?.user?.subscription);
+        console.log('POST AUTH ROUTE', resolvePostAuthRoute(response?.user));
+      }
+      navigation.reset({
+        index: 0,
+        routes: [{ name: resolvePostAuthRoute(response?.user) }],
+      });
     } catch (err: any) {
       setError(err.message || 'Error al registrarse');
     } finally {

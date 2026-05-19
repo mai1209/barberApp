@@ -21,7 +21,10 @@ function formatCurrencyArs(value) {
 }
 
 function getPlanLabel(plan) {
-  return plan === "pro" ? "Pro" : plan === "basic" ? "Básico" : "Personalizado";
+  if (plan === "free") return "Free";
+  if (plan === "pro") return "Pro";
+  if (plan === "basic") return "Básico";
+  return "Personalizado";
 }
 
 function normalizeStatus(value) {

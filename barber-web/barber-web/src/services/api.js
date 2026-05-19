@@ -153,7 +153,10 @@ export async function registerPublicAccount(payload) {
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      ...payload,
+      registrationSource: 'web',
+    }),
   });
 
   const data = await response.json().catch(() => null);

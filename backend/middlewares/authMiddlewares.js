@@ -1,6 +1,7 @@
 import { verifyAccessToken } from "../token/jwtManager.js";
 import { UserModel } from "../models/User.js";
 import { normalizeAppRole, resolveEffectiveOwnerId } from "../utils/userRoles.js";
+import { normalizeEffectiveSubscription } from "../utils/subscriptionState.js";
 
 export async function requireAuth(req, res, next) {
   try {
@@ -21,10 +22,7 @@ export async function requireAuth(req, res, next) {
       return res.status(401).json({ error: "Usuario no autorizado" });
     }
 
-    let subscription = {
-      plan: user.subscription?.plan || "basic",
-      status: user.subscription?.status || "trial",
-    };
+    let subscription = normalizeEffectiveSubscription(user.subscription);
 
     if (normalizeAppRole(user.role) === "barber" && user.shopOwnerId) {
       const ownerUser = await UserModel.findById(user.shopOwnerId)
@@ -32,10 +30,7 @@ export async function requireAuth(req, res, next) {
         .lean();
 
       if (ownerUser && ownerUser.isActive !== false) {
-        subscription = {
-          plan: ownerUser.subscription?.plan || subscription.plan,
-          status: ownerUser.subscription?.status || subscription.status,
-        };
+        subscription = normalizeEffectiveSubscription(ownerUser.subscription);
       }
     }
 

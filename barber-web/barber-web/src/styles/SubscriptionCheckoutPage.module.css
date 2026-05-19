@@ -462,6 +462,46 @@
   font-weight: 500;
 }
 
+.registeredIntroCard {
+  display: grid;
+  gap: 10px;
+  padding: 18px 18px 20px;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(33, 192, 99, 0.09), rgba(15, 23, 42, 0.02)),
+    rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(33, 192, 99, 0.16);
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.08);
+}
+
+.registeredIntroBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(33, 192, 99, 0.12);
+  color: #0f7a3b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.registeredIntroTitle {
+  color: #0f172a;
+  font-size: 1.04rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.registeredIntroText {
+  color: #475569;
+  font-size: 0.94rem;
+  line-height: 1.65;
+}
+
 .modeToggleGroup {
   display: flex;
   flex-direction: column;

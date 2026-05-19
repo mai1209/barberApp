@@ -38,7 +38,7 @@ const PRIVACY_POLICY_URL = 'https://barberappbycodex.com/politica-de-privacidad'
 const TERMS_OF_USE_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 
 type SubscriptionState = {
-  plan?: 'basic' | 'pro' | 'custom';
+  plan?: 'free' | 'basic' | 'pro' | 'custom';
   status?: 'trial' | 'active' | 'past_due' | 'cancelled';
   billingCycle?: 'monthly' | 'yearly' | 'custom' | null;
   renewalMode?: 'manual' | 'automatic';
@@ -77,6 +77,17 @@ const PLAN_COPY: Record<
     includes: string[];
   }
 > = {
+  free: {
+    label: 'Free',
+    summary: 'Acceso limitado para probar la app y operar con un equipo chico.',
+    price: 'Sin cargo',
+    includes: [
+      'Agenda operativa con acceso limitado',
+      '1 barbero activo',
+      'Carga de servicios y turnos',
+      'Upgrade a Básico o Pro cuando quieras',
+    ],
+  },
   basic: {
     label: 'Básico',
     summary: 'Todo lo necesario para vender turnos online y ordenar la agenda.',
@@ -148,6 +159,7 @@ function getStatusCopy(status?: SubscriptionState['status']) {
 }
 
 function getPlanAccent(plan: SubscriptionState['plan'], theme: Theme) {
+  if (plan === 'free') return '#5A8CFF';
   if (plan === 'pro') return '#21C063';
   if (plan === 'custom') return '#F5C451';
   return theme.primary;
@@ -178,6 +190,7 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
   const isIOS = Platform.OS === 'ios';
   const usesStoreBilling = isStoreBillingPlatform();
   const [subscription, setSubscription] = useState<SubscriptionState | null>(null);
+  const [registrationSource, setRegistrationSource] = useState<'mobile' | 'web'>('mobile');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingRenewalMode, setUpdatingRenewalMode] = useState(false);
@@ -208,6 +221,7 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
         const response = await syncStoreSubscription(payload);
         await saveUserProfile(response.user);
         setSubscription(response.user?.subscription ?? null);
+        setRegistrationSource(response.user?.registrationSource === 'web' ? 'web' : 'mobile');
         await finishTransaction({ purchase, isConsumable: false });
         const nextRoute = resolvePostAuthRoute(response.user);
         Alert.alert('Plan activado', 'La suscripción del negocio quedó activa en esta cuenta.', [
@@ -264,6 +278,7 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
       const response = await syncStoreSubscription(payload);
       await saveUserProfile(response.user);
       setSubscription(response.user?.subscription ?? null);
+      setRegistrationSource(response.user?.registrationSource === 'web' ? 'web' : 'mobile');
       if (
         options?.redirectOnSuccess &&
         response.user &&
@@ -293,6 +308,7 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
     try {
       const [res, pricingResponse] = await Promise.all([getCurrentUser(), getPlanPricing()]);
       setSubscription(res.user?.subscription ?? null);
+      setRegistrationSource(res.user?.registrationSource === 'web' ? 'web' : 'mobile');
       await saveUserProfile(res.user);
       setPriceOverrides({
         basic: {
@@ -361,7 +377,7 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
     });
   }, [billingConnected, storeSubscriptions, usesStoreBilling]);
 
-  const planKey = subscription?.plan ?? 'basic';
+  const planKey = subscription?.plan ?? 'free';
   const planInfo = PLAN_COPY[planKey];
   const planAccent = getPlanAccent(planKey, theme);
   const basePriceArs =
@@ -440,7 +456,11 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
   const proStoreProduct = storeSubscriptions.find(product => product.id === STORE_SUBSCRIPTION_PRODUCTS.pro);
   const currentGooglePurchaseToken =
     subscription?.storePurchaseToken || null;
+  const isPaidPlan =
+    planKey === 'basic' || planKey === 'pro' || planKey === 'custom';
+  const isWebRegisteredAccount = registrationSource === 'web';
   const isWebManagedAccount =
+    isPaidPlan &&
     !currentStoreProductId &&
     (subscription?.provider === 'mercadopago' ||
       Boolean(subscription?.mercadoPagoPreapprovalId) ||
@@ -450,8 +470,21 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
     isWebManagedAccount &&
     subscription?.status === 'active' &&
     hasFutureAccessWindow(subscription?.expiresAt);
+  const shouldHideStoreActions = isWebRegisteredAccount || isWebManagedAccount;
 
   const getRenewalHint = () => {
+    if (isWebRegisteredAccount) {
+      if (planKey === 'free') {
+        return 'Para desbloquear todas las funciones, activá una suscripción en tu cuenta.';
+      }
+
+      if (subscription?.status === 'past_due' || subscription?.status === 'cancelled') {
+        return 'Tu plan venció. Cuando la suscripción vuelva a estar activa, el acceso completo se restablece automáticamente.';
+      }
+
+      return 'Esta pantalla muestra el estado actual de tu plan y su vencimiento.';
+    }
+
     if (usesStoreBilling) {
       if (subscription?.status === 'past_due') {
         return 'La suscripción del negocio quedó con pago pendiente. Revisala desde el store o restaurá la compra.';
@@ -676,8 +709,9 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
           <Text style={styles.eyebrow}>PLAN Y SUSCRIPCIÓN</Text>
           <Text style={styles.title}>Suscripción del negocio</Text>
           <Text style={styles.subtitle}>
-            Comprá o restaurá el plan del negocio desde Apple y seguí usando la app con acceso
-            completo.
+            {shouldHideStoreActions
+              ? 'Revisá el estado actual del plan y el acceso disponible de esta cuenta.'
+              : 'Comprá o restaurá el plan del negocio desde Apple y seguí usando la app con acceso completo.'}
           </Text>
         </View>
 
@@ -691,10 +725,19 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
             {isRestrictedAccount ? (
               <View style={styles.lockedCard}>
                 <Text style={styles.lockedEyebrow}>ACCESO LIMITADO</Text>
-                <Text style={styles.lockedTitle}>Esta cuenta tiene acceso limitado</Text>
+                <Text style={styles.lockedTitle}>
+                  {shouldHideStoreActions && planKey !== 'free'
+                    ? 'Tu plan venció'
+                    : shouldHideStoreActions && planKey === 'free'
+                      ? 'Desbloqueá todas las funciones'
+                      : 'Esta cuenta tiene acceso limitado'}
+                </Text>
                 <Text style={styles.lockedText}>
-                  Comprá o restaurá la suscripción del negocio para volver a habilitar el acceso
-                  operativo completo.
+                  {shouldHideStoreActions && planKey === 'free'
+                    ? 'Esta cuenta está usando el plan Free limitado. Para habilitar todas las funciones, pagá la suscripción.'
+                    : shouldHideStoreActions
+                      ? 'El acceso completo quedó suspendido hasta que la suscripción vuelva a estar activa.'
+                      : 'Comprá o restaurá la suscripción del negocio para volver a habilitar el acceso operativo completo.'}
                 </Text>
               </View>
             ) : null}
@@ -713,8 +756,12 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
               </View>
 
               <Text style={styles.planSummary}>
-                {isWebManagedAccount
-                  ? 'Esta cuenta se administra por fuera de App Store. Acá solo mostramos el estado comercial actual.'
+                {planKey === 'free'
+                  ? shouldHideStoreActions
+                    ? 'Esta cuenta está usando el acceso Free limitado. Para desbloquear todas las funciones, pagá la suscripción.'
+                    : 'Esta cuenta está usando el acceso Free limitado. Desde esta pantalla podés activar un plan pago cuando quieras.'
+                  : isWebManagedAccount
+                  ? 'Esta pantalla muestra el estado actual de la cuenta y su disponibilidad.'
                   : 'El plan del negocio se administra con tu suscripción de la App Store.'}
               </Text>
 
@@ -761,12 +808,13 @@ export default function SubscriptionSettingsScreen({ navigation }: { navigation:
                 <Text style={styles.renewalHintText}>{getRenewalHint()}</Text>
               </View>
 
-              {isWebManagedAccount ? (
+              {shouldHideStoreActions ? (
                 <View style={styles.iosNoticeCard}>
                   <Text style={styles.iosNoticeTitle}>Estado del plan</Text>
                   <Text style={styles.iosNoticeText}>
-                    Esta pantalla muestra el estado actual de la cuenta. Si el plan venció o no
-                    está activo, el acceso queda suspendido.
+                    {planKey === 'free'
+                      ? 'Para desbloquear todas las funciones, pagá la suscripción.'
+                      : 'Esta pantalla muestra el estado actual de la cuenta. Si el plan venció o no está activo, el acceso queda suspendido.'}
                   </Text>
                 </View>
               ) : (

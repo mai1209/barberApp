@@ -46,9 +46,12 @@ import {
   BarChart2,
   Plus,
   Clock,
+  Clock3,
   Scissors,
   User,
   MessageCircle,
+  CalendarDays,
+  Ban,
 } from 'lucide-react-native';
 
 const PRO_PLAN_URL = 'https://barberappbycodex.com/planes?plan=pro';
@@ -375,6 +378,41 @@ function BarberDashboard({ route, navigation }: Props) {
     });
   };
 
+  const handleOpenProfileSection = (
+    advancedSection: 'buffer' | 'closedDays' | 'timeBlocks',
+  ) => {
+    if (!canSelfEditProfile) {
+      Alert.alert(
+        'Perfil bloqueado',
+        'El administrador desactivó la edición del perfil del barbero.',
+      );
+      return;
+    }
+
+    if (barberProfile) {
+      navigation.navigate('Register-Employed', {
+        barber: barberProfile,
+        selfEdit: isBarberUser,
+        advancedSection,
+      });
+      return;
+    }
+
+    if (!activeBarberId) {
+      return;
+    }
+
+    navigation.navigate('Register-Employed', {
+      barber: {
+        _id: activeBarberId,
+        fullName: resolvedBarberName,
+        workDays: [],
+      },
+      selfEdit: isBarberUser,
+      advancedSection,
+    });
+  };
+
   const datePanResponder = useMemo(
     () =>
       PanResponder.create({
@@ -675,7 +713,10 @@ function BarberDashboard({ route, navigation }: Props) {
               onPress={() => handleWaitingReminder(appointment)}
             >
               <View style={styles.btnWhatsappRow}>
-                <Image style={styles.btnWhatsappImage} source={require('../assets/wp.png')} />
+                <Image
+                  style={styles.btnWhatsappImage}
+                  source={require('../assets/wp.png')}
+                />
 
                 <Text style={styles.btnWhatsappHint}>Recordatorio</Text>
               </View>
@@ -743,22 +784,63 @@ function BarberDashboard({ route, navigation }: Props) {
               <Plus size={20} color={theme.textOnPrimary} strokeWidth={2} />
               <Text style={styles.mainActionBtnText}>NUEVO TURNO</Text>
             </Pressable>
-
+            {canSelfEditProfile ? (
+              <Pressable
+                onPress={handleEditProfile}
+                style={({ pressed }) => [
+                  styles.secondaryActionBtn,
+                  pressed && {
+                    backgroundColor: hexToRgba(theme.primary, 0.2),
+                  },
+                ]}
+              >
+                <Pencil size={14} color={theme.primary} />
+                <Text style={styles.secondaryActionText}>Editar Perfil</Text>
+              </Pressable>
+            ) : null}
             <View style={styles.secondaryActionsRow}>
-              {canSelfEditProfile ? (
-                <Pressable
-                  onPress={handleEditProfile}
-                  style={({ pressed }) => [
-                    styles.secondaryActionBtn,
-                    pressed && {
-                      backgroundColor: hexToRgba(theme.primary, 0.2),
-                    },
-                  ]}
-                >
-                  <Pencil size={14} color={theme.primary} />
-                  <Text style={styles.secondaryActionText}>Editar Perfil</Text>
-                </Pressable>
-              ) : null}
+              <Pressable
+                onPress={() => handleOpenProfileSection('buffer')}
+                style={({ pressed }) => [
+                  styles.secondaryActionBtn,
+                  pressed && {
+                    backgroundColor: hexToRgba(theme.primary, 0.2),
+                  },
+                ]}
+              >
+                <Clock3 size={14} color={theme.primary} />
+                <Text style={styles.secondaryActionText}>
+                  Tiempo extra
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => handleOpenProfileSection('closedDays')}
+                style={({ pressed }) => [
+                  styles.secondaryActionBtn,
+                  pressed && {
+                    backgroundColor: hexToRgba(theme.primary, 0.2),
+                  },
+                ]}
+              >
+                <CalendarDays size={14} color={theme.primary} />
+                <Text style={styles.secondaryActionText}>Días cerrados</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => handleOpenProfileSection('timeBlocks')}
+                style={({ pressed }) => [
+                  styles.secondaryActionBtn,
+                  pressed && {
+                    backgroundColor: hexToRgba(theme.primary, 0.2),
+                  },
+                ]}
+              >
+                <Ban size={14} color={theme.primary} />
+                <Text style={styles.secondaryActionText}>
+                  Tomar receso
+                </Text>
+              </Pressable>
 
               {Platform.OS !== 'ios' || hasProAccess ? (
                 <Pressable
@@ -939,7 +1021,7 @@ const makeStyles = (theme: Theme) =>
       borderColor: hexToRgba(theme.primary, 0.2),
       paddingVertical: 12,
       borderRadius: 16,
-      gap: 8,
+      gap: 2,
     },
     secondaryActionBtnLocked: {
       borderColor: hexToRgba(theme.primary, 0.28),
@@ -948,7 +1030,7 @@ const makeStyles = (theme: Theme) =>
     secondaryActionText: {
       color: theme.primary,
       fontWeight: '700',
-      fontSize: 13,
+      fontSize: 12,
     },
     section: { paddingHorizontal: 20 },
     agendaTopRow: {
@@ -1181,8 +1263,7 @@ const makeStyles = (theme: Theme) =>
       fontWeight: '600',
     },
     errorText: { color: '#ff7b7b', textAlign: 'center', marginBottom: 10 },
-        btnWhatsappImage: { width: 20, height: 20 },
-
+    btnWhatsappImage: { width: 20, height: 20 },
   });
 
 export default BarberDashboard;

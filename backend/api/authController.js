@@ -38,6 +38,7 @@ import {
   resolveEffectiveOwnerId,
   serializeAuthUser,
 } from "../utils/userRoles.js";
+import { normalizeEffectiveSubscription } from "../utils/subscriptionState.js";
 
 const PASSWORD_RESET_EXPIRY_MS = 15 * 60 * 1000;
 const SUBSCRIPTION_CURRENCY_ID = String(
@@ -72,6 +73,12 @@ const DEFAULT_STORE_SUBSCRIPTION_PRODUCTS = {
 
 function sanitizeEmail(email) {
   return String(email ?? "").trim().toLowerCase();
+}
+
+function normalizeRegistrationSource(rawSource) {
+  return String(rawSource || "").trim().toLowerCase() === "web"
+    ? "web"
+    : "mobile";
 }
 
 function getStoreSubscriptionProducts() {
@@ -571,7 +578,7 @@ function sanitizeSubscriptionInput(input) {
 
   if (Object.prototype.hasOwnProperty.call(input, "plan")) {
     const plan = String(input.plan ?? "").trim();
-    if (!["basic", "pro", "custom"].includes(plan)) {
+    if (!["free", "basic", "pro", "custom"].includes(plan)) {
       throw new Error("El plan no es válido.");
     }
     updates.plan = plan;
@@ -1108,6 +1115,7 @@ async function buildAvailableSlug(baseValue) {
 
 async function buildAuthUserResponse(userDoc) {
   const userResponse = serializeAuthUser(userDoc);
+  userResponse.subscription = normalizeEffectiveSubscription(userResponse.subscription);
 
   if (userResponse.role !== "barber" || !userDoc?.shopOwnerId) {
     return userResponse;
@@ -1125,7 +1133,7 @@ async function buildAuthUserResponse(userDoc) {
   }
 
   if (ownerDoc?.subscription) {
-    userResponse.subscription = ownerDoc.subscription;
+    userResponse.subscription = normalizeEffectiveSubscription(ownerDoc.subscription);
   }
 
   if (ownerDoc?.themeConfig) {
@@ -1148,6 +1156,9 @@ export async function registerUser(req, res, next) {
     const fullName = String(req.body?.fullName ?? "").trim();
     const email = sanitizeEmail(req.body?.email);
     const password = String(req.body?.password ?? "");
+    const registrationSource = normalizeRegistrationSource(
+      req.body?.registrationSource,
+    );
     const requestedSlugRaw = String(req.body?.shopSlug ?? "").trim();
     const requestedSlug = requestedSlugRaw ? normalizeSlugCandidate(requestedSlugRaw) : "";
 
@@ -1184,10 +1195,12 @@ export async function registerUser(req, res, next) {
       shopSlug,
       email,
       passwordHash,
+      registrationSource,
       subscription: {
-        plan: "basic",
-        status: "trial",
-        billingCycle: "monthly",
+        plan: "free",
+        status: "active",
+        billingCycle: null,
+        renewalMode: "manual",
         startedAt: new Date(),
       },
       // no aceptar role desde el cliente
@@ -2350,9 +2363,9 @@ export async function listSubscriptionUsers(req, res, next) {
         isActive: Boolean(user.isActive),
         createdAt: user.createdAt,
         subscription: user.subscription ?? {
-          plan: "basic",
-          status: "trial",
-          billingCycle: "monthly",
+          plan: "free",
+          status: "active",
+          billingCycle: null,
           startedAt: null,
           expiresAt: null,
         },

@@ -46,6 +46,11 @@ function getInitialPaymentMode() {
     : "manual";
 }
 
+function getInitialRegisteredFlag() {
+  const url = new URL(window.location.href);
+  return String(url.searchParams.get("registered") || "").trim() === "1";
+}
+
 function ArrowIcon() {
   return (
     <svg
@@ -108,40 +113,13 @@ function PlayIcon() {
   );
 }
 
-function MercadoPagoIcon() {
-  return (
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <ellipse cx="12" cy="12" rx="11" ry="8.5" fill="#009EE3" />
-      <path
-        d="M7.5 12c1.1-1.35 2.25-2.02 3.45-2.02.93 0 1.8.37 2.63 1.12l.42.38.37-.33c.89-.78 1.79-1.17 2.71-1.17 1.16 0 2.3.67 3.42 2.02"
-        stroke="#fff7d6"
-        strokeWidth="1.15"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M6.9 12.55h2.5l1.2 1.15c.22.21.58.2.79-.02l1.18-1.22c.21-.21.55-.23.78-.03l1.05.93c.22.2.56.19.77-.02l1.2-1.12h2.74"
-        stroke="#ffffff"
-        strokeWidth="1.15"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 export default function SubscriptionCheckoutPage({
   branding = DEFAULT_DOMAIN_BRANDING,
 }) {
   const [selectedPlan, setSelectedPlan] = useState(getInitialPlan);
   const [paymentMode, setPaymentMode] = useState(getInitialPaymentMode);
   const [email, setEmail] = useState(getInitialEmail);
+  const [showRegisteredIntro] = useState(getInitialRegisteredFlag);
   const [couponCode, setCouponCode] = useState("");
   const [pricing, setPricing] = useState({
     basic: { ars: 25000, usdReference: 25 },
@@ -379,6 +357,22 @@ export default function SubscriptionCheckoutPage({
                 Seleccionaste: {PLAN_META[selectedPlan].title}
               </span>
             </div>
+
+            {showRegisteredIntro ? (
+              <div className={styles.registeredIntroCard}>
+                <span className={styles.registeredIntroBadge}>
+                  Registro exitoso
+                </span>
+                <p className={styles.registeredIntroTitle}>
+                  Tu cuenta ya quedó creada.
+                </p>
+                <p className={styles.registeredIntroText}>
+                  Ya podés descargar la app y probar Barber App gratis con el
+                  plan limitado. Si querés acceder a todas las funciones desde
+                  ahora, elegí un plan y completá el pago en esta pantalla.
+                </p>
+              </div>
+            ) : null}
 
             <div className={styles.processorCard}>
               <div className={styles.processorIcon}>

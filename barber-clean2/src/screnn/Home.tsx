@@ -32,7 +32,7 @@ import {
   getUserProfile,
   subscribeToUserProfile,
 } from '../services/authStorage';
-import { hasProPlanAccess } from '../services/planAccess';
+import { hasActiveFreePlan, hasProPlanAccess } from '../services/planAccess';
 import ProFeatureModal from '../components/ProFeatureModal';
 import {
   getCurrentUser,
@@ -61,7 +61,6 @@ type Props = {
 };
 
 const PUBLIC_BOOKING_BASE = 'https://barberappbycodex.com';
-const PRO_PLAN_URL = 'https://barberappbycodex.com/planes?plan=pro';
 const WELCOME_MODAL_KEY_PREFIX = 'HOME_WELCOME_MODAL_DISMISSED';
 const SHOP_TZ = 'America/Argentina/Cordoba';
 
@@ -166,6 +165,7 @@ function Home({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [currentUser, setCurrentUser] = useState<any | null>(null);
   const [hasProAccess, setHasProAccess] = useState(false);
   const [setupSummary, setSetupSummary] = useState({
     loading: true,
@@ -195,6 +195,9 @@ function Home({ navigation }: Props) {
   }, [shopSlug]);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const isFreePlan = hasActiveFreePlan(currentUser);
+  const hasReachedFreeBarberLimit =
+    isFreePlan && setupSummary.barberCount >= 1;
 
   const isToday = useMemo(
     () => isSameDay(selectedDate, new Date()),
@@ -220,6 +223,18 @@ function Home({ navigation }: Props) {
     Alert.alert('¡Copiado!', 'El link de turnos se copió al portapapeles.');
   }, [shareLink]);
 
+  const openUpgradeScreen = useCallback(() => {
+    if (Platform.OS === 'ios') {
+      navigation.navigate('Subscription-Settings');
+      return;
+    }
+
+    navigation.navigate('Plans', {
+      fromRegistration: false,
+      email: currentUser?.email,
+    });
+  }, [currentUser?.email, navigation]);
+
   const onboardingItems = useMemo(
     () => [
       {
@@ -240,15 +255,20 @@ function Home({ navigation }: Props) {
         key: 'barbers',
         title: 'Sumá tus barberos',
         description:
-          setupSummary.barberCount > 0
+          hasReachedFreeBarberLimit
+            ? 'Ya usás el único barbero incluido en Free. Extendé tu plan para sumar más perfiles.'
+            : setupSummary.barberCount > 0
             ? `${setupSummary.barberCount} barbero${
                 setupSummary.barberCount === 1 ? '' : 's'
               } cargado${setupSummary.barberCount === 1 ? '' : 's'}.`
             : 'Creá al menos un perfil con horarios para empezar a tomar turnos.',
         complete: setupSummary.barberCount > 0,
-        actionLabel: 'Barberos',
+        actionLabel: hasReachedFreeBarberLimit ? 'Extender plan' : 'Barberos',
         icon: Users,
-        onPress: () => navigation.navigate('List-Barber'),
+        onPress: () =>
+          hasReachedFreeBarberLimit
+            ? openUpgradeScreen()
+            : navigation.navigate('List-Barber'),
       },
       {
         key: 'payments',
@@ -273,6 +293,7 @@ function Home({ navigation }: Props) {
     ],
     [
       navigation,
+      hasReachedFreeBarberLimit,
       setupSummary.serviceCount,
       setupSummary.barberCount,
       setupSummary.paymentLabel,
@@ -391,6 +412,7 @@ function Home({ navigation }: Props) {
         paymentSettings?: any;
       }>();
       if (isMounted && storedUser) {
+        setCurrentUser(storedUser);
         if (storedUser?.fullName) setFullName(storedUser.fullName);
         setHasProAccess(hasProPlanAccess(storedUser));
         const paymentSettings = storedUser?.paymentSettings ?? {};
@@ -441,6 +463,7 @@ function Home({ navigation }: Props) {
 
   useEffect(() => {
     return subscribeToUserProfile(user => {
+      setCurrentUser(user);
       setHasProAccess(hasProPlanAccess(user));
       setFullName(user?.fullName || '');
       const paymentSettings = user?.paymentSettings ?? {};
@@ -471,16 +494,8 @@ function Home({ navigation }: Props) {
 
   const handleOpenSubscriptionSettings = useCallback(async () => {
     setProModalVariant(null);
-    if (Platform.OS === 'ios') {
-      navigation.navigate('Subscription-Settings');
-      return;
-    }
-    try {
-      await Linking.openURL(PRO_PLAN_URL);
-    } catch (_error) {
-      Alert.alert('No pudimos abrir el sitio de planes', PRO_PLAN_URL);
-    }
-  }, [navigation]);
+    openUpgradeScreen();
+  }, [openUpgradeScreen]);
 
   useFocusEffect(
     useCallback(() => {
